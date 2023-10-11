@@ -1,9 +1,8 @@
 import discord
-from discord.ext import commands
 import logging
-import os
 from dotenv import load_dotenv
-
+import os
+from discord.ext import commands
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,18 +11,15 @@ logging.basicConfig(level=logging.INFO)
 
 # Define the intents you need for your bot
 intents = discord.Intents.default()
-intents.typing = False 
-intents.message_content = True  
+intents.typing = False
 
 # Initialize Poof Poof
-bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=intents)
-
+bot = commands.Bot(command_prefix="/", intents=intents)
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} is connected !!')
     bot.heartbeat_interval = 360
-    await bot.sync_commands()
 
 @bot.event
 async def on_message(message):
@@ -59,4 +55,3 @@ if __name__ == "__main__":
         print("---> Bot stopped by user.")
     finally:
         loop.close()
-
