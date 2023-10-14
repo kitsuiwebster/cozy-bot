@@ -13,8 +13,25 @@ intents = discord.Intents.default()
 intents.typing = False
 # intents.message_content = True
 
-# Initialize Poof Poof
+# Initialize Cozy Bot
 bot = commands.Bot(command_prefix="/", intents=intents)
+
+
+async def change_status():
+    await bot.wait_until_ready()
+
+    while not bot.is_closed():
+        server_count = len(bot.guilds)
+        total_member_count = sum(guild.member_count for guild in bot.guilds)
+        statuses = [
+            discord.Game(name=f"I am in {server_count} servers"),
+            discord.Game(name=f"I have {total_member_count} members"),
+        ]
+
+        for status in statuses:
+            await bot.change_presence(activity=status)
+            await asyncio.sleep(10)
+
 
 @bot.event
 async def on_ready():
@@ -43,6 +60,8 @@ async def run_bot():
 
     bot_token = os.getenv("DISCORD_BOT_TOKEN")
     await bot.start(bot_token)
+
+    asyncio.ensure_future(change_status())
 
 
 if __name__ == "__main__":
