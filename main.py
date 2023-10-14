@@ -11,11 +11,13 @@ logging.basicConfig(level=logging.INFO)
 # Define the intents you need for your bot
 intents = discord.Intents.default()
 intents.typing = False
-# intents.message_content = True
+intents.members = True
+intents.message_content = True
+intents.guilds = True
 
 # Initialize Cozy Bot
 bot = commands.Bot(command_prefix="/", intents=intents)
-
+# print(bot.guilds)
 
 async def change_status():
     await bot.wait_until_ready()
@@ -24,32 +26,38 @@ async def change_status():
         server_count = len(bot.guilds)
         total_member_count = sum(guild.member_count for guild in bot.guilds)
         statuses = [
-            discord.Game(name=f"I am in {server_count} servers"),
-            discord.Game(name=f"I have {total_member_count} members"),
+            discord.Game(name=f"in {server_count} servers"),
+            discord.Game(name=f"with {total_member_count} members"),
         ]
 
         for status in statuses:
             await bot.change_presence(activity=status)
             await asyncio.sleep(10)
 
+@bot.event
+async def on_error(event, *args, **kwargs):
+    print(f"An error occurred: {event}")
+
+
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} is connected !!')
     bot.heartbeat_interval = 360
+    bot.loop.create_task(change_status())
+
+    server_count = len(bot.guilds)
+    total_member_count = sum(guild.member_count for guild in bot.guilds)
+    print(f'Total members: {total_member_count}, total serveurs {server_count}')
+    # print("Cozy Bot's servers")
+    # for guild in bot.guilds:
+    #     print(f"{guild.name}")
 
 @bot.event
 async def on_message(message):
-    # Avoid responding to the bot's own messages
     if message.author == bot.user:
         return
     await bot.process_commands(message)
-
-async def change_status():
-    await bot.wait_until_ready()
-
-    while not bot.is_closed():
-        discord.Game("🌧️"),
 
 async def run_bot():
     try:
@@ -61,7 +69,6 @@ async def run_bot():
     bot_token = os.getenv("DISCORD_BOT_TOKEN")
     await bot.start(bot_token)
 
-    asyncio.ensure_future(change_status())
 
 
 if __name__ == "__main__":
@@ -74,5 +81,3 @@ if __name__ == "__main__":
         print("---> Bot stopped by user.")
     finally:
         loop.close()
-
-#test
