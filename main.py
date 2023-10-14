@@ -6,12 +6,12 @@ from discord.ext import commands
 
 # Load environment variables from .env file
 load_dotenv()
-
 logging.basicConfig(level=logging.INFO)
 
 # Define the intents you need for your bot
 intents = discord.Intents.default()
 intents.typing = False
+# intents.message_content = True
 
 # Initialize Poof Poof
 bot = commands.Bot(command_prefix="/", intents=intents)
