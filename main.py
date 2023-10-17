@@ -19,20 +19,20 @@ intents.guilds = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 # print(bot.guilds)
 
-async def change_status():
-    await bot.wait_until_ready()
+# async def change_status():
+#     await bot.wait_until_ready()
 
-    while not bot.is_closed():
-        server_count = len(bot.guilds)
-        total_member_count = sum(guild.member_count for guild in bot.guilds)
-        statuses = [
-            discord.Game(name=f"in {server_count} servers"),
-            discord.Game(name=f"with {total_member_count} members"),
-        ]
+#     while not bot.is_closed():
+#         server_count = len(bot.guilds)
+#         total_member_count = sum(guild.member_count for guild in bot.guilds)
+#         statuses = [
+#             discord.Game(name=f"in {server_count} servers"),
+#             discord.Game(name=f"with {total_member_count} members"),
+#         ]
 
-        for status in statuses:
-            await bot.change_presence(activity=status)
-            await asyncio.sleep(10)
+#         for status in statuses:
+#             await bot.change_presence(activity=status)
+#             await asyncio.sleep(10)
 
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -44,11 +44,11 @@ async def on_error(event, *args, **kwargs):
 async def on_ready():
     print(f'{bot.user.name} is connected !!')
     bot.heartbeat_interval = 360
-    bot.loop.create_task(change_status())
+    # bot.loop.create_task(change_status())
 
-    server_count = len(bot.guilds)
-    total_member_count = sum(guild.member_count for guild in bot.guilds)
-    print(f'Total members: {total_member_count}, total serveurs {server_count}')
+    # server_count = len(bot.guilds)
+    # total_member_count = sum(guild.member_count for guild in bot.guilds)
+    # print(f'Total members: {total_member_count}, total servers {server_count}')
     # print("Cozy Bot's servers")
     # for guild in bot.guilds:
     #     print(f"{guild.name}")
