@@ -3,9 +3,10 @@ from discord.ext import commands
 from discord.ui import Button, View
 
 class RainView(View):
-    def __init__(self, rain_sounds, user_id):
+    def __init__(self, rain_sounds, user_id, bot):
         super().__init__(timeout=None)
         self.user_id = user_id
+        self.bot = bot
         for i, sound in enumerate(rain_sounds):
             button = Button(style=ButtonStyle.primary, label=f"Rain Sound {i+1}", custom_id=sound)
             button.callback = self.on_button_click
@@ -15,7 +16,7 @@ class RainView(View):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Only the user who initiated the interaction can use these buttons.", ephemeral=True)
             return
-        interaction.view.bot.dispatch("button_click", interaction)
+        await self.bot.get_cog("RainCog").on_button_click(interaction)
 
 class RainCog(commands.Cog):
     def __init__(self, bot):
@@ -36,15 +37,17 @@ class RainCog(commands.Cog):
         else:
             await ctx.voice_client.move_to(channel)
 
-        view = RainView(self.rain_sounds, ctx.author.id)
-        view.bot = self.bot
+        view = RainView(self.rain_sounds, ctx.author.id, self.bot)
         await ctx.respond("Please select a rain sound:", view=view)
 
     @commands.Cog.listener()
     async def on_button_click(self, interaction):
         if interaction.custom_id in self.rain_sounds:
-            await interaction.response.defer()
-            await interaction.response.send_message(f"{interaction.user.mention} has called {self.bot.user.mention} to play the sound of the rain 🌧️")
+            if interaction.response.is_done():
+                await interaction.followup.send(f"{interaction.user.mention} has called {self.bot.user.mention} to play the sound of the rain 🌧️")
+            else:
+                await interaction.response.defer()
+                await interaction.followup.send(f"{interaction.user.mention} has called {self.bot.user.mention} to play the sound of the rain 🌧️")
 
             audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{interaction.custom_id}")
             interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
@@ -57,3 +60,4 @@ class RainCog(commands.Cog):
 
 def setup(bot):
     bot.add_cog(RainCog(bot))
+
