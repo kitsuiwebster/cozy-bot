@@ -3,3 +3,5 @@ sounds/fart00.mp3 filter=lfs diff=lfs merge=lfs -text
 sounds/rain00.mp3 filter=lfs diff=lfs merge=lfs -text
 sounds/rain01.mp3 filter=lfs diff=lfs merge=lfs -text
 sounds/rain02.mp3 filter=lfs diff=lfs merge=lfs -text
+sounds/rain03.mp3 filter=lfs diff=lfs merge=lfs -text
+sounds/rain04.mp3 filter=lfs diff=lfs merge=lfs -text
