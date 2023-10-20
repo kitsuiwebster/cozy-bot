@@ -54,12 +54,12 @@ class RainCog(commands.Cog):
     async def on_button_click(self, interaction):
         if interaction.custom_id in self.rain_sounds:
             if interaction.response.is_done():
-                await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]} 🌧️")
+                await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]}")
             else:
                 await interaction.response.defer()
 
             if interaction.message.guild.voice_client is not None:
-                await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]} 🌧️")
+                await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]}")
                 audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{interaction.custom_id}")
                 interaction.message.guild.voice_client.stop()
                 interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
