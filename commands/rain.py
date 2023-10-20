@@ -14,7 +14,7 @@ class RainView(View):
 
     async def on_button_click(self, interaction):
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the user who initiated the interaction can use these buttons.", ephemeral=True)
+            await interaction.response.send_message("Only the user who typed the command can use these buttons.", ephemeral=True)
             return
         await self.bot.get_cog("RainCog").on_button_click(interaction)
 
