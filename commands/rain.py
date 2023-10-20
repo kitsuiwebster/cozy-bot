@@ -50,7 +50,9 @@ class RainCog(commands.Cog):
                 await interaction.followup.send(f"{interaction.user.mention} has called {self.bot.user.mention} to play the sound of the rain 🌧️")
 
             audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{interaction.custom_id}")
+            interaction.message.guild.voice_client.stop()
             interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
+
 
     async def after_playing(self, error):
         if error:
