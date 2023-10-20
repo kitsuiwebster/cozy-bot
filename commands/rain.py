@@ -17,7 +17,7 @@ class RainView(View):
 
     async def on_button_click(self, interaction):
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the user who typed the command can use these buttons.", ephemeral=True)
+            await interaction.response.send_message("Only the user who typed the command can use these buttons.😵‍💫", ephemeral=True)
             return
         await self.bot.get_cog("RainCog").on_button_click(interaction)
 
@@ -33,12 +33,12 @@ class RainCog(commands.Cog):
             "rain04.mp3": "🌧️🚗⚡"
         }
 
-    @commands.slash_command(name="rain", description="Play the sound of rain")
+    @commands.slash_command(name="rain", description="Play the sound of rain.🌧️")
     async def _rain(self, ctx):
         await ctx.defer()
 
         if ctx.author.voice is None:
-            await ctx.send("You need to be in a voice channel to use this command.")
+            await ctx.send("You need to be in a voice channel to use this command.😵")
             return
 
         channel = ctx.author.voice.channel
@@ -64,7 +64,7 @@ class RainCog(commands.Cog):
                 interaction.message.guild.voice_client.stop()
                 interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
             else:
-                await interaction.followup.send(f" I am not connected to a voice channel, please use a command to call me! 🌝")
+                await interaction.followup.send(f" I am not connected to a voice channel, please use a command to call me.🙃")
 
     async def after_playing(self, error):
         if error:

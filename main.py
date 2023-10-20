@@ -44,12 +44,12 @@ async def on_ready():
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
 
-    server_count = len(bot.guilds)
-    total_member_count = sum(guild.member_count for guild in bot.guilds)
-    print(f'Total members: {total_member_count}, total servers {server_count}')
-    print("Cozy Bot's servers")
-    for guild in bot.guilds:
-        print(f"{guild.name}")
+    # server_count = len(bot.guilds)
+    # total_member_count = sum(guild.member_count for guild in bot.guilds)
+    # print(f'Total members: {total_member_count}, total servers {server_count}')
+    # print("Cozy Bot's servers")
+    # for guild in bot.guilds:
+    #     print(f"{guild.name}")
 
 @bot.event
 async def on_message(message):
