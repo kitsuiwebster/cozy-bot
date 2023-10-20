@@ -28,7 +28,7 @@ class RainCog(commands.Cog):
         await ctx.defer()
 
         if ctx.author.voice is None:
-            await ctx.respond("You need to be in a voice channel to use this command.")
+            await ctx.send("You need to be in a voice channel to use this command.")
             return
 
         channel = ctx.author.voice.channel
@@ -40,19 +40,22 @@ class RainCog(commands.Cog):
         view = RainView(self.rain_sounds, ctx.author.id, self.bot)
         await ctx.respond("Please select a rain sound:", view=view)
 
+
     @commands.Cog.listener()
     async def on_button_click(self, interaction):
         if interaction.custom_id in self.rain_sounds:
             if interaction.response.is_done():
-                await interaction.followup.send(f"{interaction.user.mention} has called {self.bot.user.mention} to play the sound of the rain 🌧️")
+                await interaction.followup.send(f"{self.bot.user.mention} started playing the sound of the rain 🌧️")
             else:
                 await interaction.response.defer()
-                await interaction.followup.send(f"{interaction.user.mention} has called {self.bot.user.mention} to play the sound of the rain 🌧️")
 
-            audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{interaction.custom_id}")
-            interaction.message.guild.voice_client.stop()
-            interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
-
+            if interaction.message.guild.voice_client is not None:
+                await interaction.followup.send(f"{self.bot.user.mention} started playing the sound of the rain 🌧️")
+                audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{interaction.custom_id}")
+                interaction.message.guild.voice_client.stop()
+                interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
+            else:
+                await interaction.followup.send(f" I am not connected to a voice channel, please use a command to call me! 🌝")
 
     async def after_playing(self, error):
         if error:
