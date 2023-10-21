@@ -17,7 +17,7 @@ Use the `/rain` command to summon CozyBot to your voice channel and immerse your
 
 ## 📥 Get CozyBot on Your Server
 
-- [Invite CozyBot to your Discord server](link_to_invite)
+- [Invite CozyBot to your Discord server](https://discord.com/api/oauth2/authorize?client_id=1156917047284994178&permissions=40550970817344&scope=bot)
 
 ## 📅 Future Plans
 
@@ -25,4 +25,4 @@ We are working to improve CozyBot and add more features. Stay tuned for more coz
 
 ## 🐞 Report a bug
 
-- [Join our Support Discord server](link_to_support_server)
+- [Join our Support Discord server](https://discord.gg/Rxeh64Y73U)
