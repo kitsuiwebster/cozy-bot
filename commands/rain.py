@@ -49,7 +49,7 @@ class RainCog(commands.Cog):
         await ctx.defer()
 
         if ctx.author.voice is None:
-            await ctx.respond(content="You need to be in a voice channel to use this command.😵")
+            await ctx.respond(content="You need to be in a voice channel to use this command.😵", ephemeral=True)
             return
 
         channel = ctx.author.voice.channel
