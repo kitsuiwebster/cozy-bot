@@ -27,7 +27,8 @@ class RainView(View):
         if  interaction.custom_id == "stop":
             # Handle pause action
             # Pause the currently playing sound
-            await self.bot.get_cog("RaintCog").stop_sound(interaction)
+            await self.bot.get_cog("RainCog").stop_sound(interaction)
+
         else: 
             await self.bot.get_cog("RainCog").on_button_click(interaction)
         
@@ -92,7 +93,7 @@ class RainCog(commands.Cog):
     async def stop_sound(self, interaction):
         if interaction.guild.voice_client.is_playing():
             interaction.guild.voice_client.stop()
-            #await interaction.response.send_message("Sound paused.", ephemeral=True)
+            await interaction.response.send_message("Sound stopped.", ephemeral=True)
 
 
 def setup(bot):

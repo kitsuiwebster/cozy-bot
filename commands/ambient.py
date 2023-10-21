@@ -3,7 +3,7 @@ from discord.ext import commands
 import os
 import random
 from pydub import AudioSegment
-from discord import FFmpegPCMAudio, ButtonStyle
+from discord import FFmpegPCMAudio
 from interactions import *
 import uuid
 from discord.ui import Button, View
@@ -21,17 +21,17 @@ class AmbientView(View):
         self.bot = bot
 
         # Button for pausing the sound
-        pause_button = Button(style=ButtonStyle.danger, label="Pause",emoji="⏸", custom_id="pause")
+        pause_button = Button(style=ButtonStyle.DANGER, label="Pause",emoji="⏸", custom_id="pause")
         pause_button.callback = self.on_button_click
         self.add_item(pause_button)
 
         # Button for resuming the sound
-        resume_button = Button(style=ButtonStyle.success, label="Resume",emoji="▶", custom_id="resume")
+        resume_button = Button(style=ButtonStyle.SUCCESS, label="Resume",emoji="▶", custom_id="resume")
         resume_button.callback = self.on_button_click
         self.add_item(resume_button)
 
         # Button for looping the sound
-        loop_button = Button(style=ButtonStyle.primary, label="Loop", emoji="🔁", custom_id="loop")
+        loop_button = Button(style=ButtonStyle.PRIMARY, label="Loop", emoji="🔁", custom_id="loop")
         loop_button.callback = self.on_button_click
         self.add_item(loop_button)
 
