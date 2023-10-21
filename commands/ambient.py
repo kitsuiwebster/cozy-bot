@@ -36,9 +36,9 @@ class AmbientView(View):
         self.add_item(loop_button)
 
         # Button for playing a new sound
-        play_new_button = Button(style=ButtonStyle.secondary, label="Play New Sound",emoji="⏭", custom_id="play_new")
-        play_new_button.callback = self.on_button_click
-        self.add_item(play_new_button)
+        # play_new_button = Button(style=ButtonStyle.secondary, label="Play New Sound",emoji="⏭", custom_id="play_new")
+        # play_new_button.callback = self.on_button_click
+        # self.add_item(play_new_button)
 
 
     async def on_button_click(self, interaction):
@@ -62,10 +62,10 @@ class AmbientView(View):
             # Handle loop action
             # Loop the current sound
             await self.bot.get_cog("AmbientCog").loop_sound(interaction)
-        elif custom_id == "play_new":
-            # Handle play new sound action
-            # Play a new sound
-            await self.bot.get_cog("AmbientCog").play_new_sound(interaction)
+        # elif custom_id == "play_new":
+        #     # Handle play new sound action
+        #     # Play a new sound
+        #     await self.bot.get_cog("AmbientCog").play_new_sound(interaction)
 
         else:
             # Handle individual sound button action
