@@ -23,14 +23,13 @@ class RainView(View):
 class RainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.rain_sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3", "killing_spree.mp3"]
+        self.rain_sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3"]
         self.sound_labels = {
             "rain00.mp3": "🌧️💧⚡",
             "rain01.mp3": "🌧️🔥🪵",
             "rain02.mp3": "🌧️💧🍃",
             "rain03.mp3": "🌧️💧🚅",
             "rain04.mp3": "🌧️🚗⚡",
-            "killing_spree.mp3": "test"
         }
 
     @commands.slash_command(name="rain", description="Play the sound of rain.🌧️")
