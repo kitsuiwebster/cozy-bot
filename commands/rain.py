@@ -14,7 +14,6 @@ class RainView(View):
             button.callback = self.on_button_click
             self.add_item(button)
 
-
     async def on_button_click(self, interaction):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Only the user who typed the command can use these buttons.😵‍💫", ephemeral=True)
@@ -24,13 +23,14 @@ class RainView(View):
 class RainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.rain_sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3"]
+        self.rain_sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3", "killing_spree.mp3"]
         self.sound_labels = {
             "rain00.mp3": "🌧️💧⚡",
             "rain01.mp3": "🌧️🔥🪵",
             "rain02.mp3": "🌧️💧🍃",
             "rain03.mp3": "🌧️💧🚅",
-            "rain04.mp3": "🌧️🚗⚡"
+            "rain04.mp3": "🌧️🚗⚡",
+            "killing_spree.mp3": "test"
         }
 
     @commands.slash_command(name="rain", description="Play the sound of rain.🌧️")
@@ -38,7 +38,7 @@ class RainCog(commands.Cog):
         await ctx.defer()
 
         if ctx.author.voice is None:
-            await ctx.send("You need to be in a voice channel to use this command.😵")
+            await ctx.respond(content="You need to be in a voice channel to use this command.😵")
             return
 
         channel = ctx.author.voice.channel
@@ -50,6 +50,13 @@ class RainCog(commands.Cog):
         view = RainView(self.rain_sounds, ctx.author.id, self.bot)
         await ctx.respond("Please select a rain sound:", view=view)
 
+    def after_playing(self, error):
+        if error:
+            print(f'Player error: {error}')
+        else:
+            audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
+            self.bot.voice_clients[0].play(audio_source, after=self.after_playing)
+
     @commands.Cog.listener()
     async def on_button_click(self, interaction):
         if interaction.custom_id in self.rain_sounds:
@@ -60,17 +67,12 @@ class RainCog(commands.Cog):
 
             if interaction.message.guild.voice_client is not None:
                 await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]}")
-                audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{interaction.custom_id}")
+                self.current_sound = interaction.custom_id
+                audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
                 interaction.message.guild.voice_client.stop()
                 interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
             else:
                 await interaction.followup.send(f" I am not connected to a voice channel, please use a command to call me.🙃")
-
-    async def after_playing(self, error):
-        if error:
-            print(f'Player error: {error}')
-        else:
-            await self.bot.voice_clients[0].disconnect()
 
 def setup(bot):
     bot.add_cog(RainCog(bot))
