@@ -14,11 +14,23 @@ class RainView(View):
             button.callback = self.on_button_click
             self.add_item(button)
 
+        # Button for pausing the sound
+        stop_button = Button(style=ButtonStyle.danger, label="Stop",emoji="⏹", custom_id="stop")
+        stop_button.callback = self.on_button_click
+        self.add_item(stop_button)
+
     async def on_button_click(self, interaction):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Only the user who typed the command can use these buttons.😵‍💫", ephemeral=True)
             return
-        await self.bot.get_cog("RainCog").on_button_click(interaction)
+        
+        if  interaction.custom_id == "stop":
+            # Handle pause action
+            # Pause the currently playing sound
+            await self.bot.get_cog("RaintCog").stop_sound(interaction)
+        else: 
+            await self.bot.get_cog("RainCog").on_button_click(interaction)
+        
 
 class RainCog(commands.Cog):
     def __init__(self, bot):
@@ -60,18 +72,28 @@ class RainCog(commands.Cog):
     async def on_button_click(self, interaction):
         if interaction.custom_id in self.rain_sounds:
             if interaction.response.is_done():
-                await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]}")
+                await interaction.followup.send(f"You chose {self.sound_labels[interaction.custom_id]}")
             else:
                 await interaction.response.defer()
 
             if interaction.message.guild.voice_client is not None:
-                await interaction.followup.send(f"You choosed {self.sound_labels[interaction.custom_id]}")
+                await interaction.followup.send(f"You chose {self.sound_labels[interaction.custom_id]}")
                 self.current_sound = interaction.custom_id
                 audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
                 interaction.message.guild.voice_client.stop()
                 interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
             else:
                 await interaction.followup.send(f" I am not connected to a voice channel, please use a command to call me.🙃")
+        elif interaction.custom_id == "stop":
+            await self.stop_sound(interaction)
+            await interaction.followup.send(f"You chose to stop the sound")
+
+
+    async def stop_sound(self, interaction):
+        if interaction.guild.voice_client.is_playing():
+            interaction.guild.voice_client.stop()
+            #await interaction.response.send_message("Sound paused.", ephemeral=True)
+
 
 def setup(bot):
     bot.add_cog(RainCog(bot))
