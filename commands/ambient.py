@@ -82,8 +82,6 @@ file_name = str(uuid.uuid4()) + '.mp3'
 file_path = os.path.join('samples', file_name)
 ambient_folder = 'ambient'
 audio_files = os.listdir(ambient_folder)
-selected_files = random.sample(audio_files, 3)
-
 
 
 
@@ -94,9 +92,30 @@ class AmbientCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.paused = False
+        self.looping = False
 
+
+    @commands.slash_command(description="Customize ambient sounds to chill")
+    async def ambient(self, ctx):
+        if ctx.voice_client.is_playing():
+            ctx.voice_client.stop()
+            
+        await ctx.defer()
+
+        if ctx.author.voice is None:
+            await ctx.send("You need to be in a voice channel to use this command.")
+            return
+    
+        channel = ctx.author.voice.channel
+        if ctx.voice_client is None:
+            await channel.connect()
+        else:
+            await ctx.voice_client.move_to(channel)
 
         
+
+        selected_files = random.sample(audio_files, 3)
+
         # Chargez les fichiers audio sélectionnés
         selected_sounds = [AudioSegment.from_file(os.path.join(ambient_folder, file)) for file in selected_files]
 
@@ -115,30 +134,13 @@ class AmbientCog(commands.Cog):
 
 
 
-
-
-
-
-    @commands.slash_command(description="Customize ambient sounds to chill")
-    async def ambient(self, ctx):
-        await ctx.defer()
-
-        if ctx.author.voice is None:
-            await ctx.send("You need to be in a voice channel to use this command.")
-            return
-    
-        channel = ctx.author.voice.channel
-        if ctx.voice_client is None:
-            await channel.connect()
-        else:
-            await ctx.voice_client.move_to(channel)
         # Send a message in the text channel where the command was invoked
         view = AmbientView(ctx.author.id, self.bot)
         await ctx.respond(f"{ctx.author.mention} has called {self.bot.user.mention} to listen to ambient sounds 🎍.", view=view)
 
         #while True:
         # Jouez le fichier temporaire
-        ctx.voice_client.play(FFmpegPCMAudio(file_path))
+        ctx.voice_client.play(FFmpegPCMAudio(file_path),after=lambda e: self.on_audio_finished(e, file_path))
 
         while ctx.voice_client.is_playing():
             await asyncio.sleep(1)
@@ -182,11 +184,20 @@ class AmbientCog(commands.Cog):
             await interaction.response.send_message("Sound will now loop.", ephemeral=True)
 
 
-    def on_audio_finished(self, interaction, error):
-        if not self.paused:
-            # Play the next sound if not paused
-            # You can implement this based on your requirements
-            pass
+    def on_audio_finished(self, error, file_path):
+        if error:
+            print(f'Player error: {error}')
+        else:
+            if not self.paused:
+                if self.looping:
+                # Implement looping logic here
+                    audio_source = FFmpegPCMAudio(file_path)
+                    self.bot.voice_clients[0].play(audio_source, after=lambda e: self.on_audio_finished(e, file_path))
+
+                else:
+                # # If not looping, you can play the next sound or take other actions
+                # # You can implement this based on your requirements
+                    pass
 
 
 

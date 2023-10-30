@@ -36,6 +36,8 @@ class RainView(View):
 class RainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.stopped = False
+        self.looping = True
         self.rain_sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3"]
         self.sound_labels = {
             "rain00.mp3": "🌧️💧⚡",
@@ -66,8 +68,13 @@ class RainCog(commands.Cog):
         if error:
             print(f'Player error: {error}')
         else:
-            audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
-            self.bot.voice_clients[0].play(audio_source, after=self.after_playing)
+            if not self.stopped:
+                if self.looping:
+                # Implement looping logic here
+                    audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
+                    self.bot.voice_clients[0].play(audio_source, after=self.after_playing)
+                else:
+                    pass
 
     @commands.Cog.listener()
     async def on_button_click(self, interaction):
@@ -93,6 +100,7 @@ class RainCog(commands.Cog):
     async def stop_sound(self, interaction):
         if interaction.guild.voice_client.is_playing():
             interaction.guild.voice_client.stop()
+            self.stopped = True
             await interaction.response.send_message("Sound stopped.", ephemeral=True)
 
 
