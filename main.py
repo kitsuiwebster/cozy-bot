@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 import os
 from discord.ext import commands
-from reactions import handle_reactions
+from reactions.reactions import handle_reactions
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
