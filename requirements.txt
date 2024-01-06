@@ -1,0 +1,5 @@
+discord==2.0.0
+discord.py==2.0.0
+discord-ui==5.1.6
+python-dotenv==1.0.0
+watchdog==3.0.0
