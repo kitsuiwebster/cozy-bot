@@ -14,7 +14,6 @@ class RainView(View):
             button.callback = self.on_button_click
             self.add_item(button)
 
-        # Button for pausing the sound
         stop_button = Button(style=ButtonStyle.danger, label="Stop",emoji="⏹", custom_id="stop")
         stop_button.callback = self.on_button_click
         self.add_item(stop_button)
@@ -25,14 +24,11 @@ class RainView(View):
             return
         
         if  interaction.custom_id == "stop":
-            # Handle pause action
-            # Pause the currently playing sound
             await self.bot.get_cog("RainCog").stop_sound(interaction)
 
         else: 
             await self.bot.get_cog("RainCog").on_button_click(interaction)
         
-
 class RainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -70,7 +66,6 @@ class RainCog(commands.Cog):
         else:
             if not self.stopped:
                 if self.looping:
-                # Implement looping logic here
                     audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
                     self.bot.voice_clients[0].play(audio_source, after=self.after_playing)
                 else:
@@ -102,7 +97,6 @@ class RainCog(commands.Cog):
             interaction.guild.voice_client.stop()
             self.stopped = True
             await interaction.response.send_message("Sound stopped.", ephemeral=True)
-
 
 def setup(bot):
     bot.add_cog(RainCog(bot))

@@ -62,6 +62,7 @@ async def on_message(message):
 async def run_bot():
     try:
         bot.load_extension('commands.rain')
+        bot.load_extension('commands.sparkles')
 
     except Exception as e:
         print(f"Error loading extension: {e}")
