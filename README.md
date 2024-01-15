@@ -9,11 +9,19 @@ Welcome to CozyBot, a discord.py bot designed to bring cozy and peaceful ambienc
 - **Raphaël MARTIN** - [@kitsuiwebster](https://gitlab.com/kitsuiwebster)
 - **Imène MEDJAOUI** - [@BubbleXGum](https://gitlab.com/medjaoui.imene)
 
-## ✨ Features
+## ✅ Features
 
-### 🌧️ Rain Ambience
+*Commands summon CozyBot to your voice channel.*
 
-Use the `/rain` command to summon CozyBot to your voice channel and immerse yourself in the soothing sound of rain. Choose the rain ambience that best suits your mood. You have the freedom to stop it and change the rain sound whenever you desire.
+### 🌧️ Rain
+
+Use the `/rain` command to immerse yourself in the soothing sound of rain. Choose the rain ambience that best suits your mood.
+
+### ✨ Sparkles
+
+Use the `/sparkles` command to bring a magical, glittering effect to your chat.
+
+*You have the freedom to stop or change any sound ambiance whenever you desire.*
 
 ## 📥 Get CozyBot on Your Server
 
