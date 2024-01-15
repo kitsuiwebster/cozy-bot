@@ -37,4 +37,4 @@ We are working to improve CozyBot and add more features. Stay tuned for more coz
 
 ## Short video presentation
 
-[![CozyBot video presentation](assets/placeholder.png)](https://youtu.be/3q5n-iqTvsQ)
+[![CozyBot video presentation](assets/placeholder.png)](https://youtu.be/3q5n-jqTvsg)
