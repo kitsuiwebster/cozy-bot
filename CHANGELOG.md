@@ -34,3 +34,4 @@ All notable changes to this project will be documented in this file.
 - Check to ensure the user is in a voice channel before executing the `/rain` command.
 - Stop functionality to stop the currently playing sound.
 - Error handling for voice channel connection and audio playback issues.
+- Reacts to keywords related to rain.
