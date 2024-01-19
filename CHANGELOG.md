@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2024-01-19
+
+### Added
+
+- `/top` command to display the top servers ranked by the time spent with CozyBot.
+
+### Fixed
+
+- Fixed a bug where sounds would stop unexpectedly.
+
+
 ## [1.0.1] - 2024-01-15
 
 ### Added

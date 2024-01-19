@@ -31,7 +31,9 @@ class RainView(View):
         
         # Handle stop button click.
         if  interaction.custom_id == "stop":
-            await self.bot.get_cog("RainCog").stop_sound(interaction)
+            # Retrieve the guild_id and pass it to the stop_sound method
+            guild_id = interaction.guild.id
+            await self.bot.get_cog("RainCog").stop_sound(interaction, guild_id)
 
         else: 
             # Handle rain sound button click.
@@ -42,8 +44,7 @@ class RainView(View):
 class RainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.stopped = False
-        self.looping = True
+        self.guild_states = {} 
         # List of rain sound file names.
         self.rain_sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3"]
         # Mapping of sound file names to emoji labels.
@@ -77,55 +78,73 @@ class RainCog(commands.Cog):
         await ctx.respond("Please select a rain sound:", view=view)
 
     # Callback function called after a sound finishes playing.
-    def after_playing(self, error):
+    def after_playing(self, error, guild_id):
+        guild_state = self.get_guild_state(guild_id)
         if error:
             print(f'Player error: {error}')
-        else:
-            # If not stopped and looping is enabled, replay the current sound.
-            if not self.stopped:
-                if self.looping:
-                    audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
-                    self.bot.voice_clients[0].play(audio_source, after=self.after_playing)
-                else:
-                    pass
+            return
+        if not guild_state['stopped'] and guild_state['looping'] and guild_state['current_sound']:
+            voice_client = self.bot.get_guild(guild_id).voice_client
+            if voice_client and voice_client.is_connected():
+                audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{guild_state['current_sound']}")
+                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+
+
+    def get_guild_state(self, guild_id):
+        if guild_id not in self.guild_states:
+            self.guild_states[guild_id] = {'stopped': False, 'looping': True, 'current_sound': None}
+        return self.guild_states[guild_id]
 
     # Listener for button click events.
     @commands.Cog.listener()
     async def on_button_click(self, interaction):
-        # Handle rain sound selection.
+        guild_id = interaction.guild.id
+        guild_state = self.get_guild_state(guild_id)
+
+        # Handle sparkles sound selection.
         if interaction.custom_id in self.rain_sounds:
             if interaction.response.is_done():
                 await interaction.followup.send(f"You chose {self.sound_labels[interaction.custom_id]}")
             else:
                 await interaction.response.defer()
-            if interaction.message.guild.voice_client is not None:
-                await interaction.followup.send(f"You chose {self.sound_labels[interaction.custom_id]}")
-                self.current_sound = interaction.custom_id
-                audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{self.current_sound}")
-                interaction.message.guild.voice_client.stop()
-                interaction.message.guild.voice_client.play(audio_source, after=self.after_playing)
+
+            guild_state['current_sound'] = interaction.custom_id
+            guild_state['stopped'] = False
+            voice_client = interaction.guild.voice_client
+
+            if voice_client is not None:
+                voice_client.stop()
+                audio_source = FFmpegPCMAudio(executable="ffmpeg", source=f"sounds/{guild_state['current_sound']}")
+                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+                await interaction.followup.send(f"Playing {self.sound_labels[interaction.custom_id]}")
             else:
-                await interaction.followup.send(f" I am not connected to a voice channel, please use a command to call me.🙃")
+                await interaction.followup.send("I am not connected to a voice channel, please use a command to call me.🙃")
 
         # Handle stop button click.
         elif interaction.custom_id == "stop":
-            await self.stop_sound(interaction)
-            await interaction.followup.send(f"You chose to stop the sound")
+            await self.stop_sound(interaction, guild_id)
 
     # Method to stop the currently playing sound.
-    async def stop_sound(self, interaction):
+    async def stop_sound(self, interaction, guild_id):
+        guild_state = self.get_guild_state(guild_id)
+        guild_state['stopped'] = True
         voice_client = interaction.guild.voice_client
         if voice_client:
-            # If a sound is playing, stop it and disconnect the voice client.
             if voice_client.is_playing():
                 voice_client.stop()
-                self.stopped = True
             await voice_client.disconnect()
-            await interaction.response.send_message("Sound stopped.")
+            # Ensure you are sending a follow-up response if the initial response was already sent.
+            if interaction.response.is_done():
+                await interaction.followup.send("Sound stopped.")
+            else:
+                await interaction.response.send_message("Sound stopped.")
         else:
-            # Send a message if the bot is not in a voice channel.
-            await interaction.response.send_message("I am not in a voice channel, I can't be stopped.", ephemeral=True)
-
+            # Handle the case where the bot is not in a voice channel.
+            message = "I am not in a voice channel, I can't be stopped."
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
 
 # Function to add the RainCog to the bot.
 def setup(bot):

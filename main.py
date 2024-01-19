@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 import os
 from discord.ext import commands
 from reactions.reactions import handle_reactions
+from datetime import datetime
+import json
 
 # Load environment variables from a .env file.
 load_dotenv()
@@ -22,6 +24,22 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 
 # Print the list of guilds the bot is a member of.
 print(bot.guilds)
+
+# Function to save voice channel time data to a file
+def save_voice_time_data():
+    with open('voice_time_data.json', 'w') as file:
+        json.dump(guild_voice_time, file)
+
+# Function to load voice channel time data from a file
+def load_voice_time_data():
+    try:
+        with open('voice_time_data.json', 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
+
+# Initialize a dictionary to store voice channel time for each guild
+guild_voice_time = load_voice_time_data()
 
 # Coroutine to change the bot's status periodically.
 async def change_status():
@@ -44,6 +62,31 @@ async def change_status():
 @bot.event
 async def on_error(event, *args, **kwargs):
     print(f"An error occurred: {event}")
+
+# Event handler for voice state updates
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.id != bot.user.id:
+        return
+
+    guild_id = str(member.guild.id)  # Convert to string for JSON compatibility
+
+    # Check if the bot has joined a voice channel
+    if before.channel is None and after.channel is not None:
+        # Record the start time
+        guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
+
+    # Check if the bot has left a voice channel
+    elif before.channel is not None and after.channel is None:
+        if guild_id in guild_voice_time and guild_voice_time[guild_id][0] is not None:
+            start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
+            accumulated_time = guild_voice_time[guild_id][1]
+            time_spent = datetime.now() - start_time
+            total_time = accumulated_time + time_spent.total_seconds()
+            guild_voice_time[guild_id] = [None, total_time]
+            print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
+            save_voice_time_data() 
+
 
 
 # Event handler for when the bot is ready and has started.
@@ -76,7 +119,7 @@ async def run_bot():
         # Load extensions for the bot.
         bot.load_extension('commands.rain')
         bot.load_extension('commands.sparkles')
-        # bot.load_extension('commands.ambient')
+        bot.load_extension('commands.top')
 
     except Exception as e:
         print(f"Error loading extension: {e}")
@@ -95,5 +138,6 @@ if __name__ == "__main__":
         loop.run_until_complete(run_bot())
     except KeyboardInterrupt:
         print("---> Bot stopped by user.")
+        save_voice_time_data()
     finally:
         loop.close()
