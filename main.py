@@ -145,6 +145,7 @@ async def run_bot():
         bot.load_extension('commands.rain')
         bot.load_extension('commands.sparkles')
         bot.load_extension('commands.top')
+        bot.load_extension('commands.total')
 
     except Exception as e:
         print(f"Error loading extension: {e}")
