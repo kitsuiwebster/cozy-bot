@@ -100,7 +100,7 @@ async def leave_voice_channel_if_alone():
                     bot_alone_time[vc.guild.id] = datetime.now()
             else:
                 # Check if the bot has been alone for more than 30 minutes
-                if len(vc.channel.members) == 1
+                if len(vc.channel.members) == 1:
                     alone_since = bot_alone_time[vc.guild.id]
                     if (datetime.now() - alone_since).total_seconds() > 1800:
                         await vc.disconnect()
