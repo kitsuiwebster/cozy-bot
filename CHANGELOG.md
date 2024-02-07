@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - YYYY-MM-DD
+
+### Added
+
+- `/total` command to track the number of people currently interacting with CozyBot.
+- The bot now leaves the voice channel if it finds itself alone for more than 30 minutes.
+
 ## [1.0.2] - 2024-01-19
 
 ### Added
