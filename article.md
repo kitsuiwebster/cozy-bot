@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Welcome to the journey of CozyBot, a unique creation designed to enhance the ambiance of Discord communities. Meet CozyBot, our delightful discord.py bot that's on a mission to sprinkle a dash of coziness over the vast lands of Discord servers. Imagine this: soft, fluffy clouds of comfort drifting into your voice channels, carrying the soothing sounds of rain, the enchanting whispers of the wind, and the magical sparkle of distant stars right to your digital doorstep. That's CozyBot for you, a wizard in the art of creating serene vibes and peaceful corners in the bustling metropolis of Discord.
+Welcome to the journey of CozyBot, a unique creation designed to enhance the ambiance of Discord communities by the developers, [Raphaël Martin](https://github.com/kitsuiwebster) and [Imène Medjaoui](https://github.com/imenemedjaoui). Meet CozyBot, our delightful discord.py bot that's on a mission to sprinkle a dash of coziness over the vast lands of Discord servers. Imagine this: soft, fluffy clouds of comfort drifting into your voice channels, carrying the soothing sounds of rain, the enchanting whispers of the wind, and the magical sparkle of distant stars right to your digital doorstep. That's CozyBot for you, a wizard in the art of creating serene vibes and peaceful corners in the bustling metropolis of Discord.
 
 Why did we conjure up CozyBot, you ask? Picture this: Discord communities, buzzing with life, laughter, and endless conversations. Yet, amidst this vibrant chaos, there lay a silent wish for a serene sanctuary, a cozy nook where one could unwind, kick back, and breathe in the tranquility. We saw that wish, waved our magic wand (well, more like our coding skills), and voilà! CozyBot was born, ready to infuse your Discord experience with calm, comfort, and a touch of enchantment.
 
@@ -10,7 +10,9 @@ But wait, there's more! CozyBot isn't just about bringing peace and quiet to you
 
 ## The Technical Backbone
 
-- **Introduction to the Technical Stack**: CozyBot is powered by a combination of libraries and technologies meticulously selected to enhance Discord servers with ambient sounds and interactive features.
+### Introduction to the Technical Stack
+
+CozyBot is powered by a combination of libraries and technologies meticulously selected to enhance Discord servers with ambient sounds and interactive features.
 
 - **discord.py**: A Python library for interacting with the Discord API, enabling CozyBot to connect to and communicate within Discord servers efficiently.
 
@@ -105,4 +107,4 @@ This description paints the current setup of CozyBot, a snapshot in time of our 
 
 So, stay tuned... and stay cozy !
 
-Oh, and here is the invitation to bring peace to your Disord Serevr: [Bring me to your land !](https://discord.com/api/oauth2/authorize?client_id=1156917047284994178&permissions=40550970817344&scope=bot)
+Oh, and here is the invitation to bring peace to your Discord Server: [Bring me to your land !](https://discord.com/api/oauth2/authorize?client_id=1156917047284994178&permissions=40550970817344&scope=bot)
