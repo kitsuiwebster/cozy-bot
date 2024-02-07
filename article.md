@@ -56,6 +56,8 @@ Maintaining optimal temperature is essential for the Raspberry Pi when running r
 ![Raspberry Pi with Ice Tower](assets/icetower.jpg)
 *The Raspberry Pi 'Guess' equipped with the Ice Tower cooling system, significantly reducing temperatures for optimal performance.*
 
+![Temperature after](assets/temperature.png)
+
 #### The box
 
 The Raspberry Pi resides in a specialized enclosure, ensuring its components are protected while maintaining optimal airflow for cooling. As a touch of personalization, the Raspberry Pi has been affectionately named 'Guess', adding a bit of character and humor to the development setup. You know why 'Guess', because 'Guess what's inside the box?'
@@ -71,7 +73,7 @@ Screen and SSH are invaluable tools in CozyBot's development and maintenance, al
 
 Incorporating a Demilitarized Zone (DMZ) within the network architecture significantly enhances CozyBot's security. Hosting CozyBot on a Raspberry Pi at my home necessitates stringent measures to protect the private network from potential external threats. By placing the Raspberry Pi in a DMZ, it is effectively isolated from the internal network. This strategic separation limits the bot’s exposure to direct internet traffic and potential vulnerabilities, ensuring that, even in the event of a compromise, the impact on the internal network is significantly minimized. This setup is crucial for safeguarding sensitive data and the infrastructure of my home network, providing an added layer of security while allowing CozyBot to operate seamlessly and safely.
 
-![Network Architecture](URL_TO_PHOTO)
+![Network Architecture](assets/network.png)
 
 ## Community Engagement and Open Source
 
@@ -89,7 +91,7 @@ Open-sourcing CozyBot comes with its own set of benefits and challenges. Managin
 
 Welcome to our cozy corner of the internet! We've whipped up a special Discord server that's open to all – a bustling playground where you can chat up the development team, hunt for bugs or pitch your brilliant feature ideas. It's not just any server; it's where you get to meet CozyBot in its natural habitat, basking in the glow of cozy vibes and spreading the calm across Discord lands.
 
-![Discord Server](URL_TO_PHOTO)
+![Discord Server](assets/discord-server.png)
 
 Whether you're here to lend a hand, toss in a two cents, or just soak up the ambiance, our Discord server is your cozy clubhouse. Come join the party, mingle with the family, and help us knit the fabric of CozyBot's future. Everyone's invited, and the door's always open. Let's make this journey together !
 
