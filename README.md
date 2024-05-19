@@ -6,8 +6,8 @@ Welcome to CozyBot, a discord.py bot designed to bring cozy and peaceful ambienc
 
 ## 👥 Developed By
 
-- **Raphaël MARTIN** - [@kitsuiwebster](https://gitlab.com/kitsuiwebster)
-- **Imène MEDJAOUI** - [@BubbleXGum](https://gitlab.com/medjaoui.imene)
+- **Raphaël MARTIN** - [@kitsuiwebster](https://github.com/kitsuiwebster)
+- **Imène MEDJAOUI** - [@BubbleXGum](https://github.com/imenemedjaoui)
 
 ## ✅ Features
 
