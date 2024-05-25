@@ -87,30 +87,6 @@ async def on_voice_state_update(member, before, after):
             print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
             save_voice_time_data() 
 
-bot_alone_time = {}
-
-# Coroutine to check if the bot is alone in a voice channel
-async def leave_voice_channel_if_alone():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        for vc in bot.voice_clients:
-            if vc.guild.id not in bot_alone_time:
-                # If the bot is alone in the voice channel, start tracking
-                if len(vc.channel.members) == 1:
-                    bot_alone_time[vc.guild.id] = datetime.now()
-            else:
-                # Check if the bot has been alone for more than 30 minutes
-                if len(vc.channel.members) == 1:
-                    alone_since = bot_alone_time[vc.guild.id]
-                    if (datetime.now() - alone_since).total_seconds() > 1800:
-                        await vc.disconnect()
-                        del bot_alone_time[vc.guild.id]  
-                        print(f"Left voice channel in {vc.guild.name} due to being alone for 30 minutes.")
-                else:
-                    # If not alone anymore, stop tracking
-                    if vc.guild.id in bot_alone_time:
-                        del bot_alone_time[vc.guild.id]
-        await asyncio.sleep(60) 
 
 
 # Event handler for when the bot is ready and has started.
@@ -119,7 +95,6 @@ async def on_ready():
     print(f'{bot.user.name} is connected !!')
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
-    bot.loop.create_task(leave_voice_channel_if_alone())
 
     # Print total members and servers.
     server_count = len(bot.guilds)
@@ -143,9 +118,11 @@ async def run_bot():
     try:
         # Load extensions for the bot.
         bot.load_extension('commands.rain')
+        bot.load_extension('commands.sea')
         bot.load_extension('commands.sparkles')
         bot.load_extension('commands.top')
         bot.load_extension('commands.total')
+        bot.load_extension('commands.background-music')
 
     except Exception as e:
         print(f"Error loading extension: {e}")

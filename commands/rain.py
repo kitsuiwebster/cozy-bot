@@ -26,7 +26,7 @@ class RainView(View):
     async def on_button_click(self, interaction):
         # Check if the user who clicked is the same as the one who initiated the command.
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the user who typed the command can use these buttons.😵‍💫", ephemeral=True)
+            await interaction.response.send_message("Only the user who typed the command can use these buttons.😵‍💫 Use the commands instead.", ephemeral=True)
             return
         
         # Handle stop button click.
@@ -50,7 +50,7 @@ class RainCog(commands.Cog):
         # Mapping of sound file names to emoji labels.
         self.sound_labels = {
             "rain00.mp3": "🌧️💧⚡",
-            "rain01.mp3": "🌧️🔥🪵",
+            "rain01.mp3": "🌧️🔥🌲",
             "rain02.mp3": "🌧️💧🍃",
             "rain03.mp3": "🌧️💧🚅",
             "rain04.mp3": "🌧️🚗⚡",
