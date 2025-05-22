@@ -15,7 +15,7 @@ def start_bot():
         bot_process.wait()
 
     # Bubble (Windows)
-    bot_process = subprocess.Popen(["C:\\Users\\Aser\\AppData\\Local\\Programs\\Python\\Python311\\python.exe", "main.py"])
+    # bot_process = subprocess.Popen(["C:\\Users\\Aser\\AppData\\Local\\Programs\\Python\\Python311\\python.exe", "main.py"])
     
     # Kitsui (Linux)
     bot_process = subprocess.Popen(["python3", "main.py"])

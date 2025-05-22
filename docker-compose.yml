@@ -1,0 +1,28 @@
+services:
+  discord-bot:
+    build: .
+    container_name: cozy-discord-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+    volumes:
+      # Mount the voice time data file to persist data
+      - ./voice_time_data.json:/app/voice_time_data.json
+      # Optional: mount logs directory if you want to persist logs
+      - bot-logs:/app/logs
+    networks:
+      - bot-network
+    # Health check to ensure the bot is running
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  bot-logs:
+
+networks:
+  bot-network:
+    driver: bridge
