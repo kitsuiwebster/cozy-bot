@@ -1,9 +1,9 @@
 .env
+.env.dev
+.env.prod
 __pycache__/
 .dockerignore
 Dockerfile
 .gitattributes
 gpt_food.txt
 repository.txt
-.env.dev
-.env.prod
