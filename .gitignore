@@ -1,4 +1,7 @@
 .env
+.env.dev
+.env.prod
+repository.txt
 __pycache__/
 .dockerignore
 Dockerfile
