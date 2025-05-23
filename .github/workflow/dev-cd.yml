@@ -1,0 +1,25 @@
+name: Dev Deploy
+
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Deploy to Dev
+        run: |
+          ${{ secrets.SSH_COMMAND }} << 'EOF'
+            cd ~/cozy-bot
+            git pull origin dev
+            docker-compose --profile dev down --remove-orphans
+            docker rmi $(docker images | grep cozy-discord-bot | awk '{print $3}') 2>/dev/null || true
+            docker-compose --profile dev up -d --build
+          EOF
