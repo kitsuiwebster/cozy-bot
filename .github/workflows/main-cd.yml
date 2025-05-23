@@ -22,7 +22,7 @@ jobs:
       - name: Deploy to Production
         run: |
           ${{ secrets.SSH_COMMAND }} << 'EOF'
-            cd ~/cozy-bot
+            cd ~/side-stuff/cozy-discord-bot
             git stash push -m "auto-stash before deploy"
             git pull origin main
             docker-compose --profile prod down --remove-orphans
