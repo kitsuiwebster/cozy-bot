@@ -21,6 +21,14 @@ Use the `/rain` command to immerse yourself in the soothing sound of rain. Choos
 
 Use the `/sparkles` command to bring a magical, glittering effect to your chat.
 
+### 🌊 Sea
+
+Use the `/sea` command to enjoy the calming sounds of ocean waves. Perfect for relaxation or as a peaceful background sound.
+
+### 🎶 Background Music
+
+Use the `/music` command to play background music. Select from a variety of genres to enhance your mood or complement your activities.
+
 *You have the freedom to stop or change any sound ambiance whenever you desire.*
 
 ## 📥 Get CozyBot on Your Server
