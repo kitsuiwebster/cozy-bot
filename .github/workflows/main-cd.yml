@@ -9,15 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Add SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
+          
       - name: Deploy to Production
         run: |
           ${{ secrets.SSH_COMMAND }} << 'EOF'
             cd ~/cozy-bot
+            git stash push -m "auto-stash before deploy"
             git pull origin main
             docker-compose --profile prod down --remove-orphans
             docker rmi $(docker images | grep cozy-discord-bot | awk '{print $3}') 2>/dev/null || true
             docker-compose --profile prod up -d --build
           EOF
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-
