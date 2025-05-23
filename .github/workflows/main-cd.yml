@@ -25,7 +25,7 @@ jobs:
             cd ~/side-stuff/cozy-discord-bot
             git stash push -m "auto-stash before deploy"
             git pull origin main
-            docker-compose --profile prod down --remove-orphans
+            docker compose --profile prod down --remove-orphans
             docker rmi $(docker images | grep cozy-discord-bot | awk '{print $3}') 2>/dev/null || true
-            docker-compose --profile prod up -d --build
+            docker compose --profile prod up -d --build
           EOF
