@@ -1,28 +1,57 @@
 services:
-  discord-bot:
-    build: .
-    container_name: cozy-discord-bot
+  # Service de développement
+  discord-bot-dev:
+    build: 
+      context: .
+      args:
+        MODE: dev
+    container_name: cozy-discord-bot-dev
+    profiles: ["dev"]
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - ENVIRONMENT=development
+    volumes:
+      # Mount source code for development
+      - .:/app
+      - bot-logs-dev:/app/logs
+    networks:
+      - bot-network-dev
+    # Override command for dev mode (optional since ARG handles it)
+    command: ["python3", "run.py", "--dev"]
+
+  # Service de production
+  discord-bot-prod:
+    build:
+      context: .
+      args:
+        MODE: prod
+    container_name: cozy-discord-bot-prod
+    profiles: ["prod"]
     restart: unless-stopped
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - ENVIRONMENT=production
     volumes:
-      # Mount the voice time data file to persist data
+      # Only mount necessary files for production
       - ./voice_time_data.json:/app/voice_time_data.json
-      # Optional: mount logs directory if you want to persist logs
-      - bot-logs:/app/logs
+      - ./.env.prod:/app/.env.prod
+      - bot-logs-prod:/app/logs
     networks:
-      - bot-network
-    # Health check to ensure the bot is running
+      - bot-network-prod
+    # Uses ARG from Dockerfile (--prod by default)
     healthcheck:
-      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "python3", "-c", "import discord; print('Bot dependencies OK')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
 volumes:
-  bot-logs:
+  bot-logs-dev:
+  bot-logs-prod:
 
 networks:
-  bot-network:
+  bot-network-dev:
+    driver: bridge
+  bot-network-prod:
     driver: bridge

@@ -6,9 +6,11 @@ from discord.ext import commands
 from reactions.reactions import handle_reactions
 from datetime import datetime
 import json
+import asyncio
 
 # Load environment variables from a .env file.
 load_dotenv()
+
 # Configure logging with an info level
 logging.basicConfig(level=logging.INFO)
 
@@ -87,8 +89,6 @@ async def on_voice_state_update(member, before, after):
             print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
             save_voice_time_data() 
 
-
-
 # Event handler for when the bot is ready and has started.
 @bot.event
 async def on_ready():
@@ -131,10 +131,8 @@ async def run_bot():
     bot_token = os.getenv("DISCORD_BOT_TOKEN")
     await bot.start(bot_token)
 
-
 # Main entry point of the script.
 if __name__ == "__main__":
-    import asyncio
     loop = asyncio.get_event_loop()
 
     try:
