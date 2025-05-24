@@ -24,11 +24,16 @@ jobs:
           ${{ secrets.SSH_COMMAND }} << 'EOF'
             cd ~/side-stuff/cozy-discord-bot
             git stash push -m "auto-stash before deploy"
+            git checkout main
             git pull origin main
             docker compose -p cozy-prod --profile prod down --remove-orphans
             docker rmi $(docker images | grep cozy-discord-bot | awk '{print $3}') 2>/dev/null || true
             docker compose -p cozy-prod --profile prod up -d --build
           EOF
 
+<<<<<<< HEAD
           
           
+=======
+      
+>>>>>>> dev
