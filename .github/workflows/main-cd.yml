@@ -29,4 +29,5 @@ jobs:
             docker rmi $(docker images | grep cozy-discord-bot | awk '{print $3}') 2>/dev/null || true
             docker compose -p cozy-prod --profile prod up -d --build
           EOF
-          
+
+      
