@@ -24,7 +24,7 @@ jobs:
           set -e
           echo "🎯 Starting production deployment..."
           
-          cd ~/side-stuff/cozy-bot
+          cd ~/cozy-bot
           
           # Git operations
           echo "📝 Updating code..."
