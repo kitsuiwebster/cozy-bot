@@ -194,4 +194,3 @@ cozy-bot/
 ├── requirements.txt           # Python dependencies
 └── voice_time_data.json       # Bot voice time data storage
 ```
-
