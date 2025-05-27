@@ -1,0 +1,56 @@
+name: Production Deploy
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: 🚀 Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: 🔑 Add SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
+      
+      - name: 🛡️ Deploy to Production
+        run: |
+          ${{ secrets.SSH_COMMAND }} << 'EOF'
+          set -e
+          echo "🎯 Starting production deployment..."
+          
+          cd ~/side-stuff/cozy-discord-bot
+          
+          # Git operations
+          echo "📝 Updating code..."
+          git stash push -m "auto-stash before deploy $(date)"
+          git checkout main
+          git pull origin main
+          
+          # Check if required files exist
+          echo "🔍 Checking environment files..."
+          if [ ! -f ".env.prod" ]; then
+            echo "❌ .env.prod not found on server!"
+            echo "Please create .env.prod file manually on the server"
+            exit 1
+          fi
+          
+          # Security check
+          echo "🔐 Running security checks..."
+          if grep -q "your_token_here\|example\|test" .env.prod; then
+            echo "❌ Production file contains placeholder values!"
+            exit 1
+          fi
+          
+          # Deploy
+          echo "🚀 Running deployment script..."
+          chmod +x deploy-prod.sh
+          ./deploy-prod.sh
+          
+          echo "✅ Production deployment completed!"
+          EOF

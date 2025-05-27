@@ -1,9 +1,63 @@
+# Environment files (contiennent les secrets)
 .env
-.env.dev
+.env.local
 .env.prod
+.env.dev
+.env.test
+
+# Garder le fichier d'exemple
+!.env.example
+
+# Docker override files
+docker-compose.override.yml
+
+# Python
 __pycache__/
-.dockerignore
-Dockerfile
-.gitattributes
-gpt_food.txt
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments  
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Bot data (si sensible)
+voice_time_data.json
+
+# Scripts temporaires
+deploy-*.sh.backup
+
+# Autre
 repository.txt
+voice_time_data.json

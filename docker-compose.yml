@@ -1,57 +1,40 @@
 services:
-  # Service de développement
-  discord-bot-dev:
+  discord-bot:
     build: 
       context: .
       args:
-        MODE: dev
-    container_name: cozy-discord-bot-dev
-    profiles: ["dev"]
+        MODE: ${BOT_MODE:-prod}
+    container_name: ${CONTAINER_NAME:-cozy-discord-bot}
+    restart: ${RESTART_POLICY:-unless-stopped}
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - ENVIRONMENT=development
+      - ENVIRONMENT=${ENVIRONMENT:-production}
     volumes:
-      # Mount source code for development
-      - .:/app
-      - bot-logs-dev:/app/logs
-    networks:
-      - bot-network-dev
-    # Override command for dev mode (optional since ARG handles it)
-    command: ["python3", "run.py", "--dev"]
-
-  # Service de production
-  discord-bot-prod:
-    build:
-      context: .
-      args:
-        MODE: prod
-    container_name: cozy-discord-bot-prod
-    profiles: ["prod"]
-    restart: unless-stopped
-    environment:
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - ENVIRONMENT=production
-    volumes:
-      # Only mount necessary files for production
+      # Volumes de base toujours montés
       - ./voice_time_data.json:/app/voice_time_data.json
-      - ./.env.prod:/app/.env.prod
-      - bot-logs-prod:/app/logs
+      - bot-logs:/app/logs
+      # Volume conditionnel pour le développement
+      - ${DEV_CODE_MOUNT:-/tmp/empty}:/app/code:rw
+      # Fichier d'environnement spécifique
+      - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
     networks:
-      - bot-network-prod
-    # Uses ARG from Dockerfile (--prod by default)
+      - bot-network
+    # Commande par défaut (peut être surchargée)
+    command: sh -c "${BOT_COMMAND:-python3 main.py}"
+    # Health check conditionnel
     healthcheck:
-      test: ["CMD", "python3", "-c", "import discord; print('Bot dependencies OK')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ${HEALTH_CHECK_CMD:-["CMD", "python3", "-c", "import discord; print('Bot dependencies OK')"]}
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: ${HEALTH_CHECK_START:-40s}
+      disable: ${HEALTH_CHECK_DISABLE:-false}
 
 volumes:
-  bot-logs-dev:
-  bot-logs-prod:
+  bot-logs:
+    name: ${VOLUME_NAME:-cozy-bot-logs}
 
 networks:
-  bot-network-dev:
-    driver: bridge
-  bot-network-prod:
+  bot-network:
+    name: ${NETWORK_NAME:-cozy-bot-network}
     driver: bridge

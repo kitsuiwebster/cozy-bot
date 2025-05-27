@@ -1,0 +1,49 @@
+name: Development Deploy
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: 🚀 Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: 🔑 Add SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
+      
+      - name: 🚀 Deploy to Development
+        run: |
+          ${{ secrets.SSH_COMMAND }} << 'EOF'
+          set -e
+          echo "🎯 Starting development deployment..."
+          
+          cd ~/side-stuff/cozy-discord-bot
+          
+          # Git operations
+          echo "📝 Updating code..."
+          git stash push -m "auto-stash before deploy $(date)"
+          git checkout dev
+          git pull origin dev
+          
+          # Check if required files exist
+          echo "🔍 Checking environment files..."
+          if [ ! -f ".env.dev" ]; then
+            echo "❌ .env.dev not found on server!"
+            echo "Please create .env.dev file manually on the server"
+            exit 1
+          fi
+          
+          # Deploy
+          echo "🚀 Running deployment script..."
+          chmod +x deploy-dev.sh
+          ./deploy-dev.sh
+          
+          echo "✅ Development deployment completed!"
+          EOF
