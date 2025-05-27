@@ -33,7 +33,14 @@ Use the `/music` command to play background music. Select from a variety of genr
 
 ## 📥 Get CozyBot on Your Server
 
+### Direct Link
+
 - [Invite CozyBot to your Discord server](https://discord.com/api/oauth2/authorize?client_id=1156917047284994178&permissions=40550970817344&scope=bot)
+
+### App Directory
+
+CozyBot is also available in the official Discord App Directory:
+- [CozyBot on Discord App Directory](https://discord.com/discovery/applications/1156917047284994178)
 
 ## 📅 Future Plans
 
