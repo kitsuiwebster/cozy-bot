@@ -27,3 +27,4 @@ USER botuser
 
 # Default command (will be overridden by docker-compose)
 CMD ["python3", "main.py"]
+
