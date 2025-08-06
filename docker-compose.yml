@@ -23,7 +23,7 @@ services:
     command: sh -c "${BOT_COMMAND:-python3 main.py}"
     # Health check conditionnel
     healthcheck:
-      test: ${HEALTH_CHECK_CMD:-["CMD", "python3", "-c", "import discord; print('Bot dependencies OK')"]}
+      test: ["CMD", "python3", "-c", "import discord; print('Bot dependencies OK')"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
