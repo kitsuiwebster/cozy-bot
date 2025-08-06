@@ -26,3 +26,5 @@
         - name: 🛡️ Deploy to Production
           run: |
             ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -l -c "cd ~/cozy-bot && git stash || true && git checkout main && git pull origin main && chmod +x deploy-prod.sh && ./deploy-prod.sh"'
+
+            
