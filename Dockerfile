@@ -2,8 +2,8 @@ FROM python:3.11-slim
 
 # Install system dependencies including ffmpeg and git
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
     git \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -23,8 +23,9 @@ COPY . .
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+
+# Switch to the non-root user
 USER botuser
 
 # Default command (will be overridden by docker-compose)
 CMD ["python3", "main.py"]
-
