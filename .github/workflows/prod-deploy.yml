@@ -17,14 +17,40 @@
           run: |
             mkdir -p ~/.ssh
             ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
-
-        - name: 🔍 Test SSH & Docker access
-          run: |
-            ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'docker --version && docker ps'
-
         
         - name: 🛡️ Deploy to Production
           run: |
-            ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -l -c "cd ~/cozy-bot && git stash || true && git checkout main && git pull origin main && chmod +x deploy-prod.sh && ./deploy-prod.sh"'
-
+            ${{ secrets.SSH_COMMAND }} << 'EOF'
+            set -e
+            echo "🎯 Starting production deployment..."
             
+            cd ~/cozy-bot
+            
+            # Git operations
+            echo "📝 Updating code..."
+            git stash push -m "auto-stash before deploy $(date)"
+            git checkout main
+            git pull origin main
+            
+            # Check if required files exist
+            echo "🔍 Checking environment files..."
+            if [ ! -f ".env.prod" ]; then
+              echo "❌ .env.prod not found on server!"
+              echo "Please create .env.prod file manually on the server"
+              exit 1
+            fi
+            
+            # Security check
+            echo "🔐 Running security checks..."
+            if grep -q "your_token_here\|example\|test" .env.prod; then
+              echo "❌ Production file contains placeholder values!"
+              exit 1
+            fi
+            
+            # Deploy
+            echo "🚀 Running deployment script..."
+            chmod +x deploy-prod.sh
+            ./deploy-prod.sh
+            
+            echo "✅ Production deployment completed!"
+            EOF
