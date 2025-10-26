@@ -9,8 +9,9 @@ class TopCog(commands.Cog):
 
     # Load voice channel usage statistics from persistent storage
     def load_voice_time_data(self):
+        data_file = 'data/voice_time_data.json'
         try:
-            with open('voice_time_data.json', 'r') as file:
+            with open(data_file, 'r') as file:
                 return json.load(file)
         except FileNotFoundError:
             return {}
