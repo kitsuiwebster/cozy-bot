@@ -2,10 +2,10 @@
 
 <p align="center">
   <a href="https://discord.gg/Rxeh64Y73U"><img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <img src="https://img.shields.io/github/license/kitsuiwebster/cozy-bot?style=for-the-badge" alt="License">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/kitsuiwebster/cozy-bot?style=for-the-badge" alt="License"></a>
   <img src="https://img.shields.io/badge/Version-1.0.5-blue?style=for-the-badge" alt="Version">
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-View-orange?style=for-the-badge" alt="Changelog"></a>
-  <img src="https://img.shields.io/badge/Made%20with-❤️-red?style=for-the-badge" alt="Made with Love">
+  <img src="https://img.shields.io/badge/Made%20with-❤️-red?style=for-the-badge&labelColor=white" alt="Made with Love">
 </p>
 
 Welcome to CozyBot, a discord.py bot designed to bring cozy and peaceful ambiences to your Discord voice channels. Our aim is to provide peace of mind and tranquility to Discord users.
