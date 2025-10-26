@@ -147,6 +147,24 @@ async def periodic_backup():
             save_voice_time_data()
             logging.info('💾 Periodic voice data backup completed')
 
+# Background task for periodic points update
+async def periodic_points_update():
+    await bot.wait_until_ready()
+    
+    while not bot.is_closed():
+        # Update listening time points every 2 minutes
+        await asyncio.sleep(120)
+        
+        # Update points for all active voice sessions
+        for guild in bot.guilds:
+            if guild.voice_client and guild.voice_client.is_playing():
+                # Find the sound cog to update listening time
+                for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog']:
+                    cog = bot.get_cog(cog_name)
+                    if cog and hasattr(cog, 'update_listening_time'):
+                        await cog.update_listening_time(guild.id)
+                        break
+
 # Global error handler for unhandled exceptions
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -194,6 +212,7 @@ async def on_ready():
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
     bot.loop.create_task(periodic_backup())
+    bot.loop.create_task(periodic_points_update())
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
@@ -222,7 +241,8 @@ async def run_bot():
             ('commands.sparkles', '✨'),
             ('commands.background-music', '🎵'),
             ('commands.top', '🏆'),
-            ('commands.total', '📊')
+            ('commands.total', '📊'),
+            ('commands.cozy_stats', '🏅')
         ]
         
         logging.info('🔧 Loading bot extensions...')

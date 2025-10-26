@@ -19,8 +19,8 @@ class TopCog(commands.Cog):
             return {}
 
     # Display guild rankings based on voice channel usage metrics
-    @app_commands.command(name="top", description="Display the top servers!")
-    async def top_command(self, interaction: discord.Interaction):
+    @app_commands.command(name="top-servers", description="Display the top servers!")
+    async def top_servers_command(self, interaction: discord.Interaction):
         try:
             # Retrieve voice channel usage statistics
             guild_voice_time = self.load_voice_time_data()
