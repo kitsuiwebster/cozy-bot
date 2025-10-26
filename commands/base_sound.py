@@ -4,6 +4,7 @@ from discord.ext import commands
 from discord.ui import Button, View
 import os
 import random
+import asyncio
 
 # Abstract base view component for audio command interfaces
 class BaseSoundView(View):
@@ -62,18 +63,12 @@ class BaseSoundCog(commands.Cog):
             await interaction.followup.send(content="You need to be in a voice channel to use this command.😵", ephemeral=True)
             return
 
-        channel = interaction.user.voice.channel
-        # Establish or migrate voice channel connection
-        try:
-            if interaction.guild.voice_client is None:
-                await channel.connect()
-            else:
-                await interaction.guild.voice_client.move_to(channel)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
-            return
+        # Store user's voice channel for later connection
+        user_channel = interaction.user.voice.channel
+        guild_state = self.get_guild_state(interaction.guild.id)
+        guild_state['target_channel'] = user_channel
 
-        # Render interactive sound selection interface
+        # Render interactive sound selection interface (bot connects when sound is chosen)
         view = BaseSoundView(self.sounds, self.sound_labels, interaction.user.id, self.bot, self.__class__.__name__)
         await interaction.followup.send(prompt_message, view=view)
 
@@ -83,7 +78,9 @@ class BaseSoundCog(commands.Cog):
             self.guild_states[guild_id] = {
                 'is_playing': False,
                 'current_sound': None,
-                'loop_task': None
+                'loop_task': None,
+                'target_channel': None,
+                'disconnect_timer': None
             }
         return self.guild_states[guild_id]
 
@@ -104,15 +101,30 @@ class BaseSoundCog(commands.Cog):
         guild_id = interaction.guild.id
         guild_state = self.get_guild_state(guild_id)
         
-        # Terminate active audio playback session
-        voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.is_playing():
-            voice_client.stop()
-        
         # Extract audio file identifier from interaction data
         sound_filename = interaction.data.get('custom_id')
         
-        # Initialize audio playback for selected file
+        # Connect to voice channel if not already connected
+        voice_client = interaction.guild.voice_client
+        if voice_client is None:
+            target_channel = guild_state.get('target_channel')
+            if target_channel:
+                try:
+                    voice_client = await target_channel.connect()
+                    # Start disconnect timer for empty channel monitoring
+                    await self.start_disconnect_timer(guild_id)
+                except Exception as e:
+                    await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
+                    return
+            else:
+                await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
+                return
+        
+        # Stop current audio if playing
+        if voice_client.is_playing():
+            voice_client.stop()
+        
+        # Initialize audio playback for selected file with loop
         try:
             sound_path = f"sounds/{sound_filename}"
             if os.path.exists(sound_path):
@@ -129,17 +141,74 @@ class BaseSoundCog(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Error playing sound: {str(e)}", ephemeral=True)
 
+    async def start_disconnect_timer(self, guild_id):
+        """Start timer to disconnect bot if channel becomes empty"""
+        guild_state = self.get_guild_state(guild_id)
+        
+        # Cancel existing timer if any
+        if guild_state['disconnect_timer']:
+            guild_state['disconnect_timer'].cancel()
+        
+        # Start new timer task
+        guild_state['disconnect_timer'] = asyncio.create_task(self.disconnect_timer_task(guild_id))
+    
+    async def disconnect_timer_task(self, guild_id):
+        """Timer task that disconnects bot after 2 minutes if channel is empty"""
+        try:
+            while True:
+                await asyncio.sleep(120)  # Wait 2 minutes
+                
+                guild = self.bot.get_guild(guild_id)
+                if not guild or not guild.voice_client:
+                    break
+                
+                voice_client = guild.voice_client
+                if not voice_client.channel:
+                    break
+                
+                # Check if there are real users (not bots) in the channel
+                human_members = [m for m in voice_client.channel.members if not m.bot]
+                
+                if not human_members:
+                    # Channel is empty, disconnect
+                    guild_state = self.get_guild_state(guild_id)
+                    if voice_client.is_playing():
+                        voice_client.stop()
+                    await voice_client.disconnect()
+                    guild_state['is_playing'] = False
+                    guild_state['current_sound'] = None
+                    guild_state['disconnect_timer'] = None
+                    print(f"🤖 Auto-disconnected from empty voice channel in {guild.name}")
+                    break
+                else:
+                    # Still has users, continue monitoring
+                    continue
+                    
+        except asyncio.CancelledError:
+            # Timer was cancelled (normal when new user joins or manual stop)
+            pass
+        except Exception as e:
+            print(f"Error in disconnect timer: {e}")
+
     async def stop_sound(self, interaction, guild_id):
-        """Terminate active audio playback session"""
+        """Terminate active audio playback session and disconnect"""
         await interaction.response.defer()
         
         guild_state = self.get_guild_state(guild_id)
         voice_client = interaction.guild.voice_client
         
-        if voice_client and voice_client.is_playing():
-            voice_client.stop()
+        # Cancel disconnect timer
+        if guild_state['disconnect_timer']:
+            guild_state['disconnect_timer'].cancel()
+            guild_state['disconnect_timer'] = None
+        
+        if voice_client:
+            if voice_client.is_playing():
+                voice_client.stop()
+            await voice_client.disconnect()
             guild_state['is_playing'] = False
             guild_state['current_sound'] = None
-            await interaction.followup.send("⏹️ Stopped playing.")
+            await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
         else:
             await interaction.followup.send("❌ No sound is currently playing.", ephemeral=True)
+
