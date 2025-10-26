@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 import os
 from discord.ext import commands
-from reactions.reactions import handle_reactions
+from cogs.reactions.reactions import handle_reactions
 from datetime import datetime
 import json
 import asyncio
@@ -141,11 +141,19 @@ async def periodic_backup():
     await bot.wait_until_ready()
     
     while not bot.is_closed():
-        # Save voice time data every 5 minutes
+        # Save data every 5 minutes
         await asyncio.sleep(300)
         if guild_voice_time:
             save_voice_time_data()
             logging.info('💾 Periodic voice data backup completed')
+        
+        # Also save gamification data periodically
+        try:
+            from cogs.stats.gamification import cozy_gamification
+            cozy_gamification.save_user_data()
+            logging.info('💾 Periodic gamification data backup completed')
+        except Exception as e:
+            logging.error(f'💾 Failed to backup gamification data: {e}')
 
 # Background task for periodic points update
 async def periodic_points_update():
@@ -236,19 +244,22 @@ async def run_bot():
     try:
         # Load bot command modules and register extensions
         extensions = [
-            ('commands.rain', '🌧️'),
-            ('commands.sea', '🌊'), 
-            ('commands.sparkles', '✨'),
-            ('commands.background-music', '🎵'),
-            ('commands.top', '🏆'),
-            ('commands.total', '📊'),
-            ('commands.cozy_stats', '🏅')
+            ('cogs.audio.rain.rain', '🌧️'),
+            ('cogs.audio.sea.sea', '🌊'), 
+            ('cogs.audio.sparkles.sparkles', '✨'),
+            ('cogs.audio.background_music.background-music', '🎵'),
+            ('cogs.audio.stop', '🛑'),
+            ('cogs.stats.profile', '🏅'),
+            ('cogs.stats.tops', '🏆'),
+            ('cogs.stats.total', '📊')
         ]
         
         logging.info('🔧 Loading bot extensions...')
         for ext_name, emoji in extensions:
             await bot.load_extension(ext_name)
-            logging.info(f'   {emoji} {ext_name} loaded successfully')
+            # Add extra space for emojis that take 2 characters
+            space = '  ' if emoji == '🌧️' else ' '
+            logging.info(f'   {emoji}{space} {ext_name} loaded successfully')
         
     except Exception as e:
         logging.error(f'💥 Error loading extension: {e}')
@@ -265,6 +276,13 @@ if __name__ == "__main__":
         loop.run_until_complete(run_bot())
     except KeyboardInterrupt:
         print("---> Bot stopped by user.")
+        # Save all data on graceful shutdown
         save_voice_time_data()
+        try:
+            from cogs.stats.gamification import cozy_gamification
+            cozy_gamification.save_user_data()
+            logging.info('💾 Gamification data saved on shutdown')
+        except Exception as e:
+            logging.error(f'💾 Failed to save gamification data on shutdown: {e}')
     finally:
         loop.close()
