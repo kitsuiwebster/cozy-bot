@@ -8,31 +8,84 @@ from datetime import datetime
 import json
 import asyncio
 
-# Load environment variables from a .env file.
+# Load environment variables from configuration file
 load_dotenv()
 
-# Configure logging with an info level
-logging.basicConfig(level=logging.INFO)
+# Configure enhanced logging system with visual formatting
+import sys
+class FancyFormatter(logging.Formatter):
+    # ANSI terminal color codes for log formatting
+    COLORS = {
+        'DEBUG': '\033[36m',    # Cyan
+        'INFO': '\033[32m',     # Green  
+        'WARNING': '\033[33m',  # Yellow
+        'ERROR': '\033[31m',    # Red
+        'CRITICAL': '\033[35m', # Magenta
+        'RESET': '\033[0m'      # Reset
+    }
+    
+    EMOJIS = {
+        'DEBUG': '🔍',
+        'INFO': '✅', 
+        'WARNING': '⚠️',
+        'ERROR': '❌',
+        'CRITICAL': '💥'
+    }
+    
+    def format(self, record):
+        # Apply visual formatting to log record
+        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+        emoji = self.EMOJIS.get(record.levelname, '📝')
+        reset = self.COLORS['RESET']
+        
+        # Apply context-specific formatting based on logger namespace
+        if 'discord.gateway' in record.name:
+            emoji = '🌐'
+        elif 'discord.voice' in record.name:
+            emoji = '🎵'
+        elif 'discord.player' in record.name:
+            emoji = '🎶'
+        elif 'discord.client' in record.name:
+            emoji = '🤖'
+            
+        # Format timestamp for log entry
+        timestamp = self.formatTime(record, '%H:%M:%S')
+        
+        # Generate formatted log message
+        return f"{color}{emoji} [{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
 
-# Set up Discord intents for the bot.
+# Initialize enhanced logging system
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Clear existing log handlers
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+# Install custom log formatter
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(FancyFormatter())
+logger.addHandler(handler)
+
+# Configure Discord Gateway intents for bot permissions
 intents = discord.Intents.default()
 intents.typing = False
 intents.members = True
 intents.message_content = True
 intents.guilds = True
 
-# Initialize the bot with a command prefix and the specified intents.
+# Initialize Discord bot instance with configuration
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# Print the list of guilds the bot is a member of.
+# Debug: Display connected guilds (development only)
 print(bot.guilds)
 
-# Function to save voice channel time data to a file
+# Persist voice channel usage statistics to storage
 def save_voice_time_data():
     with open('voice_time_data.json', 'w') as file:
         json.dump(guild_voice_time, file)
 
-# Function to load voice channel time data from a file
+# Load voice channel usage statistics from persistent storage
 def load_voice_time_data():
     try:
         with open('voice_time_data.json', 'r') as file:
@@ -40,10 +93,10 @@ def load_voice_time_data():
     except FileNotFoundError:
         return {}
 
-# Initialize a dictionary to store voice channel time for each guild
+# Initialize guild-specific voice channel usage tracking
 guild_voice_time = load_voice_time_data()
 
-# Coroutine to change the bot's status periodically.
+# Background task for dynamic bot presence updates
 async def change_status():
     await bot.wait_until_ready()
 
@@ -55,17 +108,17 @@ async def change_status():
             discord.Game(name=f"with {total_member_count} members"),
         ]
 
-        # Cycle through the statuses and set the bot's presence.
+        # Rotate through presence states with configured interval
         for status in statuses:
             await bot.change_presence(activity=status)
             await asyncio.sleep(10)
 
-# Event handler for any errors that occur.
+# Global error handler for unhandled exceptions
 @bot.event
 async def on_error(event, *args, **kwargs):
     print(f"An error occurred: {event}")
 
-# Event handler for voice state updates
+# Voice state change event handler for usage tracking
 @bot.event
 async def on_voice_state_update(member, before, after):
     if member.id != bot.user.id:
@@ -73,12 +126,12 @@ async def on_voice_state_update(member, before, after):
 
     guild_id = str(member.guild.id)  # Convert to string for JSON compatibility
 
-    # Check if the bot has joined a voice channel
+    # Track bot voice channel connection events
     if before.channel is None and after.channel is not None:
-        # Record the start time
+        # Initialize session timing for current connection
         guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
 
-    # Check if the bot has left a voice channel
+    # Process bot voice channel disconnection events
     elif before.channel is not None and after.channel is None:
         if guild_id in guild_voice_time and guild_voice_time[guild_id][0] is not None:
             start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
@@ -89,22 +142,33 @@ async def on_voice_state_update(member, before, after):
             print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
             save_voice_time_data() 
 
-# Event handler for when the bot is ready and has started.
+# Bot ready event handler - initialization complete
 @bot.event
 async def on_ready():
-    print(f'{bot.user.name} is connected !!')
+    logging.info(f'🎉 {bot.user.name} is ready and connected!')
+    
+    # Synchronize application commands with Discord API
+    try:
+        logging.info('🔄 Syncing application commands...')
+        synced = await bot.tree.sync()
+        logging.info(f'✅ Synced {len(synced)} application commands!')
+    except Exception as e:
+        logging.error(f'💥 Error syncing commands: {e}')
+    
+    logging.info('🚀 Bot startup complete - All systems operational')
+    
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
 
-    # Print total members and servers.
+    # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
     total_member_count = sum(guild.member_count for guild in bot.guilds)
-    print(f'Total members: {total_member_count}, total servers {server_count}')
-    print("Cozy Bot's servers")
+    logging.info(f'📊 Serving {total_member_count:,} members across {server_count} servers')
+    logging.info('🏠 Connected servers:')
     for guild in bot.guilds:
-        print(f"{guild.name}")
+        logging.info(f'   └─ {guild.name} ({guild.member_count:,} members)')
 
-# Event handler for processing messages.
+# Message processing event handler
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -113,25 +177,32 @@ async def on_message(message):
 
     await handle_reactions(message)
 
-# Function to run the bot.
+# Bot initialization and startup routine
 async def run_bot():
     try:
-        # Load extensions for the bot.
-        bot.load_extension('commands.rain')
-        bot.load_extension('commands.sea')
-        bot.load_extension('commands.sparkles')
-        bot.load_extension('commands.top')
-        bot.load_extension('commands.total')
-        bot.load_extension('commands.background-music')
-
+        # Load bot command modules and register extensions
+        extensions = [
+            ('commands.rain', '🌧️'),
+            ('commands.sea', '🌊'), 
+            ('commands.sparkles', '✨'),
+            ('commands.background-music', '🎵'),
+            ('commands.top', '🏆'),
+            ('commands.total', '📊')
+        ]
+        
+        logging.info('🔧 Loading bot extensions...')
+        for ext_name, emoji in extensions:
+            await bot.load_extension(ext_name)
+            logging.info(f'   {emoji} {ext_name} loaded successfully')
+        
     except Exception as e:
-        print(f"Error loading extension: {e}")
+        logging.error(f'💥 Error loading extension: {e}')
 
-    # Start the bot with the token from the environment variable.
+    # Initialize bot connection using authentication token
     bot_token = os.getenv("DISCORD_BOT_TOKEN")
     await bot.start(bot_token)
 
-# Main entry point of the script.
+# Application entry point - bot startup sequence
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 

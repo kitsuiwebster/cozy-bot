@@ -15,8 +15,8 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install the specific py-cord development version
-RUN pip install git+https://github.com/Pycord-Development/pycord.git@fc7b1042
+# Install discord.py with voice v8 fix
+RUN pip install discord.py[voice] --upgrade
 
 # Copy the rest of the application
 COPY . .
