@@ -41,6 +41,7 @@ jobs:
           ./deploy-dev.sh
 
           echo "✅ Development deployment completed!"
+          exit 0
           EOF
               SSH_RC=$?
               set -e
