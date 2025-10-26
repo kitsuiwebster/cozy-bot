@@ -1,8 +1,7 @@
 # 🛋️ CozyBot v1.0.5
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/kitsuiwebster/cozy-bot?style=for-the-badge" alt="Version">
-  <img src="https://img.shields.io/discord/1159503999764783206?style=for-the-badge&logo=discord" alt="Discord">
+  <img src="https://img.shields.io/discord/1063274226699735070?style=for-the-badge&logo=discord" alt="Discord">
   <img src="https://img.shields.io/github/license/kitsuiwebster/cozy-bot?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/github/stars/kitsuiwebster/cozy-bot?style=for-the-badge" alt="Stars">
 </p>
@@ -10,12 +9,6 @@
 Welcome to CozyBot, a discord.py bot designed to bring cozy and peaceful ambiences to your Discord voice channels. Our aim is to provide peace of mind and tranquility to Discord users.
 
 ![CozyBot Logo](assets/logo.png)
-
-## 🚀 Quick Start
-
-1. [**Invite CozyBot**](https://discord.com/api/oauth2/authorize?client_id=1156917047284994178&permissions=40550970817344&scope=bot) to your server
-2. Join a voice channel
-3. Use `/rain` to start your cozy experience!
 
 ## 📥 Get CozyBot on Your Server
 
@@ -76,16 +69,6 @@ We are working to improve CozyBot and add more features. Stay tuned for more coz
 ## Short video presentation
 
 [![CozyBot video presentation](assets/placeholder.png)](https://youtu.be/3q5n-jqTvsg)
-
-## 🤝 Contributing
-
-We welcome contributions! If you'd like to contribute to CozyBot:
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## 📄 License
 
