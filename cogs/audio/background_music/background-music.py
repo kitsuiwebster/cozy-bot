@@ -15,7 +15,7 @@ class BackgroundMusicCog(BaseSoundCog):
         }
         super().__init__(bot, "background-music", sounds, sound_labels, "Play some music in the background.🎶")
 
-    @app_commands.command(name="background-music", description="Play some music in the background.🎶")
+    @app_commands.command(name="music", description="Play some music in the background.🎶")
     async def background_music_command(self, interaction: discord.Interaction):
         await self.play_sound_command(interaction, "Please select background music:")
 
