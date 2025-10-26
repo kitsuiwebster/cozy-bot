@@ -7,6 +7,7 @@ from reactions.reactions import handle_reactions
 from datetime import datetime
 import json
 import asyncio
+import fcntl
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -70,7 +71,7 @@ logger.addHandler(handler)
 # Configure Discord Gateway intents for bot permissions
 intents = discord.Intents.default()
 intents.typing = False
-intents.members = True
+intents.members = False
 intents.message_content = True
 intents.guilds = True
 
@@ -82,15 +83,37 @@ print(bot.guilds)
 
 # Persist voice channel usage statistics to storage
 def save_voice_time_data():
-    with open('voice_time_data.json', 'w') as file:
-        json.dump(guild_voice_time, file)
+    data_file = 'data/voice_time_data.json'
+    temp_file = data_file + '.tmp'
+    
+    # Ensure data directory exists
+    os.makedirs('data', exist_ok=True)
+    
+    try:
+        # Write to temporary file with exclusive lock
+        with open(temp_file, 'w') as file:
+            fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+            json.dump(guild_voice_time, file, indent=2)
+            file.flush()
+            os.fsync(file.fileno())
+        
+        # Atomic rename to final file
+        os.rename(temp_file, data_file)
+        
+    except Exception as e:
+        # Clean up temp file on error
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        logging.error(f'Failed to save voice time data: {e}')
 
 # Load voice channel usage statistics from persistent storage
 def load_voice_time_data():
+    data_file = 'data/voice_time_data.json'
     try:
-        with open('voice_time_data.json', 'r') as file:
+        with open(data_file, 'r') as file:
             return json.load(file)
     except FileNotFoundError:
+        # Initialize with empty data if file doesn't exist
         return {}
 
 # Initialize guild-specific voice channel usage tracking
@@ -112,6 +135,17 @@ async def change_status():
         for status in statuses:
             await bot.change_presence(activity=status)
             await asyncio.sleep(10)
+
+# Background task for periodic data backup
+async def periodic_backup():
+    await bot.wait_until_ready()
+    
+    while not bot.is_closed():
+        # Save voice time data every 5 minutes
+        await asyncio.sleep(300)
+        if guild_voice_time:
+            save_voice_time_data()
+            logging.info('💾 Periodic voice data backup completed')
 
 # Global error handler for unhandled exceptions
 @bot.event
@@ -159,6 +193,7 @@ async def on_ready():
     
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
+    bot.loop.create_task(periodic_backup())
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)

@@ -11,7 +11,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
     volumes:
       # Volumes de base toujours montés
-      - ./voice_time_data.json:/app/voice_time_data.json
+      - voice-data:/app/data
       - bot-logs:/app/logs
       # Volume conditionnel pour le développement
       - ${DEV_CODE_MOUNT:-/tmp/empty}:/app/code:rw
@@ -31,6 +31,8 @@ services:
       disable: ${HEALTH_CHECK_DISABLE:-false}
 
 volumes:
+  voice-data:
+    name: ${VOICE_DATA_VOLUME:-cozy-bot-voice-data}
   bot-logs:
     name: ${VOLUME_NAME:-cozy-bot-logs}
 
