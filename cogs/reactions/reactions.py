@@ -177,4 +177,4 @@ async def handle_reactions(message):
     
     # Scan message content for rain-related terminology
     if any(keyword in clean_message for keyword in rain_keywords):
-        await add_reactions(message, ["🌧️", "💧", "☔"])
+        await add_reactions(message, ["🌧️"])
