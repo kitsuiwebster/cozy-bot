@@ -2,11 +2,15 @@
 DATE=$(date +%Y-%m-%d)
 BACKUP_DIR="/home/kitsui/backups/$DATE"
 
-mkdir -p $BACKUP_DIR
+mkdir -p $BACKUP_DIR/dev $BACKUP_DIR/prod
 
-# Copy JSON files directly from volumes (use the exact volume name from .env.dev)
-VOLUME_NAME="cozy-bot-voice-data-dev"
-docker run --rm -v $VOLUME_NAME:/data -v $BACKUP_DIR:/backup alpine sh -c 'find /data -name "*.json" -exec cp {} /backup/ \; || echo "No JSON files found"'
+# Backup dev environment
+echo "Backing up dev environment..."
+docker run --rm -v cozy-bot-voice-data-dev:/data -v $BACKUP_DIR/dev:/backup alpine sh -c 'find /data -name "*.json" -exec cp {} /backup/ \; || echo "No JSON files in dev"'
+
+# Backup prod environment  
+echo "Backing up prod environment..."
+docker run --rm -v cozy-bot-voice-data-prod:/data -v $BACKUP_DIR/prod:/backup alpine sh -c 'find /data -name "*.json" -exec cp {} /backup/ \; || echo "No JSON files in prod"'
 
 # Cleanup old backups (keep 30 days)
 find /home/kitsui/backups -maxdepth 1 -type d -mtime +30 -exec rm -rf {} \;
