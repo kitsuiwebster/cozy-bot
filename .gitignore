@@ -52,6 +52,9 @@ Thumbs.db
 *.log
 logs/
 
+# Useless
+useful
+
 # Bot data (si sensible)
 voice_time_data.json
 

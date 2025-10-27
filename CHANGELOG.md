@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2025-10-26
+
+### Added
+
+- Gamification system with `/profile`, `/top-users`, and `/achievements` commands for user engagement tracking.
+- Persistent server data with Docker volume implementation.
+- Better UX and sound playing logic.
+- Reactions in multiple languages.
+- `/stop` command for stopping currently playing sounds.
+
+### Fixed
+
+- Fixed total command data persistence issues.
+- Resolved deployment script errors (cd error 255).
+- Fixed py-cord compatibility issues by migrating to discord.py.
+
+### Changed
+
+- Complete architecture refactoring for all audio commands (`/rain`, `/sea`, `/sparkles`, `/music`).
+- Renamed `/background-music` command name to `/music`.
+- Renamed `/top` command to `/top-servers`.
+- Enhanced file locking implementation with fcntl for better data consistency.
+- Refactored codebase structure for better maintainability.
+
 ## [1.0.4] - 2024-05-25
 
 ### Added

@@ -15,14 +15,16 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install the specific py-cord development version
-RUN pip install git+https://github.com/Pycord-Development/pycord.git@fc7b1042
+# Install discord.py with voice v8 fix
+RUN pip install discord.py[voice] --upgrade
 
 # Copy the rest of the application
 COPY . .
 
-# Create a non-root user for security
-RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+# Create a non-root user for security and create data directory
+RUN useradd -m -u 1000 botuser && \
+    mkdir -p /app/data && \
+    chown -R botuser:botuser /app
 
 # Switch to the non-root user
 USER botuser
