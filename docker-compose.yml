@@ -9,6 +9,7 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENABLE_STARTUP_MESSAGES=${ENABLE_STARTUP_MESSAGES:-false}
     volumes:
       # Volumes de base toujours montés
       - voice-data:/app/data
