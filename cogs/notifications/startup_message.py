@@ -61,20 +61,29 @@ class StartupMessageCog(commands.Cog):
         return {
             "enabled": True,
             "messages": {
-                "comeback": {
+                "update": {
                     "title": "🎉 **Cozy Bot is back online!** 🎉",
-                    "description": "I'm ready to bring you relaxing sounds and cozy vibes again! ✨",
-                    "call_to_action": "Use `/rain`, `/sea`, `/sparkles`, or `/background-music` to start your cozy experience!"
+                    "description": "We're ready to bring you relaxing sounds and cozy vibes again! ✨",
+                    "call_to_action": "Use `/rain`, `/sea`, `/sparkles`, or `/background-music` to start your cozy experience!",
+                    "footer": "We wish you a great day! ✨\n— Imène and Raphaël, CozyBot developers"
                 }
             },
-            "current_message_type": "comeback"
+            "current_message_type": "update"
         }
     
     async def send_startup_messages(self):
         """Send startup message to all servers"""
         config = self.load_message_config()
-        message_type = config.get("current_message_type", "comeback")
-        message_data = config["messages"].get(message_type, config["messages"]["comeback"])
+        message_type = config.get("current_message_type", "update")
+        
+        # Get the message data, fallback to first available message if type not found
+        if message_type in config["messages"]:
+            message_data = config["messages"][message_type]
+        else:
+            # Use the first available message type
+            first_key = next(iter(config["messages"]))
+            message_data = config["messages"][first_key]
+            logging.warning(f"📢 Message type '{message_type}' not found, using '{first_key}'")
         
         # Build the formatted message
         startup_message = self.format_message(message_data)
