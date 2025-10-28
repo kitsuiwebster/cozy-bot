@@ -1,4 +1,5 @@
 {
+  "_comment": "Set 'current_message_type' to 'null' to disable startup messages",
   "enabled": true,
   "messages": {
     "update": {

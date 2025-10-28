@@ -32,17 +32,16 @@ class StartupMessageCog(commands.Cog):
             traceback.print_exc()
     
     def is_startup_messages_enabled(self):
-        """Check if startup messages are enabled via environment variable or config file"""
-        # First check environment variable
-        env_enabled = os.getenv("ENABLE_STARTUP_MESSAGES", "false").lower() == "true"
-        
-        # Then check config file
+        """Check if startup messages are enabled via config file"""
         try:
             config = self.load_message_config()
-            config_enabled = config.get("enabled", False)
-            return env_enabled or config_enabled
+            # If current_message_type is null, disable startup messages
+            message_type = config.get("current_message_type")
+            if message_type is None or message_type == "null":
+                return False
+            return config.get("enabled", True)
         except:
-            return env_enabled
+            return False
     
     def load_message_config(self):
         """Load startup message configuration from JSON file"""
