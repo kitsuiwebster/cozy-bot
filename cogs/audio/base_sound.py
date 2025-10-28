@@ -5,6 +5,7 @@ from discord.ui import Button, View
 import os
 import random
 import asyncio
+import logging
 from ..stats.gamification import cozy_gamification
 
 # Abstract base view component for audio command interfaces
@@ -88,14 +89,24 @@ class BaseSoundCog(commands.Cog):
         return self.guild_states[guild_id]
 
     def after_playing(self, error, guild_id):
-        """Audio playback completion callback handler"""
+        """Audio playback completion callback handler with automatic loop restart"""
         guild_state = self.get_guild_state(guild_id)
+        logging.info(f"🔄 after_playing called - guild_id: {guild_id}, error: {error}")
+        logging.info(f"🔄 Guild state - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
+        
         if error:
-            print(f"Player error: {error}")
+            logging.error(f"Player error: {error}")
+            # Retry after error if we were playing something
+            if guild_state['current_sound'] and guild_state['is_playing']:
+                logging.info(f"🔄 Creating restart task after error for guild {guild_id}")
+                asyncio.create_task(self.restart_audio_loop(guild_id))
         else:
-            # Handle loop state transitions on playback completion
-            if guild_state['current_sound']:
-                guild_state['is_playing'] = False
+            # Automatically restart the same audio for continuous loop
+            if guild_state['current_sound'] and guild_state['is_playing']:
+                logging.info(f"🔄 Creating restart task for normal loop in guild {guild_id}")
+                asyncio.create_task(self.restart_audio_loop(guild_id))
+            else:
+                logging.warning(f"🔄 Not restarting - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
 
     async def on_button_click(self, interaction):
         """Process audio file selection interactions"""
@@ -151,8 +162,9 @@ class BaseSoundCog(commands.Cog):
             else:
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
-                audio_source = FFmpegPCMAudio(sound_path)
-                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+                # Use FFmpeg infinite loop - SIMPLE AND WORKS!
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
+                voice_client.play(audio_source)
                 
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
@@ -237,6 +249,52 @@ class BaseSoundCog(commands.Cog):
             await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
         else:
             await interaction.followup.send("❌ No sound is currently playing.", ephemeral=True)
+
+    async def restart_audio_loop(self, guild_id):
+        """Restart audio for continuous looping"""
+        try:
+            guild_state = self.get_guild_state(guild_id)
+            voice_client = guild_state.get('voice_client')
+            current_sound = guild_state['current_sound']
+            
+            # Get voice client from guild if not in state
+            if not voice_client:
+                guild = self.bot.get_guild(guild_id)
+                if guild:
+                    voice_client = guild.voice_client
+            
+            # Only restart if we should still be playing
+            if not current_sound or not guild_state['is_playing'] or not voice_client:
+                return
+                
+            # Small delay to avoid rapid restart issues
+            await asyncio.sleep(0.1)
+            
+            # Find the correct sound path - use same logic as on_button_click
+            if current_sound.startswith('rain'):
+                sound_path = f"cogs/audio/rain/{current_sound}"
+            elif current_sound.startswith('sea'):
+                sound_path = f"cogs/audio/sea/{current_sound}"
+            elif current_sound.startswith('sparkles'):
+                sound_path = f"cogs/audio/sparkles/{current_sound}"
+            elif current_sound.startswith('background-music'):
+                sound_path = f"cogs/audio/background_music/{current_sound}"
+            else:
+                sound_path = f"cogs/audio/{current_sound}"
+            
+            # Restart audio if file exists and voice client is ready
+            if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
+                audio_source = FFmpegPCMAudio(sound_path)
+                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+                logging.info(f"🔄 Restarted audio loop: {current_sound} in guild {guild_id}")
+            
+        except Exception as e:
+            logging.error(f"❌ Failed to restart audio loop: {e}")
+            # Try again after a longer delay if restart failed
+            await asyncio.sleep(1)
+            guild_state = self.get_guild_state(guild_id)
+            if guild_state['is_playing'] and guild_state['current_sound']:
+                asyncio.create_task(self.restart_audio_loop(guild_id))
 
     async def start_gamification_session(self, interaction, guild_state, sound_filename):
         """Start tracking user session for gamification"""

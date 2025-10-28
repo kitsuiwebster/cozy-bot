@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2025-10-28
+
+### Added
+
+- Configurable startup message system.
+- Optional user parameter to `/profile` command for viewing other users' profiles.
+- Automated daily backup system for user data preservation.
+
+### Fixed
+
+- Audio stopping issues - sounds now play continuously until manually stopped.
+- Display inconsistencies to show actual Discord usernames instead of display names.
+- Data persistence issues between different deployment environments.
+- Updated `/total` command to show only user counts without revealing usernames.
+
 ## [1.0.5] - 2025-10-26
 
 ### Added

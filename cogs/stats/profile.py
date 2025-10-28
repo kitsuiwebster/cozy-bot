@@ -8,9 +8,34 @@ class ProfileCog(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="profile", description="View your cozy profile and achievements 🏆")
-    async def profile_command(self, interaction: discord.Interaction):
-        user_stats = cozy_gamification.get_user_stats(interaction.user.id)
-        rank_info = cozy_gamification.get_user_rank(interaction.user.id)
+    @app_commands.describe(user="User to view profile for (@username or just username)")
+    async def profile_command(self, interaction: discord.Interaction, user: str = None):
+        target_user = interaction.user
+        
+        # If user parameter provided, try to find the user
+        if user:
+            # Remove @ if present
+            search_username = user.replace('@', '').strip()
+            
+            # Search for user by username in gamification data
+            found_user = None
+            for user_id, stats in cozy_gamification.user_data.items():
+                try:
+                    potential_user = await self.bot.fetch_user(int(user_id))
+                    if potential_user and potential_user.name.lower() == search_username.lower():
+                        found_user = potential_user
+                        break
+                except:
+                    continue
+            
+            if found_user:
+                target_user = found_user
+            else:
+                await interaction.response.send_message(f"❌ User '{search_username}' not found in the leaderboard.", ephemeral=True)
+                return
+        
+        user_stats = cozy_gamification.get_user_stats(target_user.id)
+        rank_info = cozy_gamification.get_user_rank(target_user.id)
         
         # Calculate listening time in readable format
         total_seconds = user_stats['listening_time']
@@ -23,12 +48,12 @@ class ProfileCog(commands.Cog):
         
         # Create embed
         embed = discord.Embed(
-            title=f"🌟 {interaction.user.display_name}'s Cozy Profile",
+            title=f"🌟 {target_user.name}'s Cozy Profile",
             color=0x00ff00  # Green
         )
         
         # Add profile picture
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        embed.set_thumbnail(url=target_user.display_avatar.url)
         
         # Points and Level
         embed.add_field(

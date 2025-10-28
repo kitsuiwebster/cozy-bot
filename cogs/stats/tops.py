@@ -64,11 +64,11 @@ class TopsCog(commands.Cog):
         for i, user_data in enumerate(leaderboard, start=1):
             try:
                 user = await self.bot.fetch_user(int(user_data['user_id']))
-                username = user.display_name if user else f"User {user_data['user_id'][:8]}"
+                username = user.name if user else f"User {user_data['user_id'][:8]}"
             except:
                 try:
                     user = self.bot.get_user(int(user_data['user_id']))
-                    username = user.display_name if user else f"User {user_data['user_id'][:8]}"
+                    username = user.name if user else f"User {user_data['user_id'][:8]}"
                 except:
                     username = f"User {user_data['user_id'][:8]}"
             
