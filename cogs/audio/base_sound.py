@@ -91,15 +91,22 @@ class BaseSoundCog(commands.Cog):
     def after_playing(self, error, guild_id):
         """Audio playback completion callback handler with automatic loop restart"""
         guild_state = self.get_guild_state(guild_id)
+        logging.info(f"🔄 after_playing called - guild_id: {guild_id}, error: {error}")
+        logging.info(f"🔄 Guild state - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
+        
         if error:
-            print(f"Player error: {error}")
+            logging.error(f"Player error: {error}")
             # Retry after error if we were playing something
             if guild_state['current_sound'] and guild_state['is_playing']:
+                logging.info(f"🔄 Creating restart task after error for guild {guild_id}")
                 asyncio.create_task(self.restart_audio_loop(guild_id))
         else:
             # Automatically restart the same audio for continuous loop
             if guild_state['current_sound'] and guild_state['is_playing']:
+                logging.info(f"🔄 Creating restart task for normal loop in guild {guild_id}")
                 asyncio.create_task(self.restart_audio_loop(guild_id))
+            else:
+                logging.warning(f"🔄 Not restarting - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
 
     async def on_button_click(self, interaction):
         """Process audio file selection interactions"""
@@ -155,8 +162,9 @@ class BaseSoundCog(commands.Cog):
             else:
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
-                audio_source = FFmpegPCMAudio(sound_path)
-                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+                # Use FFmpeg infinite loop - SIMPLE AND WORKS!
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
+                voice_client.play(audio_source)
                 
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
@@ -262,15 +270,15 @@ class BaseSoundCog(commands.Cog):
             # Small delay to avoid rapid restart issues
             await asyncio.sleep(0.1)
             
-            # Find the correct sound path
-            if current_sound in ['background-music01.mp3', 'background-music02.mp3', 'background-music03.mp3']:
-                sound_path = f"cogs/audio/background_music/{current_sound}"
-            elif current_sound.startswith('rain'):
+            # Find the correct sound path - use same logic as on_button_click
+            if current_sound.startswith('rain'):
                 sound_path = f"cogs/audio/rain/{current_sound}"
             elif current_sound.startswith('sea'):
                 sound_path = f"cogs/audio/sea/{current_sound}"
             elif current_sound.startswith('sparkles'):
                 sound_path = f"cogs/audio/sparkles/{current_sound}"
+            elif current_sound.startswith('background-music'):
+                sound_path = f"cogs/audio/background_music/{current_sound}"
             else:
                 sound_path = f"cogs/audio/{current_sound}"
             
