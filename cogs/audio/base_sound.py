@@ -83,9 +83,6 @@ class BaseSoundCog(commands.Cog):
                 'loop_task': None,
                 'target_channel': None,
                 'disconnect_timer': None,
-                'session_users': set(),
-                'session_start_time': None,
-                'voice_monitor_task': None,
             }
         return self.guild_states[guild_id]
 
@@ -179,8 +176,17 @@ class BaseSoundCog(commands.Cog):
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
                 
-                # Start gamification tracking
-                await self.start_gamification_session(interaction, guild_state, sound_filename)
+                # Track sound preference for current users
+                from cogs.stats.gamification import cozy_gamification
+                voice_client = interaction.guild.voice_client
+                if voice_client and voice_client.channel:
+                    current_users = [member.id for member in voice_client.channel.members if not member.bot]
+                    for user_id in current_users:
+                        cozy_gamification.track_sound_preference(user_id, sound_filename)
+                        # Award session join points
+                        result = cozy_gamification.join_session(user_id)
+                        if result and result.get('new_achievements'):
+                            pass
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -221,22 +227,12 @@ class BaseSoundCog(commands.Cog):
                     # Channel is empty, disconnect
                     guild_state = self.get_guild_state(guild_id)
                     
-                    # Update listening time before disconnecting
-                    await self.update_listening_time(guild_id)
-                    
                     if voice_client.is_playing():
                         voice_client.stop()
                     await voice_client.disconnect()
                     guild_state['is_playing'] = False
                     guild_state['current_sound'] = None
                     guild_state['disconnect_timer'] = None
-                    guild_state['session_users'] = set()
-                    guild_state['session_start_time'] = None
-                    
-                    # Cancel voice monitoring task
-                    if guild_state.get('voice_monitor_task'):
-                        guild_state['voice_monitor_task'].cancel()
-                        guild_state['voice_monitor_task'] = None
                     
                     print(f"🤖 Auto-disconnected from empty voice channel in {guild.name}")
                     break
@@ -257,18 +253,10 @@ class BaseSoundCog(commands.Cog):
         guild_state = self.get_guild_state(guild_id)
         voice_client = interaction.guild.voice_client
         
-        # Update listening time for current session before stopping
-        await self.update_listening_time(guild_id)
-        
         # Cancel disconnect timer
         if guild_state['disconnect_timer']:
             guild_state['disconnect_timer'].cancel()
             guild_state['disconnect_timer'] = None
-        
-        # Cancel voice monitoring task
-        if guild_state.get('voice_monitor_task'):
-            guild_state['voice_monitor_task'].cancel()
-            guild_state['voice_monitor_task'] = None
         
         if voice_client:
             if voice_client.is_playing():
@@ -276,8 +264,6 @@ class BaseSoundCog(commands.Cog):
             await voice_client.disconnect()
             guild_state['is_playing'] = False
             guild_state['current_sound'] = None
-            guild_state['session_users'] = set()
-            guild_state['session_start_time'] = None
             await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
         else:
             await interaction.followup.send("❌ No sound is currently playing.", ephemeral=True)
@@ -328,108 +314,4 @@ class BaseSoundCog(commands.Cog):
             if guild_state['is_playing'] and guild_state['current_sound']:
                 asyncio.create_task(self.restart_audio_loop(guild_id))
 
-    async def start_gamification_session(self, interaction, guild_state, sound_filename):
-        """Start tracking user session for gamification"""
-        from datetime import datetime
-        
-        # Track users in voice channel
-        voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.channel:
-            current_users = {member.id for member in voice_client.channel.members if not member.bot}
-            
-            # Award points for joining session
-            for user_id in current_users:
-                if user_id not in guild_state['session_users']:
-                    result = cozy_gamification.join_session(user_id)
-                    if result and result.get('new_achievements'):
-                        # Notify about new achievements (optional)
-                        pass
-            
-            guild_state['session_users'] = current_users
-            guild_state['session_start_time'] = datetime.now()
-            
-            # Track sound preference
-            for user_id in current_users:
-                cozy_gamification.track_sound_preference(user_id, sound_filename)
-        
-        # Start voice state monitoring task
-        if guild_state.get('voice_monitor_task') is None:
-            guild_state['voice_monitor_task'] = asyncio.create_task(self.monitor_voice_changes(interaction.guild.id))
-
-    async def update_listening_time(self, guild_id):
-        """Update listening time for all users in session"""
-        from datetime import datetime
-        
-        guild_state = self.get_guild_state(guild_id)
-        if not guild_state['session_start_time'] or not guild_state['session_users']:
-            return
-        
-        # Calculate session duration
-        session_duration = (datetime.now() - guild_state['session_start_time']).total_seconds()
-        
-        # Award points for listening time
-        for user_id in guild_state['session_users']:
-            result = cozy_gamification.add_listening_time(user_id, session_duration)
-            if result and result.get('new_achievements'):
-                # Could notify about achievements here
-                pass
-        
-        # Reset session timer
-        guild_state['session_start_time'] = datetime.now()
-
-    async def monitor_voice_changes(self, guild_id):
-        """Monitor voice channel changes and update listening time accordingly"""
-        from datetime import datetime
-        
-        while True:
-            try:
-                await asyncio.sleep(30)  # Check every 30 seconds
-                
-                guild = self.bot.get_guild(guild_id)
-                if not guild or not guild.voice_client:
-                    break
-                    
-                guild_state = self.get_guild_state(guild_id)
-                if not guild_state['is_playing']:
-                    break
-                
-                voice_client = guild.voice_client
-                if not voice_client or not voice_client.channel:
-                    break
-                
-                # Get current users in voice channel
-                current_users = {member.id for member in voice_client.channel.members if not member.bot}
-                previous_users = guild_state.get('session_users', set())
-                
-                # Update listening time for users who left
-                users_who_left = previous_users - current_users
-                if users_who_left and guild_state.get('session_start_time'):
-                    session_duration = (datetime.now() - guild_state['session_start_time']).total_seconds()
-                    for user_id in users_who_left:
-                        result = cozy_gamification.add_listening_time(user_id, session_duration)
-                        if result and result.get('new_achievements'):
-                            # Could notify about achievements here
-                            pass
-                
-                # Award points for new users joining session
-                new_users = current_users - previous_users
-                for user_id in new_users:
-                    result = cozy_gamification.join_session(user_id)
-                    if result and result.get('new_achievements'):
-                        # Notify about new achievements (optional)
-                        pass
-                    # Track sound preference for new users
-                    if guild_state.get('current_sound'):
-                        cozy_gamification.track_sound_preference(user_id, guild_state['current_sound'])
-                
-                # Update session tracking
-                guild_state['session_users'] = current_users
-                guild_state['session_start_time'] = datetime.now()
-                
-            except asyncio.CancelledError:
-                # Task was cancelled (normal when audio stops)
-                break
-            except Exception as e:
-                logging.error(f"Error in voice monitor: {e}")
-                await asyncio.sleep(60)  # Wait longer on error
 

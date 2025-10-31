@@ -74,6 +74,7 @@ intents.typing = False
 intents.members = False
 intents.message_content = True
 intents.guilds = True
+intents.voice_states = True  # Required to track user voice channel changes
 
 # Initialize Discord bot instance with configuration
 bot = commands.Bot(command_prefix="/", intents=intents)
@@ -119,6 +120,9 @@ def load_voice_time_data():
 # Initialize guild-specific voice channel usage tracking
 guild_voice_time = load_voice_time_data()
 
+# Initialize user voice session tracking - simple structure
+user_voice_sessions = {}  # {guild_id: {bot_start_time: datetime, users: {user_id: join_time}}}
+
 # Background task for dynamic bot presence updates
 async def change_status():
     await bot.wait_until_ready()
@@ -155,23 +159,6 @@ async def periodic_backup():
         except Exception as e:
             logging.error(f'💾 Failed to backup gamification data: {e}')
 
-# Background task for periodic points update
-async def periodic_points_update():
-    await bot.wait_until_ready()
-    
-    while not bot.is_closed():
-        # Update listening time points every 2 minutes
-        await asyncio.sleep(120)
-        
-        # Update points for all active voice sessions
-        for guild in bot.guilds:
-            if guild.voice_client and guild.voice_client.is_playing():
-                # Find the sound cog to update listening time
-                for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog']:
-                    cog = bot.get_cog(cog_name)
-                    if cog and hasattr(cog, 'update_listening_time'):
-                        await cog.update_listening_time(guild.id)
-                        break
 
 # Global error handler for unhandled exceptions
 @bot.event
@@ -181,26 +168,102 @@ async def on_error(event, *args, **kwargs):
 # Voice state change event handler for usage tracking
 @bot.event
 async def on_voice_state_update(member, before, after):
-    if member.id != bot.user.id:
+    # Handle bot voice channel tracking (existing server functionality - keep unchanged)
+    if member.id == bot.user.id:
+        guild_id = str(member.guild.id)
+
+        # Bot joined a voice channel
+        if before.channel is None and after.channel is not None:
+            # Initialize server session timing
+            guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
+            
+            # Start user tracking session for this guild
+            user_voice_sessions[guild_id] = {
+                'bot_start_time': datetime.now(),
+                'users': {}
+            }
+            
+            # Note all users currently in the channel
+            from cogs.stats.gamification import cozy_gamification
+            current_users = [m for m in after.channel.members if not m.bot]
+            for user in current_users:
+                user_id = str(user.id)
+                user_voice_sessions[guild_id]['users'][user_id] = datetime.now()
+                # Award session join points
+                result = cozy_gamification.join_session(user_id)
+                logging.info(f"✅ {user.name} was already in channel when bot joined")
+
+        # Bot left a voice channel
+        elif before.channel is not None and after.channel is None:
+            # Handle server timing (existing)
+            if guild_id in guild_voice_time and guild_voice_time[guild_id][0] is not None:
+                start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
+                accumulated_time = guild_voice_time[guild_id][1]
+                time_spent = datetime.now() - start_time
+                total_time = accumulated_time + time_spent.total_seconds()
+                guild_voice_time[guild_id] = [None, total_time]
+                print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
+                save_voice_time_data()
+            
+            # Calculate final listening time for all remaining users
+            if guild_id in user_voice_sessions:
+                from cogs.stats.gamification import cozy_gamification
+                session = user_voice_sessions[guild_id]
+                
+                for user_id, join_time in session['users'].items():
+                    listening_duration = (datetime.now() - join_time).total_seconds()
+                    if listening_duration > 0:
+                        cozy_gamification.add_listening_time(user_id, listening_duration)
+                        points_to_add = int(listening_duration / 60)
+                        if points_to_add > 0:
+                            result = cozy_gamification.add_points(user_id, points_to_add, "Listening time")
+                        logging.info(f"🎯 Final calculation: user {user_id} listened {listening_duration}s")
+                
+                # Clean up session
+                del user_voice_sessions[guild_id]
         return
 
-    guild_id = str(member.guild.id)  # Convert to string for JSON compatibility
-
-    # Track bot voice channel connection events
-    if before.channel is None and after.channel is not None:
-        # Initialize session timing for current connection
-        guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
-
-    # Process bot voice channel disconnection events
-    elif before.channel is not None and after.channel is None:
-        if guild_id in guild_voice_time and guild_voice_time[guild_id][0] is not None:
-            start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
-            accumulated_time = guild_voice_time[guild_id][1]
-            time_spent = datetime.now() - start_time
-            total_time = accumulated_time + time_spent.total_seconds()
-            guild_voice_time[guild_id] = [None, total_time]
-            print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
-            save_voice_time_data() 
+    # Handle user voice channel changes (when bot is present)
+    if member.bot:
+        return
+    
+    guild_id = str(member.guild.id)
+    user_id = str(member.id)
+    
+    # Only track if bot is currently in a voice channel in this guild
+    if guild_id not in user_voice_sessions:
+        return
+    
+    bot_voice_client = member.guild.voice_client
+    bot_channel = bot_voice_client.channel if bot_voice_client else None
+    
+    if not bot_channel:
+        return
+    
+    from cogs.stats.gamification import cozy_gamification
+    session = user_voice_sessions[guild_id]
+    
+    # User joined the bot's channel
+    if after.channel == bot_channel and before.channel != bot_channel:
+        session['users'][user_id] = datetime.now()
+        result = cozy_gamification.join_session(user_id)
+        logging.info(f"✅ {member.name} joined bot channel")
+    
+    # User left the bot's channel  
+    elif before.channel == bot_channel and after.channel != bot_channel:
+        if user_id in session['users']:
+            join_time = session['users'][user_id]
+            listening_duration = (datetime.now() - join_time).total_seconds()
+            
+            if listening_duration > 0:
+                cozy_gamification.add_listening_time(user_id, listening_duration)
+                points_to_add = int(listening_duration / 60)
+                if points_to_add > 0:
+                    result = cozy_gamification.add_points(user_id, points_to_add, "Listening time")
+                logging.info(f"❌ {member.name} left bot channel after {listening_duration}s")
+            
+            # Remove user from session
+            del session['users'][user_id] 
 
 # Bot ready event handler - initialization complete
 @bot.event
@@ -220,7 +283,6 @@ async def on_ready():
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
     bot.loop.create_task(periodic_backup())
-    bot.loop.create_task(periodic_points_update())
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)

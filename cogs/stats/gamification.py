@@ -74,7 +74,7 @@ class CozyGamification:
                 'daily_streak': 0,
                 'last_active_date': None,
                 'level': 1,
-                'level_progress': 0
+                'level_progress': 0,
             }
         return self.user_data[user_id]
     
