@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7] - 2025-10-31
+
+### Fixed
+
+- User listening time tracking not accumulating properly.
+- Duplicate sound selection protection triggering when bot is disconnected.
+
+### Changed
+
+- Refactored voice state tracking system to use event-driven approach for better accuracy and performance.
+
 ## [1.0.6] - 2025-10-28
 
 ### Added
