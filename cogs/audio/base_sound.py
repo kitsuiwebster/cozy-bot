@@ -183,10 +183,6 @@ class BaseSoundCog(commands.Cog):
                     current_users = [member.id for member in voice_client.channel.members if not member.bot]
                     for user_id in current_users:
                         cozy_gamification.track_sound_preference(user_id, sound_filename)
-                        # Award session join points
-                        result = cozy_gamification.join_session(user_id)
-                        if result and result.get('new_achievements'):
-                            pass
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
