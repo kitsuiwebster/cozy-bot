@@ -83,8 +83,6 @@ class BaseSoundCog(commands.Cog):
                 'loop_task': None,
                 'target_channel': None,
                 'disconnect_timer': None,
-                'session_users': set(),
-                'session_start_time': None,
             }
         return self.guild_states[guild_id]
 
@@ -118,8 +116,17 @@ class BaseSoundCog(commands.Cog):
         # Extract audio file identifier from interaction data
         sound_filename = interaction.data.get('custom_id')
         
-        # Connect to voice channel if not already connected, or move to user's channel
+        # Check if the same sound is already playing (only if bot is actively playing)
         voice_client = interaction.guild.voice_client
+        if (guild_state.get('current_sound') == sound_filename and 
+            guild_state.get('is_playing') and 
+            voice_client and 
+            voice_client.is_playing()):
+            await interaction.followup.send("❌ This sound is already playing! Choose a different sound or stop playback first.", ephemeral=True)
+            return
+        
+        # Connect to voice channel if not already connected, or move to user's channel
+        # voice_client already defined above
         user_channel = guild_state.get('target_channel')
         
         if voice_client is None:
@@ -169,8 +176,13 @@ class BaseSoundCog(commands.Cog):
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
                 
-                # Start gamification tracking
-                await self.start_gamification_session(interaction, guild_state, sound_filename)
+                # Track sound preference for current users
+                from cogs.stats.gamification import cozy_gamification
+                voice_client = interaction.guild.voice_client
+                if voice_client and voice_client.channel:
+                    current_users = [member.id for member in voice_client.channel.members if not member.bot]
+                    for user_id in current_users:
+                        cozy_gamification.track_sound_preference(user_id, sound_filename)
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -210,12 +222,14 @@ class BaseSoundCog(commands.Cog):
                 if not human_members:
                     # Channel is empty, disconnect
                     guild_state = self.get_guild_state(guild_id)
+                    
                     if voice_client.is_playing():
                         voice_client.stop()
                     await voice_client.disconnect()
                     guild_state['is_playing'] = False
                     guild_state['current_sound'] = None
                     guild_state['disconnect_timer'] = None
+                    
                     print(f"🤖 Auto-disconnected from empty voice channel in {guild.name}")
                     break
                 else:
@@ -296,48 +310,4 @@ class BaseSoundCog(commands.Cog):
             if guild_state['is_playing'] and guild_state['current_sound']:
                 asyncio.create_task(self.restart_audio_loop(guild_id))
 
-    async def start_gamification_session(self, interaction, guild_state, sound_filename):
-        """Start tracking user session for gamification"""
-        from datetime import datetime
-        
-        # Track users in voice channel
-        voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.channel:
-            current_users = {member.id for member in voice_client.channel.members if not member.bot}
-            
-            # Award points for joining session
-            for user_id in current_users:
-                if user_id not in guild_state['session_users']:
-                    result = cozy_gamification.join_session(user_id)
-                    if result and result.get('new_achievements'):
-                        # Notify about new achievements (optional)
-                        pass
-            
-            guild_state['session_users'] = current_users
-            guild_state['session_start_time'] = datetime.now()
-            
-            # Track sound preference
-            for user_id in current_users:
-                cozy_gamification.track_sound_preference(user_id, sound_filename)
-
-    async def update_listening_time(self, guild_id):
-        """Update listening time for all users in session"""
-        from datetime import datetime
-        
-        guild_state = self.get_guild_state(guild_id)
-        if not guild_state['session_start_time'] or not guild_state['session_users']:
-            return
-        
-        # Calculate session duration
-        session_duration = (datetime.now() - guild_state['session_start_time']).total_seconds()
-        
-        # Award points for listening time
-        for user_id in guild_state['session_users']:
-            result = cozy_gamification.add_listening_time(user_id, session_duration)
-            if result and result.get('new_achievements'):
-                # Could notify about achievements here
-                pass
-        
-        # Reset session timer
-        guild_state['session_start_time'] = datetime.now()
 
