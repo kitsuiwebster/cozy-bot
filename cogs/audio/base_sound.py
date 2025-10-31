@@ -119,8 +119,17 @@ class BaseSoundCog(commands.Cog):
         # Extract audio file identifier from interaction data
         sound_filename = interaction.data.get('custom_id')
         
-        # Connect to voice channel if not already connected, or move to user's channel
+        # Check if the same sound is already playing (only if bot is actively playing)
         voice_client = interaction.guild.voice_client
+        if (guild_state.get('current_sound') == sound_filename and 
+            guild_state.get('is_playing') and 
+            voice_client and 
+            voice_client.is_playing()):
+            await interaction.followup.send("❌ This sound is already playing! Choose a different sound or stop playback first.", ephemeral=True)
+            return
+        
+        # Connect to voice channel if not already connected, or move to user's channel
+        # voice_client already defined above
         user_channel = guild_state.get('target_channel')
         
         if voice_client is None:
