@@ -69,12 +69,12 @@ async def get_top_servers(limit: int = None):
         for index, (guild_id, voice_time) in enumerate(sorted_guilds, start=1):
             total_seconds = int(voice_time[1])
             
-            # Get cached server name or fallback to Server ID
+            # Get cached server name or fallback to Old Server
             server_info = servernames_data.get(guild_id)
             if isinstance(server_info, dict):
-                server_name = server_info.get('name', f"Server {guild_id[:8]}")
+                server_name = server_info.get('name', "Old Server")
             else:
-                server_name = f"Server {guild_id[:8]}"
+                server_name = "Old Server"
             
             server_stats = ServerStats(
                 server_id=guild_id,
