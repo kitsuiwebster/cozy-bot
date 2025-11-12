@@ -28,6 +28,17 @@ def load_voice_time_data():
     except json.JSONDecodeError:
         return {}
 
+def load_servernames_data():
+    """Load server names cache from JSON file"""
+    data_file = 'data/servernames.json'
+    try:
+        with open(data_file, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        return {}
+
 def format_time(total_seconds: int) -> str:
     """Convert seconds to human-readable duration format"""
     days, remainder = divmod(total_seconds, 86400)
@@ -36,11 +47,12 @@ def format_time(total_seconds: int) -> str:
     return f"{days}d {hours}h {minutes}m {seconds}s"
 
 @router.get("/top-servers", response_model=TopServersResponse)
-async def get_top_servers(limit: int = 10):
+async def get_top_servers(limit: int = None):
     """Get top servers by voice time"""
     try:
-        # Load voice time data
+        # Load voice time and server names data
         guild_voice_time = load_voice_time_data()
+        servernames_data = load_servernames_data()
         
         if not guild_voice_time:
             return TopServersResponse(servers=[], total_count=0)
@@ -48,17 +60,25 @@ async def get_top_servers(limit: int = 10):
         # Sort guilds by accumulated voice time in descending order
         sorted_guilds = sorted(guild_voice_time.items(), key=lambda x: x[1][1], reverse=True)
         
-        # Limit results
-        sorted_guilds = sorted_guilds[:limit]
+        # Limit results if specified
+        if limit:
+            sorted_guilds = sorted_guilds[:limit]
         
         # Format response
         servers = []
         for index, (guild_id, voice_time) in enumerate(sorted_guilds, start=1):
             total_seconds = int(voice_time[1])
             
+            # Get cached server name or fallback to Server ID
+            server_info = servernames_data.get(guild_id)
+            if isinstance(server_info, dict):
+                server_name = server_info.get('name', f"Server {guild_id[:8]}")
+            else:
+                server_name = f"Server {guild_id[:8]}"
+            
             server_stats = ServerStats(
                 server_id=guild_id,
-                server_name=f"Server {guild_id[:8]}",  # Simplified for API, can be enhanced with bot instance
+                server_name=server_name,
                 total_time_seconds=total_seconds,
                 formatted_time=format_time(total_seconds),
                 rank=index

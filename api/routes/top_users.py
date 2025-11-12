@@ -16,6 +16,13 @@ class UserStats(BaseModel):
     display_name: Optional[str] = None
     total_points: int
     rank: int
+    listening_time_seconds: float
+    listening_time_formatted: str  # Format humain "2h 30m"
+    daily_streak: int
+    level: int
+    level_progress: float
+    sessions_joined: int
+    achievements_count: int
 
 class TopUsersResponse(BaseModel):
     users: List[UserStats]
@@ -43,8 +50,21 @@ def load_usernames_data():
     except json.JSONDecodeError:
         return {}
 
+def format_listening_time(total_seconds: float) -> str:
+    """Convert seconds to human-readable listening time format"""
+    if total_seconds < 60:
+        return f"{int(total_seconds)}s"
+    elif total_seconds < 3600:
+        minutes = int(total_seconds / 60)
+        seconds = int(total_seconds % 60)
+        return f"{minutes}m {seconds}s" if seconds > 0 else f"{minutes}m"
+    else:
+        hours = int(total_seconds / 3600)
+        minutes = int((total_seconds % 3600) / 60)
+        return f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+
 @router.get("/top-users", response_model=TopUsersResponse)
-async def get_top_users(limit: int = 10):
+async def get_top_users(limit: int = None):
     """Get top users by cozy points"""
     try:
         # Load data directly from the same JSON files the bot uses
@@ -68,7 +88,8 @@ async def get_top_users(limit: int = 10):
         
         # Sort by points descending and limit
         users_list.sort(key=lambda x: x['total_points'], reverse=True)
-        users_list = users_list[:limit]
+        if limit:
+            users_list = users_list[:limit]
         
         # Format response
         users = []
@@ -85,12 +106,23 @@ async def get_top_users(limit: int = 10):
                 username = user_info if user_info else f"User {user_data['user_id'][:8]}"
                 display_name = username
             
+            # Get original user data for additional stats
+            original_stats = user_data_raw.get(user_data['user_id'], {})
+            listening_time_seconds = original_stats.get('listening_time', 0.0)
+            
             user_stats = UserStats(
                 user_id=user_data['user_id'],
                 username=username,
                 display_name=display_name,
                 total_points=user_data['total_points'],
-                rank=i
+                rank=i,
+                listening_time_seconds=listening_time_seconds,
+                listening_time_formatted=format_listening_time(listening_time_seconds),
+                daily_streak=original_stats.get('daily_streak', 0),
+                level=original_stats.get('level', 1),
+                level_progress=original_stats.get('level_progress', 0.0),
+                sessions_joined=original_stats.get('sessions_joined', 0),
+                achievements_count=len(original_stats.get('achievements', []))
             )
             users.append(user_stats)
         

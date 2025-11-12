@@ -53,5 +53,32 @@ class SyncUsernamesCog(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Error during sync: {e}")
 
+    @app_commands.command(name="sync-servers", description="[ADMIN] Sync all server names for API")
+    async def sync_servers_command(self, interaction: discord.Interaction):
+        # Check if user is admin
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ This command is admin-only!", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        
+        try:
+            synced_count = 0
+            
+            # Sync all connected guilds
+            for guild in self.bot.guilds:
+                cozy_gamification.update_servername(str(guild.id), guild.name)
+                synced_count += 1
+            
+            await interaction.followup.send(
+                f"✅ Server names sync complete!\n"
+                f"📊 **Results:**\n"
+                f"• Synced: {synced_count} servers\n"
+                f"• Total guilds: {len(self.bot.guilds)}"
+            )
+            
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error during server sync: {e}")
+
 async def setup(bot):
     await bot.add_cog(SyncUsernamesCog(bot))

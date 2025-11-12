@@ -10,8 +10,10 @@ class CozyGamification:
     def __init__(self):
         self.data_file = 'data/cozy_points.json'
         self.usernames_file = 'data/usernames.json'
+        self.servernames_file = 'data/servernames.json'
         self.user_data = self.load_user_data()
         self.usernames = self.load_usernames()
+        self.servernames = self.load_servernames()
         
     def load_user_data(self) -> Dict:
         """Load user gamification data from persistent storage with validation"""
@@ -57,6 +59,33 @@ class CozyGamification:
                 json.dump(self.usernames, file, indent=2)
         except Exception as e:
             logging.error(f'Failed to save usernames: {e}')
+    
+    def load_servernames(self) -> Dict:
+        """Load server names cache from persistent storage"""
+        try:
+            with open(self.servernames_file, 'r') as file:
+                return json.load(file)
+        except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError:
+            return {}
+    
+    def save_servernames(self):
+        """Save server names cache to persistent storage"""
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open(self.servernames_file, 'w') as file:
+                json.dump(self.servernames, file, indent=2)
+        except Exception as e:
+            logging.error(f'Failed to save server names: {e}')
+    
+    def update_servername(self, guild_id: str, guild_name: str):
+        """Update server name in cache"""
+        self.servernames[str(guild_id)] = {
+            'name': guild_name,
+            'last_updated': datetime.now().isoformat()
+        }
+        self.save_servernames()
     
     def update_username(self, user_id: str, username: str, display_name: str = None):
         """Update username and display name in cache"""
