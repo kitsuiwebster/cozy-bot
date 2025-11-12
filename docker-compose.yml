@@ -9,6 +9,8 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - ENVIRONMENT=${ENVIRONMENT:-production}
+    ports:
+      - "${API_PORT:-8000}:8000"  # API port exposed from bot container
     volumes:
       # Volumes de base toujours montés
       - voice-data:/app/data
@@ -19,8 +21,8 @@ services:
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
     networks:
       - bot-network
-    # Commande par défaut (peut être surchargée)
-    command: sh -c "${BOT_COMMAND:-python3 main.py}"
+    # Commande par défaut (peut être surchargée) - LANCE BOT + API ENSEMBLE
+    command: python3 server.py
     # Health check conditionnel
     healthcheck:
       test: ["CMD", "python3", "-c", "import discord; print('Bot dependencies OK')"]
@@ -29,6 +31,7 @@ services:
       retries: ${HEALTH_CHECK_RETRIES:-3}
       start_period: ${HEALTH_CHECK_START:-40s}
       disable: ${HEALTH_CHECK_DISABLE:-false}
+
 
 volumes:
   voice-data:

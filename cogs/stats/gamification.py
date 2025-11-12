@@ -9,7 +9,9 @@ import logging
 class CozyGamification:
     def __init__(self):
         self.data_file = 'data/cozy_points.json'
+        self.usernames_file = 'data/usernames.json'
         self.user_data = self.load_user_data()
+        self.usernames = self.load_usernames()
         
     def load_user_data(self) -> Dict:
         """Load user gamification data from persistent storage with validation"""
@@ -36,6 +38,35 @@ class CozyGamification:
             except:
                 pass
             return {}
+    
+    def load_usernames(self) -> Dict:
+        """Load username cache from persistent storage"""
+        try:
+            with open(self.usernames_file, 'r') as file:
+                return json.load(file)
+        except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError:
+            return {}
+    
+    def save_usernames(self):
+        """Save username cache to persistent storage"""
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open(self.usernames_file, 'w') as file:
+                json.dump(self.usernames, file, indent=2)
+        except Exception as e:
+            logging.error(f'Failed to save usernames: {e}')
+    
+    def update_username(self, user_id: str, username: str, display_name: str = None):
+        """Update username and display name in cache"""
+        user_id = str(user_id)
+        self.usernames[user_id] = {
+            'username': username,
+            'display_name': display_name or username,
+            'last_updated': datetime.now().isoformat()
+        }
+        self.save_usernames()
     
     def save_user_data(self):
         """Save user gamification data to persistent storage with atomic writes"""
@@ -143,10 +174,15 @@ class CozyGamification:
         user_stats['favorite_sounds'][sound_name] += 1
         self.save_user_data()
     
-    def join_session(self, user_id: str):
+    def join_session(self, user_id: str, username: str = None):
         """Track when user joins a listening session"""
         user_stats = self.get_user_stats(user_id)
         user_stats['sessions_joined'] += 1
+        
+        # Update username cache if provided
+        if username:
+            # username is actually the display_name here, we need both
+            self.update_username(user_id, username, username)
         
         # Update daily streak
         today = datetime.now().strftime('%Y-%m-%d')

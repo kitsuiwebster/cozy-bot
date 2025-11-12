@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2025-11-12
+
+### Added
+
+- REST API with live data access for bot statistics integration with external websites.
+- `/api/top-users` endpoint to retrieve top users by cozy points with usernames and display names.
+- `/api/top-servers` endpoint to retrieve top servers by voice time with formatted duration display.
+- `/api/total` endpoint for real-time active listener statistics with cozy messages.
+- Live bot instance sharing between Discord bot and FastAPI for real-time data access.
+
+### Changed
+
+- Gamification system to cache both Discord usernames and global display names.
+- User data structure to support username tracking and display name caching.
+- API architecture to run within the same container as the Discord bot for optimal performance.
+
 ## [1.0.7] - 2025-10-31
 
 ### Fixed
@@ -11,7 +27,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Refactored voice state tracking system to use event-driven approach for better accuracy and performance.
+- Voice state tracking system to use event-driven approach for better accuracy and performance.
 
 ## [1.0.6] - 2025-10-28
 

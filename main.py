@@ -158,6 +158,37 @@ async def periodic_backup():
             logging.info('💾 Periodic gamification data backup completed')
         except Exception as e:
             logging.error(f'💾 Failed to backup gamification data: {e}')
+        
+        # Save current stats for API
+        save_current_stats_for_api()
+
+def save_current_stats_for_api():
+    """Save current bot stats for API access"""
+    try:
+        total_people_with_bot = 0
+        servers_with_bot = 0
+        
+        for guild in bot.guilds:
+            voice_state = guild.voice_client
+            if voice_state and voice_state.channel:
+                servers_with_bot += 1
+                for member in voice_state.channel.members:
+                    if member != bot.user:
+                        total_people_with_bot += 1
+        
+        stats = {
+            'current_listeners': total_people_with_bot,
+            'servers_with_bot': servers_with_bot,
+            'total_servers': len(bot.guilds),
+            'last_updated': datetime.now().isoformat()
+        }
+        
+        os.makedirs('data', exist_ok=True)
+        with open('data/current_stats.json', 'w') as f:
+            json.dump(stats, f, indent=2)
+            
+    except Exception as e:
+        logging.error(f'💾 Failed to save current stats: {e}')
 
 
 # Global error handler for unhandled exceptions
@@ -189,8 +220,9 @@ async def on_voice_state_update(member, before, after):
             for user in current_users:
                 user_id = str(user.id)
                 user_voice_sessions[guild_id]['users'][user_id] = datetime.now()
-                # Award session join points
-                result = cozy_gamification.join_session(user_id)
+                # Award session join points - pass both username and display_name
+                result = cozy_gamification.join_session(user_id, user.name)  # real username
+                cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
                 logging.info(f"✅ {user.name} was already in channel when bot joined")
 
         # Bot left a voice channel
@@ -246,7 +278,8 @@ async def on_voice_state_update(member, before, after):
     # User joined the bot's channel
     if after.channel == bot_channel and before.channel != bot_channel:
         session['users'][user_id] = datetime.now()
-        result = cozy_gamification.join_session(user_id)
+        result = cozy_gamification.join_session(user_id, member.name)  # real username
+        cozy_gamification.update_username(user_id, member.name, member.global_name or member.display_name)
         logging.info(f"✅ {member.name} joined bot channel")
     
     # User left the bot's channel  
@@ -268,6 +301,14 @@ async def on_voice_state_update(member, before, after):
 # Bot ready event handler - initialization complete
 @bot.event
 async def on_ready():
+    # Set bot instance for API access
+    try:
+        from api.routes.stats import set_bot_instance
+        set_bot_instance(bot)
+        logging.info('🔗 Bot instance shared with API for LIVE access')
+    except Exception as e:
+        logging.warning(f'⚠️ Could not share bot instance with API: {e}')
+    
     logging.info(f'🎉 {bot.user.name} is ready and connected!')
     
     # Synchronize application commands with Discord API
@@ -314,6 +355,7 @@ async def run_bot():
             ('cogs.stats.profile', '🏅'),
             ('cogs.stats.tops', '🏆'),
             ('cogs.stats.total', '📊'),
+            ('cogs.stats.sync_usernames', '👥'),
             ('cogs.notifications.startup_message', '📢')
         ]
         
