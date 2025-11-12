@@ -128,7 +128,7 @@ class ProfileCog(commands.Cog):
             fav_display = sound_emojis.get(fav_sound, fav_sound)
             embed.add_field(
                 name="🎶 Favorite Sound", 
-                value=f"**{fav_display}** ({fav_count} times)", 
+                value=f"**{fav_display}** ({fav_count})", 
                 inline=False
             )
         
