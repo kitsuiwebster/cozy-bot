@@ -13,6 +13,7 @@ docker-compose.override.yml
 
 # Python
 __pycache__/
+__init__.py
 *.py[cod]
 *$py.class
 *.so
