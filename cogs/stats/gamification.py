@@ -238,6 +238,19 @@ class CozyGamification:
         except:
             return False
     
+    def get_current_streak(self, user_id: str) -> int:
+        """Get the current valid streak for a user, returns 0 if not active today"""
+        user_stats = self.get_user_stats(user_id)
+        today = datetime.now().strftime('%Y-%m-%d')
+        last_active = user_stats.get('last_active_date')
+        
+        # If not active today, streak is 0
+        if last_active != today:
+            return 0
+        
+        # If active today, return the stored streak
+        return user_stats.get('daily_streak', 0)
+    
     def check_level_achievements(self, level: int, user_stats: Dict) -> List[str]:
         """Check for level-based achievements"""
         achievements = []

@@ -88,9 +88,11 @@ class ProfileCog(commands.Cog):
             inline=True
         )
         
+        # Get current valid streak (0 if not active today)
+        current_streak = cozy_gamification.get_current_streak(str(interaction.user.id))
         embed.add_field(
             name="🔥 Daily Streak", 
-            value=f"**{user_stats['daily_streak']} days**", 
+            value=f"**{current_streak} days**", 
             inline=True
         )
         

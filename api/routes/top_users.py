@@ -8,6 +8,8 @@ from pydantic import BaseModel
 # Add project root to path to import cogs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from cogs.stats.gamification import cozy_gamification
+
 router = APIRouter()
 
 class UserStats(BaseModel):
@@ -110,6 +112,9 @@ async def get_top_users(limit: int = None):
             original_stats = user_data_raw.get(user_data['user_id'], {})
             listening_time_seconds = original_stats.get('listening_time', 0.0)
             
+            # Get current valid streak (0 if not active today)
+            current_streak = cozy_gamification.get_current_streak(user_data['user_id'])
+            
             user_stats = UserStats(
                 user_id=user_data['user_id'],
                 username=username,
@@ -118,7 +123,7 @@ async def get_top_users(limit: int = None):
                 rank=i,
                 listening_time_seconds=listening_time_seconds,
                 listening_time_formatted=format_listening_time(listening_time_seconds),
-                daily_streak=original_stats.get('daily_streak', 0),
+                daily_streak=current_streak,
                 level=original_stats.get('level', 1),
                 level_progress=original_stats.get('level_progress', 0.0),
                 sessions_joined=original_stats.get('sessions_joined', 0),
