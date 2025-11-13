@@ -112,8 +112,8 @@ async def get_top_users(limit: int = None):
             original_stats = user_data_raw.get(user_data['user_id'], {})
             listening_time_seconds = original_stats.get('listening_time', 0.0)
             
-            # Get streak directly from stored data
-            current_streak = original_stats.get('daily_streak', 0)
+            # Get current valid streak (respects 24h rule)
+            current_streak = cozy_gamification.get_current_streak(user_data['user_id'])
             
             user_stats = UserStats(
                 user_id=user_data['user_id'],
