@@ -254,23 +254,27 @@ class CozyGamification:
         """Convert sound filename to emoji display name"""
         sound_mapping = {
             # Rain sounds
-            'rain1.mp3': '🌧️☔💧',
-            'rain2.mp3': '🌧️⛈️💨', 
-            'rain3.mp3': '🌧️🌊⚡',
+            'rain01.mp3': '🌧️☔💧',
+            'rain02.mp3': '🌧️⛈️💨', 
+            'rain03.mp3': '🌧️🌊⚡',
+            'rain04.mp3': '🌧️🌩️💦',
             # Sea sounds  
-            'sea1.mp3': '🌊🏖️🐚',
-            'sea2.mp3': '🌊⛵🌅',
-            'sea3.mp3': '🌊🏝️🦀',
+            'sea01.mp3': '🌊🏖️🐚',
+            'sea02.mp3': '🌊⛵🌅',
+            'sea03.mp3': '🌊🏝️🦀',
+            'sea04.mp3': '🌊🐋🌀',
             # Sparkles sounds
-            'sparkles1.mp3': '✨⭐💫',
-            'sparkles2.mp3': '✨🌟💎',
-            'sparkles3.mp3': '✨🎇🌌',
+            'sparkles01.mp3': '✨⭐💫',
+            'sparkles02.mp3': '✨🌟💎',
+            'sparkles03.mp3': '✨🎇🌌',
+            'sparkles04.mp3': '✨💫⚡',
             # Background music
-            'background-music1.mp3': '🎵🎶🎼',
-            'background-music2.mp3': '🎵🎹🎸',
-            'background-music3.mp3': '🎵🎺🥁'
+            'background-music01.mp3': '🎵🎶🎼',
+            'background-music02.mp3': '🎵🎹🎸',
+            'background-music03.mp3': '🎵🎺🥁',
+            'background-music04.mp3': '🎵🎻🎷'
         }
-        return sound_mapping.get(sound_filename, f'🎵 {sound_filename}')
+        return sound_mapping.get(sound_filename, sound_filename)
     
     def get_user_favorite_sound(self, user_id: str) -> str:
         """Get user's most listened sound by time with emoji display"""
