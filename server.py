@@ -27,7 +27,7 @@ def start_api():
             port=8000,  # HTTPS port
             ssl_keyfile=ssl_keyfile,
             ssl_certfile=ssl_certfile,
-            log_level="info"
+            log_level="error"
         )
     else:
         print("⚠️  No SSL certificates found, starting with HTTP...")
@@ -35,7 +35,7 @@ def start_api():
             "api.app:app",
             host="0.0.0.0",
             port=8000,
-            log_level="info"
+            log_level="error"
         )
 
 async def start_bot():
