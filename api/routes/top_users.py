@@ -8,6 +8,8 @@ from pydantic import BaseModel
 # Add project root to path to import cogs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from cogs.stats.gamification import cozy_gamification
+
 router = APIRouter()
 
 class UserStats(BaseModel):
@@ -16,6 +18,13 @@ class UserStats(BaseModel):
     display_name: Optional[str] = None
     total_points: int
     rank: int
+    listening_time_seconds: float
+    listening_time_formatted: str  # Format humain "2h 30m"
+    daily_streak: int
+    level: int
+    level_progress: float
+    sessions_joined: int
+    achievements_count: int
 
 class TopUsersResponse(BaseModel):
     users: List[UserStats]
@@ -43,8 +52,126 @@ def load_usernames_data():
     except json.JSONDecodeError:
         return {}
 
+def format_listening_time(total_seconds: float) -> str:
+    """Convert seconds to human-readable listening time format"""
+    if total_seconds < 60:
+        return f"{int(total_seconds)}s"
+    elif total_seconds < 3600:
+        minutes = int(total_seconds / 60)
+        seconds = int(total_seconds % 60)
+        return f"{minutes}m {seconds}s" if seconds > 0 else f"{minutes}m"
+    else:
+        hours = int(total_seconds / 3600)
+        minutes = int((total_seconds % 3600) / 60)
+        return f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+
+class SoundStats(BaseModel):
+    sound_name: str
+    total_time: float
+    formatted_time: str
+    session_count: int
+
+class UserSoundStats(BaseModel):
+    user_id: str
+    username: Optional[str] = None
+    favorite_sound: Optional[str] = None
+    sounds: List[SoundStats]
+
+def get_sound_display_name(sound_filename: str) -> str:
+    """Convert sound filename to emoji display name"""
+    sound_mapping = {
+        # Rain sounds (from actual Discord buttons)
+        'rain00.mp3': '🌧️💧⚡',
+        'rain01.mp3': '🌧️🌿🌙',
+        'rain02.mp3': '🌧️⛈️💨',
+        'rain03.mp3': '🌧️🏠🔥',
+        'rain04.mp3': '🌧️🚗⚡',
+        # Sea sounds (from actual Discord buttons)  
+        'sea00.mp3': '🌊💧💦',
+        'sea01.mp3': '🌊🕊️⛱️',
+        'sea02.mp3': '🌊🏝️🌙',
+        'sea03.mp3': '🌊⛵🕊️',
+        'sea04.mp3': '🌊🤿🔱',
+        # Sparkles sounds (from actual Discord buttons)
+        'sparkles00.mp3': '✨🪄⭐',
+        'sparkles01.mp3': '✨🌟💫',
+        'sparkles02.mp3': '✨🪄💎',
+        'sparkles03.mp3': '✨🌲🌙',
+        'sparkles04.mp3': '✨🪄💫',
+        # Background music (from actual Discord buttons)
+        'background-music00.mp3': '🎶🏛️🌙',
+        'background-music01.mp3': '🎶🍃🌩️',
+        'background-music02.mp3': '🎶🏺💦',
+        'background-music03.mp3': '🎶🌸💦',
+        'background-music04.mp3': '🎶🌿💦'
+    }
+    return sound_mapping.get(sound_filename, sound_filename)
+
+class TopSoundStats(BaseModel):
+    sound_name: str
+    display_name: str
+    total_time: float
+    formatted_time: str
+    total_sessions: int
+    unique_listeners: int
+
+class TopSoundsResponse(BaseModel):
+    sounds: List[TopSoundStats]
+    total_sounds: int
+
+@router.get("/top-sounds", response_model=TopSoundsResponse)
+async def get_top_sounds(limit: int = 10):
+    """Get most listened sounds globally"""
+    try:
+        user_data = load_cozy_points_data()
+        
+        # Aggregate all sound data across users
+        sound_aggregates = {}
+        
+        for user_id, user_stats in user_data.items():
+            listening_times = user_stats.get('listening_time_by_sound', {})
+            
+            for sound_name, sound_data in listening_times.items():
+                if sound_name not in sound_aggregates:
+                    sound_aggregates[sound_name] = {
+                        'total_time': 0.0,
+                        'total_sessions': 0,
+                        'unique_listeners': set()
+                    }
+                
+                sound_aggregates[sound_name]['total_time'] += sound_data['total_time']
+                sound_aggregates[sound_name]['total_sessions'] += sound_data['session_count']
+                sound_aggregates[sound_name]['unique_listeners'].add(user_id)
+        
+        # Convert to list and sort by total time
+        sounds_list = []
+        for sound_name, data in sound_aggregates.items():
+            sounds_list.append(TopSoundStats(
+                sound_name=sound_name,
+                display_name=get_sound_display_name(sound_name),
+                total_time=data['total_time'],
+                formatted_time=format_listening_time(data['total_time']),
+                total_sessions=data['total_sessions'],
+                unique_listeners=len(data['unique_listeners'])
+            ))
+        
+        # Sort by total time descending
+        sounds_list.sort(key=lambda x: x.total_time, reverse=True)
+        
+        # Apply limit
+        if limit:
+            sounds_list = sounds_list[:limit]
+        
+        return TopSoundsResponse(
+            sounds=sounds_list,
+            total_sounds=len(sounds_list)
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
+
 @router.get("/top-users", response_model=TopUsersResponse)
-async def get_top_users(limit: int = 10):
+async def get_top_users(limit: int = None):
     """Get top users by cozy points"""
     try:
         # Load data directly from the same JSON files the bot uses
@@ -68,7 +195,8 @@ async def get_top_users(limit: int = 10):
         
         # Sort by points descending and limit
         users_list.sort(key=lambda x: x['total_points'], reverse=True)
-        users_list = users_list[:limit]
+        if limit:
+            users_list = users_list[:limit]
         
         # Format response
         users = []
@@ -85,12 +213,26 @@ async def get_top_users(limit: int = 10):
                 username = user_info if user_info else f"User {user_data['user_id'][:8]}"
                 display_name = username
             
+            # Get original user data for additional stats
+            original_stats = user_data_raw.get(user_data['user_id'], {})
+            listening_time_seconds = original_stats.get('listening_time', 0.0)
+            
+            # Get current valid streak (respects 24h rule)
+            current_streak = cozy_gamification.get_current_streak(user_data['user_id'])
+            
             user_stats = UserStats(
                 user_id=user_data['user_id'],
                 username=username,
                 display_name=display_name,
                 total_points=user_data['total_points'],
-                rank=i
+                rank=i,
+                listening_time_seconds=listening_time_seconds,
+                listening_time_formatted=format_listening_time(listening_time_seconds),
+                daily_streak=current_streak,
+                level=original_stats.get('level', 1),
+                level_progress=original_stats.get('level_progress', 0.0),
+                sessions_joined=original_stats.get('sessions_joined', 0),
+                achievements_count=len(original_stats.get('achievements', []))
             )
             users.append(user_stats)
         

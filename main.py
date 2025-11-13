@@ -208,6 +208,10 @@ async def on_voice_state_update(member, before, after):
             # Initialize server session timing
             guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
             
+            # Cache server name
+            from cogs.stats.gamification import cozy_gamification
+            cozy_gamification.update_servername(guild_id, member.guild.name)
+            
             # Start user tracking session for this guild
             user_voice_sessions[guild_id] = {
                 'bot_start_time': datetime.now(),

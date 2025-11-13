@@ -10,8 +10,10 @@ class CozyGamification:
     def __init__(self):
         self.data_file = 'data/cozy_points.json'
         self.usernames_file = 'data/usernames.json'
+        self.servernames_file = 'data/servernames.json'
         self.user_data = self.load_user_data()
         self.usernames = self.load_usernames()
+        self.servernames = self.load_servernames()
         
     def load_user_data(self) -> Dict:
         """Load user gamification data from persistent storage with validation"""
@@ -57,6 +59,33 @@ class CozyGamification:
                 json.dump(self.usernames, file, indent=2)
         except Exception as e:
             logging.error(f'Failed to save usernames: {e}')
+    
+    def load_servernames(self) -> Dict:
+        """Load server names cache from persistent storage"""
+        try:
+            with open(self.servernames_file, 'r') as file:
+                return json.load(file)
+        except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError:
+            return {}
+    
+    def save_servernames(self):
+        """Save server names cache to persistent storage"""
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open(self.servernames_file, 'w') as file:
+                json.dump(self.servernames, file, indent=2)
+        except Exception as e:
+            logging.error(f'Failed to save server names: {e}')
+    
+    def update_servername(self, guild_id: str, guild_name: str):
+        """Update server name in cache"""
+        self.servernames[str(guild_id)] = {
+            'name': guild_name,
+            'last_updated': datetime.now().isoformat()
+        }
+        self.save_servernames()
     
     def update_username(self, user_id: str, username: str, display_name: str = None):
         """Update username and display name in cache"""
@@ -166,13 +195,104 @@ class CozyGamification:
             return self.add_points(user_id, points_to_add, "Listening time")
         return None
     
-    def track_sound_preference(self, user_id: str, sound_name: str):
-        """Track user's favorite sounds"""
+    def track_sound_start(self, user_id: str, sound_name: str):
+        """Track when user starts listening to a sound"""
         user_stats = self.get_user_stats(user_id)
-        if sound_name not in user_stats['favorite_sounds']:
-            user_stats['favorite_sounds'][sound_name] = 0
-        user_stats['favorite_sounds'][sound_name] += 1
+        
+        # Finalize previous sound if any
+        self.finalize_current_sound(user_id)
+        
+        # Start tracking new sound
+        user_stats['current_sound'] = {
+            'name': sound_name,
+            'start_time': datetime.now().isoformat()
+        }
+        
+        # Initialize sound stats if not exists
+        if 'listening_time_by_sound' not in user_stats:
+            user_stats['listening_time_by_sound'] = {}
+        if sound_name not in user_stats['listening_time_by_sound']:
+            user_stats['listening_time_by_sound'][sound_name] = {
+                'total_time': 0.0,
+                'session_count': 0
+            }
+        
+        user_stats['listening_time_by_sound'][sound_name]['session_count'] += 1
         self.save_user_data()
+    
+    def finalize_current_sound(self, user_id: str):
+        """Finalize current sound listening session and add time"""
+        user_stats = self.get_user_stats(user_id)
+        current_sound = user_stats.get('current_sound')
+        
+        if current_sound and 'start_time' in current_sound:
+            try:
+                start_time = datetime.fromisoformat(current_sound['start_time'])
+                duration = (datetime.now() - start_time).total_seconds()
+                
+                sound_name = current_sound['name']
+                if 'listening_time_by_sound' not in user_stats:
+                    user_stats['listening_time_by_sound'] = {}
+                if sound_name not in user_stats['listening_time_by_sound']:
+                    user_stats['listening_time_by_sound'][sound_name] = {
+                        'total_time': 0.0,
+                        'session_count': 0
+                    }
+                
+                user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
+                user_stats['current_sound'] = None
+                
+            except Exception as e:
+                logging.error(f'Error finalizing sound session: {e}')
+                user_stats['current_sound'] = None
+    
+    def track_sound_preference(self, user_id: str, sound_name: str):
+        """Track user's favorite sounds (legacy method, redirects to new system)"""
+        self.track_sound_start(user_id, sound_name)
+    
+    def get_sound_display_name(self, sound_filename: str) -> str:
+        """Convert sound filename to emoji display name"""
+        sound_mapping = {
+            # Rain sounds (from actual Discord buttons)
+            'rain00.mp3': '🌧️💧⚡',
+            'rain01.mp3': '🌧️🌿🌙',
+            'rain02.mp3': '🌧️⛈️💨',
+            'rain03.mp3': '🌧️🏠🔥',
+            'rain04.mp3': '🌧️🚗⚡',
+            # Sea sounds (from actual Discord buttons)  
+            'sea00.mp3': '🌊💧💦',
+            'sea01.mp3': '🌊🕊️⛱️',
+            'sea02.mp3': '🌊🏝️🌙',
+            'sea03.mp3': '🌊⛵🕊️',
+            'sea04.mp3': '🌊🤿🔱',
+            # Sparkles sounds (from actual Discord buttons)
+            'sparkles00.mp3': '✨🪄⭐',
+            'sparkles01.mp3': '✨🌟💫',
+            'sparkles02.mp3': '✨🪄💎',
+            'sparkles03.mp3': '✨🌲🌙',
+            'sparkles04.mp3': '✨🪄💫',
+            # Background music (from actual Discord buttons)
+            'background-music00.mp3': '🎶🏛️🌙',
+            'background-music01.mp3': '🎶🍃🌩️',
+            'background-music02.mp3': '🎶🏺💦',
+            'background-music03.mp3': '🎶🌸💦',
+            'background-music04.mp3': '🎶🌿💦'
+        }
+        return sound_mapping.get(sound_filename, sound_filename)
+    
+    def get_user_favorite_sound(self, user_id: str) -> str:
+        """Get user's most listened sound by time with emoji display"""
+        user_stats = self.get_user_stats(user_id)
+        listening_times = user_stats.get('listening_time_by_sound', {})
+        
+        if not listening_times:
+            return None
+            
+        # Find sound with most time
+        favorite = max(listening_times.items(), key=lambda x: x[1]['total_time'])
+        if favorite[1]['total_time'] > 0:
+            return self.get_sound_display_name(favorite[0])
+        return None
     
     def join_session(self, user_id: str, username: str = None):
         """Track when user joins a listening session"""
@@ -208,6 +328,28 @@ class CozyGamification:
             return (current - last).days == 1
         except:
             return False
+    
+    def get_current_streak(self, user_id: str) -> int:
+        """Get the current valid streak for a user"""
+        user_stats = self.get_user_stats(user_id)
+        today = datetime.now().strftime('%Y-%m-%d')
+        last_active = user_stats.get('last_active_date')
+        
+        # If last active was yesterday or today, return stored streak
+        if last_active:
+            try:
+                last = datetime.strptime(last_active, '%Y-%m-%d')
+                current = datetime.strptime(today, '%Y-%m-%d')
+                days_diff = (current - last).days
+                
+                # If active today or yesterday, streak is still valid
+                if days_diff <= 1:
+                    return user_stats.get('daily_streak', 0)
+            except:
+                pass
+        
+        # Only reset streak to 0 if more than 1 day inactive
+        return 0
     
     def check_level_achievements(self, level: int, user_stats: Dict) -> List[str]:
         """Check for level-based achievements"""

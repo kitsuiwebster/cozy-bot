@@ -53,5 +53,54 @@ class SyncUsernamesCog(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Error during sync: {e}")
 
+    @app_commands.command(name="sync-servers", description="[ADMIN] Sync server names for servers with statistics")
+    async def sync_servers_command(self, interaction: discord.Interaction):
+        # Check if user is admin
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ This command is admin-only!", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        
+        try:
+            synced_count = 0
+            skipped_count = 0
+            
+            # Load voice time data to see which servers have stats
+            import json
+            import os
+            try:
+                with open('data/voice_time_data.json', 'r') as f:
+                    voice_stats = json.load(f)
+            except FileNotFoundError:
+                await interaction.followup.send("❌ No voice statistics found!")
+                return
+            
+            # Sync only guilds that have voice statistics
+            for guild_id_str in voice_stats.keys():
+                try:
+                    guild_id = int(guild_id_str)
+                    guild = self.bot.get_guild(guild_id)
+                    if guild:
+                        cozy_gamification.update_servername(guild_id_str, guild.name)
+                        synced_count += 1
+                    else:
+                        skipped_count += 1
+                except Exception as e:
+                    skipped_count += 1
+                    print(f"Failed to sync server {guild_id_str}: {e}")
+            
+            await interaction.followup.send(
+                f"✅ Server names sync complete!\n"
+                f"📊 **Results:**\n"
+                f"• Synced: {synced_count} servers with stats\n"
+                f"• Skipped: {skipped_count} servers (bot not in guild)\n"
+                f"• Total servers with stats: {len(voice_stats)}\n"
+                f"• Total bot guilds: {len(self.bot.guilds)}"
+            )
+            
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error during server sync: {e}")
+
 async def setup(bot):
     await bot.add_cog(SyncUsernamesCog(bot))

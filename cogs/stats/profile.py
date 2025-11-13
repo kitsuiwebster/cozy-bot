@@ -88,45 +88,43 @@ class ProfileCog(commands.Cog):
             inline=True
         )
         
+        # Get current valid streak (0 if not active today)
+        current_streak = cozy_gamification.get_current_streak(str(interaction.user.id))
         embed.add_field(
             name="🔥 Daily Streak", 
-            value=f"**{user_stats['daily_streak']} days**", 
+            value=f"**{current_streak} days**", 
             inline=True
         )
         
-        # Favorite Sound
-        if user_stats['favorite_sounds']:
-            fav_sound = max(user_stats['favorite_sounds'], key=user_stats['favorite_sounds'].get)
-            fav_count = user_stats['favorite_sounds'][fav_sound]
-            
-            # Map sound files to emojis
-            sound_emojis = {
-                "rain00.mp3": "🌧️💧⚡",
-                "rain01.mp3": "🌧️🌿🌙",
-                "rain02.mp3": "🌧️⛈️💨",
-                "rain03.mp3": "🌧️🏠🔥",
-                "rain04.mp3": "🌧️🚗⚡",
-                "sea00.mp3": "🌊💧💦",
-                "sea01.mp3": "🌊🕊️⛱️",
-                "sea02.mp3": "🌊🏝️🌙",
-                "sea03.mp3": "🌊⛵🕊️",
-                "sea04.mp3": "🌊🤿🔱",
-                "sparkles00.mp3": "✨🪄⭐",
-                "sparkles01.mp3": "✨🌟💫",
-                "sparkles02.mp3": "✨🪄💎",
-                "sparkles03.mp3": "✨🌲🌙",
-                "sparkles04.mp3": "✨🪄💫",
-                "background-music00.mp3": "🎶🏛️🌙",
-                "background-music01.mp3": "🎶🍃🌩️",
-                "background-music02.mp3": "🎶🏺💦",
-                "background-music03.mp3": "🎶🌸💦",
-                "background-music04.mp3": "🎶🌿💦"
-            }
-            
-            fav_display = sound_emojis.get(fav_sound, fav_sound)
+        # Favorite Sound (by listening time)
+        favorite_sound_display = cozy_gamification.get_user_favorite_sound(str(target_user.id))
+        if favorite_sound_display:
+            # Get listening time for favorite sound
+            listening_times = user_stats.get('listening_time_by_sound', {})
+            if listening_times:
+                # Find the sound with most time
+                favorite_data = max(listening_times.items(), key=lambda x: x[1]['total_time'])
+                if favorite_data[1]['total_time'] > 0:
+                    total_seconds = int(favorite_data[1]['total_time'])
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    
+                    if hours > 0:
+                        time_str = f"{hours}h {minutes}m"
+                    elif minutes > 0:
+                        time_str = f"{minutes}m"
+                    else:
+                        time_str = f"{total_seconds}s"
+                    
+                    embed.add_field(
+                        name="🎶 Favorite Sound", 
+                        value=f"**{favorite_sound_display}** ({time_str})", 
+                        inline=False
+                    )
+        else:
             embed.add_field(
                 name="🎶 Favorite Sound", 
-                value=f"**{fav_display}** ({fav_count} times)", 
+                value="Start listening to discover your favorite!", 
                 inline=False
             )
         

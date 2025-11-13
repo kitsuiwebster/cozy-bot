@@ -19,6 +19,8 @@ services:
       - ${DEV_CODE_MOUNT:-/tmp/empty}:/app/code:rw
       # Fichier d'environnement spécifique
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
+      # SSL certificates from Let's Encrypt
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - bot-network
     # Commande par défaut (peut être surchargée) - LANCE BOT + API ENSEMBLE

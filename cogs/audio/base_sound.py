@@ -176,13 +176,13 @@ class BaseSoundCog(commands.Cog):
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
                 
-                # Track sound preference for current users
+                # Track sound start for current users
                 from cogs.stats.gamification import cozy_gamification
                 voice_client = interaction.guild.voice_client
                 if voice_client and voice_client.channel:
                     current_users = [member.id for member in voice_client.channel.members if not member.bot]
                     for user_id in current_users:
-                        cozy_gamification.track_sound_preference(user_id, sound_filename)
+                        cozy_gamification.track_sound_start(user_id, sound_filename)
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -248,6 +248,13 @@ class BaseSoundCog(commands.Cog):
         
         guild_state = self.get_guild_state(guild_id)
         voice_client = interaction.guild.voice_client
+        
+        # Finalize sound sessions for all users before stopping
+        from cogs.stats.gamification import cozy_gamification
+        if voice_client and voice_client.channel:
+            current_users = [member.id for member in voice_client.channel.members if not member.bot]
+            for user_id in current_users:
+                cozy_gamification.finalize_current_sound(user_id)
         
         # Cancel disconnect timer
         if guild_state['disconnect_timer']:
