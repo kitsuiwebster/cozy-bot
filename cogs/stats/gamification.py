@@ -195,13 +195,96 @@ class CozyGamification:
             return self.add_points(user_id, points_to_add, "Listening time")
         return None
     
-    def track_sound_preference(self, user_id: str, sound_name: str):
-        """Track user's favorite sounds"""
+    def track_sound_start(self, user_id: str, sound_name: str):
+        """Track when user starts listening to a sound"""
         user_stats = self.get_user_stats(user_id)
-        if sound_name not in user_stats['favorite_sounds']:
-            user_stats['favorite_sounds'][sound_name] = 0
-        user_stats['favorite_sounds'][sound_name] += 1
+        
+        # Finalize previous sound if any
+        self.finalize_current_sound(user_id)
+        
+        # Start tracking new sound
+        user_stats['current_sound'] = {
+            'name': sound_name,
+            'start_time': datetime.now().isoformat()
+        }
+        
+        # Initialize sound stats if not exists
+        if 'listening_time_by_sound' not in user_stats:
+            user_stats['listening_time_by_sound'] = {}
+        if sound_name not in user_stats['listening_time_by_sound']:
+            user_stats['listening_time_by_sound'][sound_name] = {
+                'total_time': 0.0,
+                'session_count': 0
+            }
+        
+        user_stats['listening_time_by_sound'][sound_name]['session_count'] += 1
         self.save_user_data()
+    
+    def finalize_current_sound(self, user_id: str):
+        """Finalize current sound listening session and add time"""
+        user_stats = self.get_user_stats(user_id)
+        current_sound = user_stats.get('current_sound')
+        
+        if current_sound and 'start_time' in current_sound:
+            try:
+                start_time = datetime.fromisoformat(current_sound['start_time'])
+                duration = (datetime.now() - start_time).total_seconds()
+                
+                sound_name = current_sound['name']
+                if 'listening_time_by_sound' not in user_stats:
+                    user_stats['listening_time_by_sound'] = {}
+                if sound_name not in user_stats['listening_time_by_sound']:
+                    user_stats['listening_time_by_sound'][sound_name] = {
+                        'total_time': 0.0,
+                        'session_count': 0
+                    }
+                
+                user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
+                user_stats['current_sound'] = None
+                
+            except Exception as e:
+                logging.error(f'Error finalizing sound session: {e}')
+                user_stats['current_sound'] = None
+    
+    def track_sound_preference(self, user_id: str, sound_name: str):
+        """Track user's favorite sounds (legacy method, redirects to new system)"""
+        self.track_sound_start(user_id, sound_name)
+    
+    def get_sound_display_name(self, sound_filename: str) -> str:
+        """Convert sound filename to emoji display name"""
+        sound_mapping = {
+            # Rain sounds
+            'rain1.mp3': '🌧️☔💧',
+            'rain2.mp3': '🌧️⛈️💨', 
+            'rain3.mp3': '🌧️🌊⚡',
+            # Sea sounds  
+            'sea1.mp3': '🌊🏖️🐚',
+            'sea2.mp3': '🌊⛵🌅',
+            'sea3.mp3': '🌊🏝️🦀',
+            # Sparkles sounds
+            'sparkles1.mp3': '✨⭐💫',
+            'sparkles2.mp3': '✨🌟💎',
+            'sparkles3.mp3': '✨🎇🌌',
+            # Background music
+            'background-music1.mp3': '🎵🎶🎼',
+            'background-music2.mp3': '🎵🎹🎸',
+            'background-music3.mp3': '🎵🎺🥁'
+        }
+        return sound_mapping.get(sound_filename, f'🎵 {sound_filename}')
+    
+    def get_user_favorite_sound(self, user_id: str) -> str:
+        """Get user's most listened sound by time with emoji display"""
+        user_stats = self.get_user_stats(user_id)
+        listening_times = user_stats.get('listening_time_by_sound', {})
+        
+        if not listening_times:
+            return None
+            
+        # Find sound with most time
+        favorite = max(listening_times.items(), key=lambda x: x[1]['total_time'])
+        if favorite[1]['total_time'] > 0:
+            return self.get_sound_display_name(favorite[0])
+        return None
     
     def join_session(self, user_id: str, username: str = None):
         """Track when user joins a listening session"""

@@ -65,6 +65,103 @@ def format_listening_time(total_seconds: float) -> str:
         minutes = int((total_seconds % 3600) / 60)
         return f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
 
+class SoundStats(BaseModel):
+    sound_name: str
+    total_time: float
+    formatted_time: str
+    session_count: int
+
+class UserSoundStats(BaseModel):
+    user_id: str
+    username: Optional[str] = None
+    favorite_sound: Optional[str] = None
+    sounds: List[SoundStats]
+
+def get_sound_display_name(sound_filename: str) -> str:
+    """Convert sound filename to emoji display name"""
+    sound_mapping = {
+        # Rain sounds
+        'rain1.mp3': '🌧️☔💧',
+        'rain2.mp3': '🌧️⛈️💨', 
+        'rain3.mp3': '🌧️🌊⚡',
+        # Sea sounds  
+        'sea1.mp3': '🌊🏖️🐚',
+        'sea2.mp3': '🌊⛵🌅',
+        'sea3.mp3': '🌊🏝️🦀',
+        # Sparkles sounds
+        'sparkles1.mp3': '✨⭐💫',
+        'sparkles2.mp3': '✨🌟💎',
+        'sparkles3.mp3': '✨🎇🌌',
+        # Background music
+        'background-music1.mp3': '🎵🎶🎼',
+        'background-music2.mp3': '🎵🎹🎸',
+        'background-music3.mp3': '🎵🎺🥁'
+    }
+    return sound_mapping.get(sound_filename, f'🎵 {sound_filename}')
+
+class TopSoundStats(BaseModel):
+    sound_name: str
+    display_name: str
+    total_time: float
+    formatted_time: str
+    total_sessions: int
+    unique_listeners: int
+
+class TopSoundsResponse(BaseModel):
+    sounds: List[TopSoundStats]
+    total_sounds: int
+
+@router.get("/top-sounds", response_model=TopSoundsResponse)
+async def get_top_sounds(limit: int = 10):
+    """Get most listened sounds globally"""
+    try:
+        user_data = load_cozy_points_data()
+        
+        # Aggregate all sound data across users
+        sound_aggregates = {}
+        
+        for user_id, user_stats in user_data.items():
+            listening_times = user_stats.get('listening_time_by_sound', {})
+            
+            for sound_name, sound_data in listening_times.items():
+                if sound_name not in sound_aggregates:
+                    sound_aggregates[sound_name] = {
+                        'total_time': 0.0,
+                        'total_sessions': 0,
+                        'unique_listeners': set()
+                    }
+                
+                sound_aggregates[sound_name]['total_time'] += sound_data['total_time']
+                sound_aggregates[sound_name]['total_sessions'] += sound_data['session_count']
+                sound_aggregates[sound_name]['unique_listeners'].add(user_id)
+        
+        # Convert to list and sort by total time
+        sounds_list = []
+        for sound_name, data in sound_aggregates.items():
+            sounds_list.append(TopSoundStats(
+                sound_name=sound_name,
+                display_name=get_sound_display_name(sound_name),
+                total_time=data['total_time'],
+                formatted_time=format_listening_time(data['total_time']),
+                total_sessions=data['total_sessions'],
+                unique_listeners=len(data['unique_listeners'])
+            ))
+        
+        # Sort by total time descending
+        sounds_list.sort(key=lambda x: x.total_time, reverse=True)
+        
+        # Apply limit
+        if limit:
+            sounds_list = sounds_list[:limit]
+        
+        return TopSoundsResponse(
+            sounds=sounds_list,
+            total_sounds=len(sounds_list)
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
+
 @router.get("/top-users", response_model=TopUsersResponse)
 async def get_top_users(limit: int = None):
     """Get top users by cozy points"""

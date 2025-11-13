@@ -99,5 +99,84 @@ class TopsCog(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="top-sounds", description="View the most listened sounds! 🎵")
+    async def top_sounds_command(self, interaction: discord.Interaction):
+        try:
+            # Load cozy points data to aggregate sound listening times
+            data_file = 'data/cozy_points.json'
+            try:
+                with open(data_file, 'r') as file:
+                    user_data = json.load(file)
+            except FileNotFoundError:
+                await interaction.response.send_message("No listening data found yet! Start playing some sounds! 🎵")
+                return
+            
+            # Aggregate sound data across all users
+            sound_aggregates = {}
+            
+            for user_id, user_stats in user_data.items():
+                listening_times = user_stats.get('listening_time_by_sound', {})
+                
+                for sound_name, sound_data in listening_times.items():
+                    if sound_name not in sound_aggregates:
+                        sound_aggregates[sound_name] = {
+                            'total_time': 0.0,
+                            'total_sessions': 0,
+                            'unique_listeners': set()
+                        }
+                    
+                    sound_aggregates[sound_name]['total_time'] += sound_data['total_time']
+                    sound_aggregates[sound_name]['total_sessions'] += sound_data['session_count']
+                    sound_aggregates[sound_name]['unique_listeners'].add(user_id)
+            
+            if not sound_aggregates:
+                await interaction.response.send_message("No sound listening data yet! Start playing some cozy sounds! 🎵")
+                return
+            
+            # Convert to list and sort by total time
+            sounds_list = []
+            for sound_name, data in sound_aggregates.items():
+                display_name = cozy_gamification.get_sound_display_name(sound_name)
+                total_time = data['total_time']
+                unique_listeners = len(data['unique_listeners'])
+                
+                sounds_list.append({
+                    'display_name': display_name,
+                    'total_time': total_time,
+                    'unique_listeners': unique_listeners
+                })
+            
+            # Sort by total time descending and take top 10
+            sounds_list.sort(key=lambda x: x['total_time'], reverse=True)
+            top_sounds = sounds_list[:10]
+            
+            # Create embed with same style as other tops
+            embed = discord.Embed(title="Top Sounds by listening time 🎵", description="", color=0x00ff00)
+            
+            # Format like top-servers
+            for i, sound_data in enumerate(top_sounds, start=1):
+                # Convert seconds to human-readable duration format
+                total_seconds = int(sound_data['total_time'])
+                days, remainder = divmod(total_seconds, 86400)
+                hours, remainder = divmod(remainder, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                
+                if days > 0:
+                    time_str = f"{days}d {hours}h {minutes}m"
+                elif hours > 0:
+                    time_str = f"{hours}h {minutes}m {seconds}s"
+                elif minutes > 0:
+                    time_str = f"{minutes}m {seconds}s"
+                else:
+                    time_str = f"{seconds}s"
+                
+                listeners_info = f"{time_str} • {sound_data['unique_listeners']} listeners"
+                embed.add_field(name=f"{i}. {sound_data['display_name']}", value=listeners_info, inline=False)
+            
+            await interaction.response.send_message(embed=embed)
+            
+        except Exception as e:
+            await interaction.response.send_message(f"An error occurred while executing the command: {e}", ephemeral=True)
+
 async def setup(bot):
     await bot.add_cog(TopsCog(bot))
