@@ -253,26 +253,30 @@ class CozyGamification:
     def get_sound_display_name(self, sound_filename: str) -> str:
         """Convert sound filename to emoji display name"""
         sound_mapping = {
-            # Rain sounds
-            'rain01.mp3': '🌧️☔💧',
-            'rain02.mp3': '🌧️⛈️💨', 
-            'rain03.mp3': '🌧️🌊⚡',
-            'rain04.mp3': '🌧️🌩️💦',
-            # Sea sounds  
-            'sea01.mp3': '🌊🏖️🐚',
-            'sea02.mp3': '🌊⛵🌅',
-            'sea03.mp3': '🌊🏝️🦀',
-            'sea04.mp3': '🌊🐋🌀',
-            # Sparkles sounds
-            'sparkles01.mp3': '✨⭐💫',
-            'sparkles02.mp3': '✨🌟💎',
-            'sparkles03.mp3': '✨🎇🌌',
-            'sparkles04.mp3': '✨💫⚡',
-            # Background music
-            'background-music01.mp3': '🎵🎶🎼',
-            'background-music02.mp3': '🎵🎹🎸',
-            'background-music03.mp3': '🎵🎺🥁',
-            'background-music04.mp3': '🎵🎻🎷'
+            # Rain sounds (from actual Discord buttons)
+            'rain00.mp3': '🌧️💧⚡',
+            'rain01.mp3': '🌧️🌿🌙',
+            'rain02.mp3': '🌧️⛈️💨',
+            'rain03.mp3': '🌧️🏠🔥',
+            'rain04.mp3': '🌧️🚗⚡',
+            # Sea sounds (from actual Discord buttons)  
+            'sea00.mp3': '🌊💧💦',
+            'sea01.mp3': '🌊🕊️⛱️',
+            'sea02.mp3': '🌊🏝️🌙',
+            'sea03.mp3': '🌊⛵🕊️',
+            'sea04.mp3': '🌊🤿🔱',
+            # Sparkles sounds (from actual Discord buttons)
+            'sparkles00.mp3': '✨🪄⭐',
+            'sparkles01.mp3': '✨🌟💫',
+            'sparkles02.mp3': '✨🪄💎',
+            'sparkles03.mp3': '✨🌲🌙',
+            'sparkles04.mp3': '✨🪄💫',
+            # Background music (from actual Discord buttons)
+            'background-music00.mp3': '🎶🏛️🌙',
+            'background-music01.mp3': '🎶🍃🌩️',
+            'background-music02.mp3': '🎶🏺💦',
+            'background-music03.mp3': '🎶🌸💦',
+            'background-music04.mp3': '🎶🌿💦'
         }
         return sound_mapping.get(sound_filename, sound_filename)
     
