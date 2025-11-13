@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 2025-11-13
+
+### Added
+
+- Advanced sound analytics system with per-sound listening time tracking for detailed user preferences.
+- `/top-sounds` command to display most listened sounds globally with formatted time and listener counts.
+- `/api/top-sounds` endpoint to retrieve sound popularity statistics with emoji display names.
+- HTTPS support with Let's Encrypt SSL certificates for secure API access.
+- Enhanced favorite sound calculation based on listening time instead of session count.
+
+### Changed
+
+- User profiles now display favorite sounds with actual listening time duration instead of session counts.
+- Daily streak calculation to preserve streaks during bot restarts and only reset after 24+ hours of inactivity.
+- Sound preference tracking to monitor actual listening duration per sound for accurate analytics.
+
+### Fixed
+
+- Streak data loss during bot restarts - streaks are now properly preserved across deployments.
+
 ## [1.0.8] - 2025-11-12
 
 ### Added
