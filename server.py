@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def start_api():
     """Start FastAPI in a separate thread"""
     # Check if SSL certificates exist
-    ssl_keyfile = "/home/kitsui/ssl/private.key"
-    ssl_certfile = "/home/kitsui/ssl/cert.pem"
+    ssl_keyfile = "/etc/letsencrypt/live/cozybotapi.kitsuiwebster.com/privkey.pem"
+    ssl_certfile = "/etc/letsencrypt/live/cozybotapi.kitsuiwebster.com/fullchain.pem"
     
     if os.path.exists(ssl_keyfile) and os.path.exists(ssl_certfile):
         print("🔒 Starting API with HTTPS...")
