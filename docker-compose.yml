@@ -11,7 +11,6 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
     ports:
       - "${API_PORT:-8000}:8000"  # API port exposed from bot container
-      - "${HTTPS_PORT:-8443}:8443"  # HTTPS port for SSL
     volumes:
       # Volumes de base toujours montés
       - voice-data:/app/data
