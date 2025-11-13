@@ -359,7 +359,6 @@ async def run_bot():
             ('cogs.stats.profile', '🏅'),
             ('cogs.stats.tops', '🏆'),
             ('cogs.stats.total', '📊'),
-            ('cogs.stats.sync_usernames', '👥'),
             ('cogs.notifications.startup_message', '📢')
         ]
         
