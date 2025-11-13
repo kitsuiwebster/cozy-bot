@@ -118,7 +118,7 @@ class ProfileCog(commands.Cog):
                     
                     embed.add_field(
                         name="🎶 Favorite Sound", 
-                        value=f"**{favorite_sound_display}** ({time_str})", 
+                        value=f"**{favorite_sound_display}**", 
                         inline=False
                     )
         else:
