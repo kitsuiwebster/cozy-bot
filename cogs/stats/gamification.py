@@ -236,8 +236,7 @@ class CozyGamification:
         
         while level_up:
             current_level += 1
-            # Award level bonus for THIS specific level: current_level * 20 points (plus généreux pour compenser)
-            single_level_bonus = current_level * 20
+            single_level_bonus = current_level * 10
             total_level_bonus_points += single_level_bonus
             user_stats['total_points'] += single_level_bonus
             

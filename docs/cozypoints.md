@@ -39,14 +39,14 @@
 - **Level 5→6**: 1250 points needed (5²×50)
 
 ### Level Bonus
-- **Level 2**: +40 points
-- **Level 3**: +60 points  
-- **Level 4**: +80 points
-- **Level 5**: +100 points
-- **Level 6**: +120 points
-- **Level 10**: +200 points
+- **Level 2**: +20 points
+- **Level 3**: +30 points  
+- **Level 4**: +40 points
+- **Level 5**: +50 points
+- **Level 6**: +60 points
+- **Level 10**: +100 points
 
-- When you reach level X, you get +X×20 bonus points
+- When you reach level X, you get +X×10 bonus points
 
 ## Achievement System
 
