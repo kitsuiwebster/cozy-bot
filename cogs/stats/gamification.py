@@ -8,12 +8,12 @@ import logging
 import traceback
 
 def colorize_points(text):
-    """Colorize point values in blue"""
-    return f'\033[34m{text}\033[0m'
+    """Colorize point values in green"""
+    return f'\033[32m{text}\033[0m'
 
 def colorize_duration(text):
-    """Colorize duration values in cyan"""
-    return f'\033[36m{text}\033[0m'
+    """Colorize duration values in blue"""
+    return f'\033[34m{text}\033[0m'
 
 class CozyGamification:
     def __init__(self):

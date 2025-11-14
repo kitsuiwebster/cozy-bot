@@ -268,13 +268,13 @@ async def periodic_backup():
                 for guild_id, added_time in guild_voice_time_changes.items():
                     if added_time > 0:
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                        logging.info(f"  🏠 +{format_duration(added_time)} for {server_name}")
+                        logging.info(f"  🏠 \033[34m+{format_duration(added_time)}\033[0m for {server_name}")
                 
                 # Log active session updates
                 for guild_id, added_time in active_session_updates.items():
                     if added_time > 0:
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                        logging.info(f"  🏠 +{format_duration(added_time)} for {server_name} (active session)")
+                        logging.info(f"  🏠 \033[34m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
                 
                 # Reset changes tracking
                 guild_voice_time_changes.clear()
@@ -413,7 +413,7 @@ async def on_voice_state_update(member, before, after):
                 # Award session join points - pass both username and display_name
                 result = cozy_gamification.join_session(user_id, user.name)  # real username
                 cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
-                logging.info(f"👉 USER JOIN: {user.name} was already in channel when bot joined {after.channel.name} in {member.guild.name}")
+                logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
@@ -437,8 +437,8 @@ async def on_voice_state_update(member, before, after):
                     guild_voice_time[guild_id] = [None, 0]
                     session_duration = 0
                     total_time = 0
-                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: +{format_duration(session_duration)}, server total: {format_duration(total_time)}")
-                logging.info(f"🏠 +{format_duration(session_duration)} for {before.channel.guild.name}")
+                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[34m+{format_duration(session_duration)}\033[0m, server total: \033[34m{format_duration(total_time)}\033[0m")
+                logging.info(f"🏠 \033[34m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
@@ -466,7 +466,7 @@ async def on_voice_state_update(member, before, after):
                     if final_duration > 0:
                         result = cozy_gamification.add_listening_time(user_id, final_duration)
                         points_to_add = result['points_added'] if result else int(final_duration / 60)
-                        logging.info(f"👋 BOT DISCONNECT: {username} final session - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
+                        logging.info(f"👋 BOT DISCONNECT: {username} final session - total: \033[34m{format_duration(total_session_time)}\033[0m, final chunk: \033[34m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
                 
                 # Clean up session
                 del user_voice_sessions[guild_id]
@@ -500,7 +500,7 @@ async def on_voice_state_update(member, before, after):
         }
         result = cozy_gamification.join_session(user_id, member.name)  # real username
         cozy_gamification.update_username(user_id, member.name, member.global_name or member.display_name)
-        logging.info(f"✅ USER JOIN: {member.name} joined bot channel {after.channel.name} in {member.guild.name}")
+        logging.info(f"✅ USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
     elif before.channel == bot_channel and after.channel != bot_channel:
@@ -518,13 +518,13 @@ async def on_voice_state_update(member, before, after):
             if final_duration > 0:
                 result = cozy_gamification.add_listening_time(user_id, final_duration)
                 points_to_add = result['points_added'] if result else int(final_duration / 60)
-                logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
+                logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[34m{format_duration(total_session_time)}\033[0m, final chunk: \033[34m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
-                logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - no additional time")
+                logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
             
             # Finalize sound tracking when user leaves
             cozy_gamification.finalize_current_sound(user_id)
-            logging.info(f"👉 SOUND TRACKING: Finalized current sound for {member.name}")
+            logging.info(f"👉 SOUND TRACKING: Finalized current sound for \033[35m{member.name}\033[0m")
             
             # Remove user from session
             del session['users'][user_id] 
