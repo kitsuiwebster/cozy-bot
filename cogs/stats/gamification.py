@@ -161,11 +161,14 @@ class CozyGamification:
                         if points > 0:
                             logging.info(f"  👉 +{points} points for {username}")
                     
-                    # Sound-specific time for this user
-                    if user_id in self.changes_since_save['user_sound_time']:
-                        for sound_name, sound_time in self.changes_since_save['user_sound_time'][user_id].items():
-                            if sound_time > 0:
-                                logging.info(f"  👉 +{format_duration(sound_time)} of {sound_name} for {username}")
+                    # Sound-specific time for this user - SAFE ACCESS
+                    if (isinstance(self.changes_since_save['user_sound_time'], dict) and 
+                        user_id in self.changes_since_save['user_sound_time']):
+                        user_sound_data = self.changes_since_save['user_sound_time'][user_id]
+                        if isinstance(user_sound_data, dict):
+                            for sound_name, sound_time in user_sound_data.items():
+                                if isinstance(sound_time, (int, float)) and sound_time > 0:
+                                    logging.info(f"  👉 +{format_duration(sound_time)} of {sound_name} for {username}")
                 
                 # Reset tracking for next period
                 self.changes_since_save = {
@@ -271,13 +274,21 @@ class CozyGamification:
                     'points': 100
                 })
         
-        # Track points breakdown for regular points
-        if user_id not in self.changes_since_save['user_points_breakdown']:
-            self.changes_since_save['user_points_breakdown'][user_id] = []
-        self.changes_since_save['user_points_breakdown'][user_id].append({
-            'reason': reason,
-            'points': points
-        })
+        # Track points breakdown for regular points - SAFE ACCESS  
+        try:
+            if not isinstance(self.changes_since_save['user_points_breakdown'], dict):
+                self.changes_since_save['user_points_breakdown'] = {}
+            if user_id not in self.changes_since_save['user_points_breakdown']:
+                self.changes_since_save['user_points_breakdown'][user_id] = []
+            if not isinstance(self.changes_since_save['user_points_breakdown'][user_id], list):
+                self.changes_since_save['user_points_breakdown'][user_id] = []
+            self.changes_since_save['user_points_breakdown'][user_id].append({
+                'reason': reason,
+                'points': points
+            })
+        except Exception as e:
+            logging.warning(f"⚠️ Error tracking points breakdown: {e} - resetting structures")
+            self.changes_since_save['user_points_breakdown'] = {}
         
         self.save_user_data()
         
@@ -369,16 +380,31 @@ class CozyGamification:
                 user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
                 user_stats['current_sound'] = None
                 
-                # Track changes for periodic logging
-                if user_id not in self.changes_since_save['user_listening_time']:
-                    self.changes_since_save['user_listening_time'][user_id] = 0
-                self.changes_since_save['user_listening_time'][user_id] += duration
-                
-                if user_id not in self.changes_since_save['user_sound_time']:
-                    self.changes_since_save['user_sound_time'][user_id] = {}
-                if sound_name not in self.changes_since_save['user_sound_time'][user_id]:
-                    self.changes_since_save['user_sound_time'][user_id][sound_name] = 0
-                self.changes_since_save['user_sound_time'][user_id][sound_name] += duration
+                # Track changes for periodic logging - SAFE ACCESS
+                try:
+                    if not isinstance(self.changes_since_save['user_listening_time'], dict):
+                        self.changes_since_save['user_listening_time'] = {}
+                    if user_id not in self.changes_since_save['user_listening_time']:
+                        self.changes_since_save['user_listening_time'][user_id] = 0
+                    self.changes_since_save['user_listening_time'][user_id] += duration
+                    
+                    if not isinstance(self.changes_since_save['user_sound_time'], dict):
+                        self.changes_since_save['user_sound_time'] = {}
+                    if user_id not in self.changes_since_save['user_sound_time']:
+                        self.changes_since_save['user_sound_time'][user_id] = {}
+                    if not isinstance(self.changes_since_save['user_sound_time'][user_id], dict):
+                        self.changes_since_save['user_sound_time'][user_id] = {}
+                    if sound_name not in self.changes_since_save['user_sound_time'][user_id]:
+                        self.changes_since_save['user_sound_time'][user_id][sound_name] = 0
+                    self.changes_since_save['user_sound_time'][user_id][sound_name] += duration
+                except Exception as e:
+                    logging.warning(f"⚠️ Error updating changes tracking: {e} - resetting structures")
+                    self.changes_since_save = {
+                        'user_listening_time': {},
+                        'user_sound_time': {},
+                        'user_points': {},
+                        'user_points_breakdown': {}
+                    }
                 
                 # Award points for listening time
                 points_added = int(duration / 60)
