@@ -133,7 +133,8 @@ class CozyGamification:
             has_changes = any(self.changes_since_save['user_listening_time']) or any(self.changes_since_save['user_sound_time']) or any(self.changes_since_save['user_points'])
             
             if has_changes or force_detailed_log:
-                logging.info(f"✅️ PERIODIC SAVE - Changes since last save:")
+                save_type = "PERIODIC SAVE" if force_detailed_log else "EVENT SAVE"
+                logging.info(f"✅️ {save_type} - Changes since last save:")
                 
                 # Log user changes
                 for user_id in set(list(self.changes_since_save['user_listening_time'].keys()) + 
@@ -179,7 +180,7 @@ class CozyGamification:
                     'user_points_breakdown': {}
                 }
             else:
-                logging.info(f"🚫 PERIODIC SAVE - No changes since last save")
+                logging.info(f"🚫 EVENT SAVE - No changes since last save")
             
         except Exception as e:
             # Clean up temp file on error
