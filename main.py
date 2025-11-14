@@ -134,6 +134,9 @@ def load_voice_time_data():
 # Initialize guild-specific voice channel usage tracking
 guild_voice_time = load_voice_time_data()
 
+# Track guild voice time changes for periodic logging
+guild_voice_time_changes = {}  # {guild_id: added_seconds_since_last_save}
+
 # Initialize user voice session tracking - with accumulated time
 user_voice_sessions = {}  # {guild_id: {bot_start_time: datetime, users: {user_id: {join_time: datetime, accumulated_time: float}}}}
 
@@ -166,6 +169,16 @@ async def periodic_backup():
             from cogs.stats.gamification import cozy_gamification
             
             logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
+            
+            # Log voice time changes for servers since last save
+            if guild_voice_time_changes:
+                from cogs.stats.gamification import cozy_gamification
+                for guild_id, added_time in guild_voice_time_changes.items():
+                    if added_time > 0:
+                        server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
+                        logging.info(f"  🏠 +{format_duration(added_time)} for {server_name}")
+                # Reset changes tracking
+                guild_voice_time_changes.clear()
             
             # Save voice time data for all servers (silently)
             if guild_voice_time:
@@ -307,13 +320,18 @@ async def on_voice_state_update(member, before, after):
                     session_duration = time_spent.total_seconds()
                     total_time = accumulated_time + session_duration
                     guild_voice_time[guild_id] = [None, total_time]
+                    
+                    # Track this change for periodic logging
+                    if guild_id not in guild_voice_time_changes:
+                        guild_voice_time_changes[guild_id] = 0
+                    guild_voice_time_changes[guild_id] += session_duration
                 else:
                     # Reset corrupted data
                     guild_voice_time[guild_id] = [None, 0]
                     session_duration = 0
                     total_time = 0
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: +{format_duration(session_duration)}, server total: {format_duration(total_time)}")
-                logging.info(f"🏠 +{format_duration(session_duration)} pour {before.channel.guild.name}")
+                logging.info(f"🏠 +{format_duration(session_duration)} for {before.channel.guild.name}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
