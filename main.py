@@ -26,8 +26,8 @@ class FancyFormatter(logging.Formatter):
     }
     
     EMOJIS = {
-        'DEBUG': '🔍',
-        'INFO': '✅', 
+        'DEBUG': '⚙️',
+        'INFO': '✨', 
         'WARNING': '⚠️',
         'ERROR': '❌',
         'CRITICAL': '💥'
@@ -39,15 +39,6 @@ class FancyFormatter(logging.Formatter):
         emoji = self.EMOJIS.get(record.levelname, '📝')
         reset = self.COLORS['RESET']
         
-        # Apply context-specific formatting based on logger namespace
-        if 'discord.gateway' in record.name:
-            emoji = '🌐'
-        elif 'discord.voice' in record.name:
-            emoji = '🎵'
-        elif 'discord.player' in record.name:
-            emoji = '🎶'
-        elif 'discord.client' in record.name:
-            emoji = '🤖'
             
         # Format timestamp for log entry
         timestamp = self.formatTime(record, '%H:%M:%S')
@@ -80,7 +71,7 @@ intents.voice_states = True  # Required to track user voice channel changes
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # Debug: Display connected guilds (development only)
-print(bot.guilds)
+logging.debug(f"⚔️ Bot guilds: {bot.guilds}")
 
 # Persist voice channel usage statistics to storage
 def format_duration(seconds):
@@ -249,13 +240,13 @@ def save_current_stats_for_api():
             json.dump(stats, f, indent=2)
             
     except Exception as e:
-        logging.error(f'💾 Failed to save current stats: {e}')
+        logging.error(f'❌ Failed to save current stats: {e}')
 
 
 # Global error handler for unhandled exceptions
 @bot.event
 async def on_error(event, *args, **kwargs):
-    print(f"An error occurred: {event}")
+    logging.error(f"An error occurred: {event}")
 
 # Voice state change event handler for usage tracking
 @bot.event
@@ -301,9 +292,10 @@ async def on_voice_state_update(member, before, after):
                 start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
                 accumulated_time = guild_voice_time[guild_id][1]
                 time_spent = datetime.now() - start_time
-                total_time = accumulated_time + time_spent.total_seconds()
+                session_duration = time_spent.total_seconds()
+                total_time = accumulated_time + session_duration
                 guild_voice_time[guild_id] = [None, total_time]
-                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} after {format_duration(total_time)}")
+                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: +{format_duration(session_duration)}, server total: {format_duration(total_time)}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
@@ -406,7 +398,7 @@ async def on_ready():
         synced = await bot.tree.sync()
         logging.info(f'✅ Synced {len(synced)} application commands!')
     except Exception as e:
-        logging.error(f'💥 Error syncing commands: {e}')
+        logging.error(f'❌ Error syncing commands: {e}')
     
     logging.info('🚀 Bot startup complete - All systems operational')
     
@@ -452,14 +444,22 @@ async def run_bot():
             await bot.load_extension(ext_name)
             # Add extra space for emojis that take 2 characters
             space = '  ' if emoji == '🌧️' else ' '
-            logging.info(f'   {emoji}{space} {ext_name} loaded successfully')
+            logging.info(f'✅️ {emoji}{space} {ext_name} loaded successfully')
         
     except Exception as e:
-        logging.error(f'💥 Error loading extension: {e}')
+        logging.error(f'❌ Error loading extension: {e}')
 
     # Initialize bot connection using authentication token
     bot_token = os.getenv("DISCORD_BOT_TOKEN")
-    await bot.start(bot_token)
+    if not bot_token:
+        logging.critical('💥 Discord token not found in environment variables')
+        return
+    
+    try:
+        await bot.start(bot_token)
+    except Exception as e:
+        logging.critical(f'💥 Failed to start bot: {e}')
+        raise
 
 # Application entry point - bot startup sequence
 if __name__ == "__main__":
@@ -468,7 +468,7 @@ if __name__ == "__main__":
     try:
         loop.run_until_complete(run_bot())
     except KeyboardInterrupt:
-        print("---> Bot stopped by user.")
+        logging.info("🛑 Bot stopped by user.")
         # Save all data on graceful shutdown
         save_voice_time_data()
         try:

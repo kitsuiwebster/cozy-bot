@@ -25,18 +25,18 @@ class CozyGamification:
                 if isinstance(data, dict):
                     return data
                 else:
-                    logging.warning('Invalid gamification data structure, starting fresh')
+                    logging.warning('❌ Invalid gamification data structure, starting fresh')
                     return {}
         except FileNotFoundError:
-            logging.info('No existing gamification data found, starting fresh')
+            logging.info('❌ No existing gamification data found, starting fresh')
             return {}
         except json.JSONDecodeError as e:
-            logging.error(f'Corrupted gamification data file: {e}, starting fresh')
+            logging.error(f'❌ Corrupted gamification data file: {e}, starting fresh')
             # Try to backup corrupted file
             try:
                 backup_file = self.data_file + f'.corrupted.{datetime.now().strftime("%Y%m%d_%H%M%S")}'
                 os.rename(self.data_file, backup_file)
-                logging.info(f'Corrupted file backed up as: {backup_file}')
+                logging.info(f'❌ Corrupted file backed up as: {backup_file}')
             except:
                 pass
             return {}
@@ -58,7 +58,7 @@ class CozyGamification:
             with open(self.usernames_file, 'w') as file:
                 json.dump(self.usernames, file, indent=2)
         except Exception as e:
-            logging.error(f'Failed to save usernames: {e}')
+            logging.error(f'❌ Failed to save usernames: {e}')
     
     def load_servernames(self) -> Dict:
         """Load server names cache from persistent storage"""
@@ -77,7 +77,7 @@ class CozyGamification:
             with open(self.servernames_file, 'w') as file:
                 json.dump(self.servernames, file, indent=2)
         except Exception as e:
-            logging.error(f'Failed to save server names: {e}')
+            logging.error(f'❌ Failed to save server names: {e}')
     
     def update_servername(self, guild_id: str, guild_name: str):
         """Update server name in cache"""
@@ -119,7 +119,7 @@ class CozyGamification:
             # Clean up temp file on error
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-            logging.error(f'Failed to save gamification data: {e}')
+            logging.error(f'❌ Failed to save gamification data: {e}')
     
     def get_user_stats(self, user_id: str) -> Dict:
         """Get or create user statistics"""
@@ -243,7 +243,7 @@ class CozyGamification:
                 user_stats['current_sound'] = None
                 
             except Exception as e:
-                logging.error(f'Error finalizing sound session: {e}')
+                logging.error(f'❌ Error finalizing sound session: {e}')
                 user_stats['current_sound'] = None
     
     def track_sound_preference(self, user_id: str, sound_name: str):

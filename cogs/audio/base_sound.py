@@ -91,7 +91,7 @@ class BaseSoundCog(commands.Cog):
         guild_state = self.get_guild_state(guild_id)
         
         if error:
-            logging.error(f"Player error: {error}")
+            logging.error(f"❌ Player error: {error}")
             # Retry after error if we were playing something
             if guild_state['current_sound'] and guild_state['is_playing']:
                 asyncio.create_task(self.restart_audio_loop(guild_id))
@@ -180,7 +180,7 @@ class BaseSoundCog(commands.Cog):
                     logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
                     for member in current_users:
                         cozy_gamification.track_sound_start(member.id, sound_filename)
-                        logging.info(f"  🎵 Tracking {sound_filename} for {member.name}")
+                        logging.info(f"🎵 Tracking {sound_filename} for {member.name}")
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -228,7 +228,7 @@ class BaseSoundCog(commands.Cog):
                     guild_state['current_sound'] = None
                     guild_state['disconnect_timer'] = None
                     
-                    print(f"🤖 Auto-disconnected from empty voice channel in {guild.name}")
+                    logging.info(f"👋 AUTO-DISCONNECT: Left empty voice channel in {guild.name}")
                     break
                 else:
                     # Still has users, continue monitoring
@@ -238,7 +238,7 @@ class BaseSoundCog(commands.Cog):
             # Timer was cancelled (normal when new user joins or manual stop)
             pass
         except Exception as e:
-            print(f"Error in disconnect timer: {e}")
+            logging.error(f"❌ Error in disconnect timer: {e}")
 
     async def stop_sound(self, interaction, guild_id):
         """Terminate active audio playback session and disconnect"""
@@ -254,7 +254,7 @@ class BaseSoundCog(commands.Cog):
             logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
             for member in current_users:
                 cozy_gamification.finalize_current_sound(member.id)
-                logging.info(f"  🛑 Finalized sound tracking for {member.name}")
+                logging.info(f"🛑 Finalized sound tracking for {member.name}")
         
         # Cancel disconnect timer
         if guild_state['disconnect_timer']:
