@@ -105,7 +105,7 @@ class CozyGamification:
         }
         self.save_usernames()
     
-    def save_user_data(self):
+    def save_user_data(self, force_detailed_log=False):
         """Save user gamification data to persistent storage with atomic writes"""
         temp_file = self.data_file + '.tmp'
         
@@ -123,10 +123,12 @@ class CozyGamification:
             # Atomic rename to final file
             os.rename(temp_file, self.data_file)
             
-            # Log changes since last save
+            # Log changes since last save (or force detailed log for hourly backup)
             from main import format_duration
             
-            if any(self.changes_since_save['user_listening_time']) or any(self.changes_since_save['user_sound_time']) or any(self.changes_since_save['user_points']):
+            has_changes = any(self.changes_since_save['user_listening_time']) or any(self.changes_since_save['user_sound_time']) or any(self.changes_since_save['user_points'])
+            
+            if has_changes or force_detailed_log:
                 logging.info(f"✅️ PERIODIC SAVE - Changes since last save:")
                 
                 # Log user changes
@@ -170,7 +172,7 @@ class CozyGamification:
                     'user_points_breakdown': {}
                 }
             else:
-                logging.info(f"✅️ PERIODIC SAVE - No changes since last save")
+                logging.info(f"🚫 PERIODIC SAVE - No changes since last save")
             
         except Exception as e:
             # Clean up temp file on error
@@ -217,7 +219,7 @@ class CozyGamification:
             user_stats['total_points'] += level_bonus_points
             
             username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"🆙 Level bonus: {username} reached level {new_level} (+{level_bonus_points} points)")
+            logging.info(f"⭐ Level bonus: {username} reached level {new_level} (+{level_bonus_points} points)")
             
             # Check for level achievements AFTER logging level bonus
             level_achievements = self.check_level_achievements(new_level, user_stats)

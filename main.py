@@ -153,91 +153,34 @@ async def change_status():
             await bot.change_presence(activity=status)
             await asyncio.sleep(10)
 
-# Background task for periodic data backup and streak bonuses
+# Background task for hourly data backup
 async def periodic_backup():
     await bot.wait_until_ready()
     
     while not bot.is_closed():
-        # Save data every hour, but check for streak bonuses every 10 minutes
+        # Full backup every 10 minutes
         await asyncio.sleep(600)  # 10 minutes
         
-        # Award streak bonuses every 10 minutes
         try:
             from cogs.stats.gamification import cozy_gamification
             
-            for guild_id, session in user_voice_sessions.items():
-                for user_id, user_data in session['users'].items():
-                    # Get user's current streak
-                    streak = cozy_gamification.get_current_streak(user_id)
-                    if streak > 0:
-                        # Award streak points
-                        result = cozy_gamification.add_points(user_id, streak, f"Streak bonus ({streak} days)")
-                        username = cozy_gamification.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-                        logging.info(f"🔥 Streak bonus: {username} +{streak} points (streak: {streak} days)")
+            logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
+            
+            # Save voice time data for all servers
+            if guild_voice_time:
+                save_voice_time_data()
+                logging.info("✅ Voice time data saved for all servers")
+            
+            # Save gamification data (users, points, achievements, etc.) with detailed logging
+            cozy_gamification.save_user_data(force_detailed_log=True)
+            
+            logging.info("✅ PERIODIC BACKUP: Complete backup finished")
+            
         except Exception as e:
-            logging.error(f'❌ Streak bonus error: {e}')
-        
-        # Full backup every hour (6 cycles of 10 minutes)
-        if hasattr(periodic_backup, 'cycle_count'):
-            periodic_backup.cycle_count += 1
-        else:
-            periodic_backup.cycle_count = 1
-            
-        if periodic_backup.cycle_count >= 6:  # Every hour
-            periodic_backup.cycle_count = 0
-        if guild_voice_time:
-            save_voice_time_data()
-            logging.info('✅ Periodic voice data backup completed')
-        
-        # Calculate and save listening time for active users
-        try:
-            from cogs.stats.gamification import cozy_gamification
-            active_users_updated = 0
-            
-            # Process active sessions
-            for guild_id, session in user_voice_sessions.items():
-                guild = bot.get_guild(int(guild_id))
-                guild_name = guild.name if guild else f"Guild {guild_id}"
-                
-                logging.info(f'✅ Processing active sessions in {guild_name}:')
-                
-                for user_id, user_data in session['users'].items():
-                    # Calculate current listening duration since last check
-                    listening_duration = (datetime.now() - user_data['join_time']).total_seconds()
-                    
-                    # Get username from bot cache
-                    try:
-                        user = await bot.fetch_user(int(user_id))
-                        username = user.name if user else f"User {user_id[:8]}"
-                    except:
-                        username = f"User {user_id[:8]}"
-                    
-                    # Accumulate time and save to database
-                    if listening_duration > 0:
-                        user_data['accumulated_time'] += listening_duration
-                        result = cozy_gamification.add_listening_time(user_id, listening_duration)
-                        points_to_add = result['points_added'] if result else int(listening_duration / 60)
-                        
-                        total_session_time = user_data['accumulated_time']
-                        logging.info(f'👉 {username}: +{format_duration(listening_duration)} (session total: {format_duration(total_session_time)}) +{points_to_add} points')
-                        
-                        # Reset join time to now for next calculation
-                        user_data['join_time'] = datetime.now()
-                        active_users_updated += 1
-            
-            # Save all data
-            cozy_gamification.save_user_data()
-            if active_users_updated > 0:
-                logging.info(f'✅ PERIODIC BACKUP: Updated {active_users_updated} active users listening time')
-            else:
-                logging.info('🚫 PERIODIC BACKUP: No active users to update')
-            logging.info('✅ Periodic gamification data backup completed')
-        except Exception as e:
-            logging.error(f'❌ PERIODIC BACKUP FAILED: {e}')
+            logging.error(f"❌ PERIODIC BACKUP FAILED: {e}")
         
         # Save current stats for API
         save_current_stats_for_api()
-
 def save_current_stats_for_api():
     """Save current bot stats for API access"""
     try:
