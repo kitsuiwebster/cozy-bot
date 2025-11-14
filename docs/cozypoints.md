@@ -31,15 +31,22 @@
 
 ## Level System
 
-### Level Bonus
-- **Level 2**: +20 points
-- **Level 3**: +30 points  
-- **Level 4**: +40 points
-- **Level 5**: +50 points
-- **Level 6**: +60 points
-- **Level 10**: +100 points
+### Level Requirements (Quadratic Progression)
+- **Level 1→2**: 50 points needed (1²×50)
+- **Level 2→3**: 200 points needed (2²×50)  
+- **Level 3→4**: 450 points needed (3²×50)
+- **Level 4→5**: 800 points needed (4²×50)
+- **Level 5→6**: 1250 points needed (5²×50)
 
-- When you reach level X, you get +X×10 bonus points
+### Level Bonus
+- **Level 2**: +40 points
+- **Level 3**: +60 points  
+- **Level 4**: +80 points
+- **Level 5**: +100 points
+- **Level 6**: +120 points
+- **Level 10**: +200 points
+
+- When you reach level X, you get +X×20 bonus points
 
 ## Achievement System
 

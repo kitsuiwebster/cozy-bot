@@ -216,24 +216,36 @@ class CozyGamification:
         new_achievements = []
         level_bonus_points = 0
         
-        if level_up:
-            # Award level bonus: new_level * 10 points
-            level_bonus_points = new_level * 10
-            user_stats['total_points'] += level_bonus_points
+        # Handle level-ups with proper cascade handling
+        current_level = old_level
+        total_level_bonus_points = 0
+        
+        while level_up:
+            current_level += 1
+            # Award level bonus for THIS specific level: current_level * 20 points (plus généreux pour compenser)
+            single_level_bonus = current_level * 20
+            total_level_bonus_points += single_level_bonus
+            user_stats['total_points'] += single_level_bonus
             
             username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"⭐ Level bonus: {username} reached level {new_level} (+{level_bonus_points} points)")
+            logging.info(f"⭐ Level bonus: {username} reached level {current_level} (+{single_level_bonus} points)")
             
-            # Check for level achievements AFTER logging level bonus
-            level_achievements = self.check_level_achievements(new_level, user_stats)
+            # Check for level achievements for THIS level
+            level_achievements = self.check_level_achievements(current_level, user_stats)
             if level_achievements:
                 logging.info(f"🏆 Level achievement: {username} unlocked {', '.join(level_achievements)}")
             new_achievements.extend(level_achievements)
             
-            # Recalculate level after bonus (might level up again!)
+            # Check if bonus points caused ANOTHER level up
             new_level, progress = self.calculate_level(user_stats['total_points'])
             user_stats['level'] = new_level
             user_stats['level_progress'] = progress
+            
+            # Continue loop if we leveled up again
+            level_up = new_level > current_level
+            
+        # Update final level bonus points for return value
+        level_bonus_points = total_level_bonus_points
         
         # Check other achievements
         new_achievements.extend(self.check_general_achievements(user_stats))
@@ -286,7 +298,7 @@ class CozyGamification:
         accumulated_points = 0
         
         while True:
-            points_needed_for_next = level * 10
+            points_needed_for_next = level * level * 50  # Progression quadratique plus difficile
             if accumulated_points + points_needed_for_next > total_points:
                 break
             accumulated_points += points_needed_for_next
@@ -294,7 +306,7 @@ class CozyGamification:
         
         # Calculate progress towards next level
         points_in_current_level = total_points - accumulated_points
-        points_needed_for_next = level * 10
+        points_needed_for_next = level * level * 50
         progress = (points_in_current_level / points_needed_for_next) * 100
         
         return level, round(progress, 1)
