@@ -316,4 +316,3 @@ class BaseSoundCog(commands.Cog):
             if guild_state['is_playing'] and guild_state['current_sound']:
                 asyncio.create_task(self.restart_audio_loop(guild_id))
 
-
