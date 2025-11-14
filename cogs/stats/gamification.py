@@ -15,6 +15,13 @@ class CozyGamification:
         self.usernames = self.load_usernames()
         self.servernames = self.load_servernames()
         
+        # Track changes since last save for logging
+        self.changes_since_save = {
+            'user_listening_time': {},  # user_id: added_seconds
+            'user_sound_time': {},      # user_id: {sound_name: added_seconds}
+            'user_points': {}           # user_id: added_points
+        }
+        
     def load_user_data(self) -> Dict:
         """Load user gamification data from persistent storage with validation"""
         try:
@@ -114,6 +121,46 @@ class CozyGamification:
             
             # Atomic rename to final file
             os.rename(temp_file, self.data_file)
+            
+            # Log changes since last save
+            from main import format_duration
+            
+            if any(self.changes_since_save['user_listening_time']) or any(self.changes_since_save['user_sound_time']) or any(self.changes_since_save['user_points']):
+                logging.info(f"💾 PERIODIC SAVE - Changes since last save:")
+                
+                # Log user changes
+                for user_id in set(list(self.changes_since_save['user_listening_time'].keys()) + 
+                                 list(self.changes_since_save['user_sound_time'].keys()) + 
+                                 list(self.changes_since_save['user_points'].keys())):
+                    
+                    username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+                    
+                    # Total listening time for this user
+                    if user_id in self.changes_since_save['user_listening_time']:
+                        total_time = self.changes_since_save['user_listening_time'][user_id]
+                        if total_time > 0:
+                            logging.info(f"  👤 +{format_duration(total_time)} pour {username}")
+                    
+                    # Points for this user
+                    if user_id in self.changes_since_save['user_points']:
+                        points = self.changes_since_save['user_points'][user_id]
+                        if points > 0:
+                            logging.info(f"  💎 +{points} points pour {username}")
+                    
+                    # Sound-specific time for this user
+                    if user_id in self.changes_since_save['user_sound_time']:
+                        for sound_name, sound_time in self.changes_since_save['user_sound_time'][user_id].items():
+                            if sound_time > 0:
+                                logging.info(f"  🎵 +{format_duration(sound_time)} de {sound_name} pour {username}")
+                
+                # Reset tracking for next period
+                self.changes_since_save = {
+                    'user_listening_time': {},
+                    'user_sound_time': {},
+                    'user_points': {}
+                }
+            else:
+                logging.info(f"💾 PERIODIC SAVE - No changes since last save")
             
         except Exception as e:
             # Clean up temp file on error
@@ -241,6 +288,32 @@ class CozyGamification:
                 
                 user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
                 user_stats['current_sound'] = None
+                
+                # Track changes for periodic logging
+                if user_id not in self.changes_since_save['user_listening_time']:
+                    self.changes_since_save['user_listening_time'][user_id] = 0
+                self.changes_since_save['user_listening_time'][user_id] += duration
+                
+                if user_id not in self.changes_since_save['user_sound_time']:
+                    self.changes_since_save['user_sound_time'][user_id] = {}
+                if sound_name not in self.changes_since_save['user_sound_time'][user_id]:
+                    self.changes_since_save['user_sound_time'][user_id][sound_name] = 0
+                self.changes_since_save['user_sound_time'][user_id][sound_name] += duration
+                
+                # Award points for listening time
+                points_added = int(duration / 60)
+                if points_added > 0:
+                    self.add_points(user_id, points_added, f"Listening to {sound_name}")
+                    if user_id not in self.changes_since_save['user_points']:
+                        self.changes_since_save['user_points'][user_id] = 0
+                    self.changes_since_save['user_points'][user_id] += points_added
+                
+                # Log the sound tracking addition
+                from main import format_duration
+                duration_str = format_duration(duration)
+                username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+                points_str = f" (+{points_added} point{'s' if points_added != 1 else ''})" if points_added > 0 else ""
+                logging.info(f"🎵 +{duration_str} de {sound_name} pour {username}{points_str}")
                 
             except Exception as e:
                 logging.error(f'❌ Error finalizing sound session: {e}')

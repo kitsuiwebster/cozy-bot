@@ -296,6 +296,7 @@ async def on_voice_state_update(member, before, after):
                 total_time = accumulated_time + session_duration
                 guild_voice_time[guild_id] = [None, total_time]
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: +{format_duration(session_duration)}, server total: {format_duration(total_time)}")
+                logging.info(f"🏠 +{format_duration(session_duration)} pour {before.channel.guild.name}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
