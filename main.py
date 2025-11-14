@@ -268,13 +268,13 @@ async def periodic_backup():
                 for guild_id, added_time in guild_voice_time_changes.items():
                     if added_time > 0:
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                        logging.info(f"  🏠 \033[34m+{format_duration(added_time)}\033[0m for {server_name}")
+                        logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name}")
                 
                 # Log active session updates
                 for guild_id, added_time in active_session_updates.items():
                     if added_time > 0:
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                        logging.info(f"  🏠 \033[34m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
+                        logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
                 
                 # Reset changes tracking
                 guild_voice_time_changes.clear()
@@ -284,7 +284,7 @@ async def periodic_backup():
                 for user_id, update_info in active_user_updates.items():
                     username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                     time_str = f'\033[36m+{format_duration(update_info["time"])}\033[0m'
-                    points_str = f' (\033[34m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
+                    points_str = f' (\033[94m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
                     logging.info(f"  👉 {time_str} for {username} ({update_info['sound']} active session){points_str}")
             
             # Save voice time data for all servers (silently)
@@ -437,8 +437,8 @@ async def on_voice_state_update(member, before, after):
                     guild_voice_time[guild_id] = [None, 0]
                     session_duration = 0
                     total_time = 0
-                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[34m+{format_duration(session_duration)}\033[0m, server total: \033[34m{format_duration(total_time)}\033[0m")
-                logging.info(f"🏠 \033[34m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
+                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
+                logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
@@ -466,7 +466,7 @@ async def on_voice_state_update(member, before, after):
                     if final_duration > 0:
                         result = cozy_gamification.add_listening_time(user_id, final_duration)
                         points_to_add = result['points_added'] if result else int(final_duration / 60)
-                        logging.info(f"👋 BOT DISCONNECT: {username} final session - total: \033[34m{format_duration(total_session_time)}\033[0m, final chunk: \033[34m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
+                        logging.info(f"👋 BOT DISCONNECT: {username} final session - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
                 
                 # Clean up session
                 del user_voice_sessions[guild_id]
@@ -518,7 +518,7 @@ async def on_voice_state_update(member, before, after):
             if final_duration > 0:
                 result = cozy_gamification.add_listening_time(user_id, final_duration)
                 points_to_add = result['points_added'] if result else int(final_duration / 60)
-                logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[34m{format_duration(total_session_time)}\033[0m, final chunk: \033[34m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
+                logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
             

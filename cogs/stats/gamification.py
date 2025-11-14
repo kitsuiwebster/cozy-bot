@@ -13,7 +13,7 @@ def colorize_points(text):
 
 def colorize_duration(text):
     """Colorize duration values in blue"""
-    return f'\033[34m{text}\033[0m'
+    return f'\033[94m{text}\033[0m'
 
 class CozyGamification:
     def __init__(self):
