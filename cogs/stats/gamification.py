@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import asyncio
 import fcntl
 import logging
+import traceback
 
 class CozyGamification:
     def __init__(self):
@@ -184,7 +185,7 @@ class CozyGamification:
             # Clean up temp file on error
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-            logging.error(f'❌ Failed to save gamification data: {e}')
+            logging.error(f'❌ Failed to save gamification data: {e}\n{traceback.format_exc()}')
     
     def get_user_stats(self, user_id: str) -> Dict:
         """Get or create user statistics"""
@@ -455,7 +456,7 @@ class CozyGamification:
                 logging.info(f"👉 +{duration_str} of {sound_name} for {username}{points_str}{bonus_str}")
                 
             except Exception as e:
-                logging.error(f'❌ Error finalizing sound session: {e}')
+                logging.error(f'❌ Error finalizing sound session: {e}\n{traceback.format_exc()}')
                 user_stats['current_sound'] = None
     
     def track_sound_preference(self, user_id: str, sound_name: str):
