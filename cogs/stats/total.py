@@ -6,7 +6,7 @@ class TotalCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="total", description="Find out how many are currently soaking in coziness with me! 📊")
+    @app_commands.command(name="total", description="Find out how many are currently soaking in coziness with me")
     async def total_command(self, interaction: discord.Interaction):
         total_people_with_bot = 0
 
@@ -23,11 +23,11 @@ class TotalCog(commands.Cog):
         elif total_people_with_bot == 1:
             message = "🌧️  1 person is currently enjoying some cozy vibes!"
         elif total_people_with_bot <= 5:
-            message = f"✨ {total_people_with_bot} cozy listeners are currently relaxing together!"
+            message = f"✨ {total_people_with_bot} cozy listeners are currently relaxing!"
         elif total_people_with_bot <= 10:
-            message = f"🎵 {total_people_with_bot} people are currently in cozy mode! The relaxation is spreading!"
+            message = f"🎵 {total_people_with_bot} people are currently in cozy mode!"
         else:
-            message = f"🌊 Wow! {total_people_with_bot} people are currently soaking in coziness! What a peaceful community!"
+            message = f"🌊 Wow! {total_people_with_bot} people are currently soaking in coziness!"
 
         await interaction.response.send_message(message)
 

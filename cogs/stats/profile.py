@@ -7,7 +7,7 @@ class ProfileCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="profile", description="View your cozy profile and achievements 🏆")
+    @app_commands.command(name="profile", description="View your cozy profile and achievements")
     @app_commands.describe(user="User to view profile for (@username or just username)")
     async def profile_command(self, interaction: discord.Interaction, user: str = None):
         target_user = interaction.user
@@ -147,7 +147,7 @@ class ProfileCog(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="achievements", description="View all available achievements 🏅")
+    @app_commands.command(name="achievements", description="View all available achievements")
     async def achievements_command(self, interaction: discord.Interaction):
         user_stats = cozy_gamification.get_user_stats(interaction.user.id)
         earned_achievements = user_stats['achievements']

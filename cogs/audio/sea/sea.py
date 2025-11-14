@@ -15,7 +15,7 @@ class SeaCog(BaseSoundCog):
         }
         super().__init__(bot, "sea", sounds, sound_labels, "Play the sound of sea.🌊")
 
-    @app_commands.command(name="sea", description="Play the sound of sea.🌊")
+    @app_commands.command(name="sea", description="Play the sound of sea")
     async def sea_command(self, interaction: discord.Interaction):
         await self.play_sound_command(interaction, "Please select a sea sound:")
 

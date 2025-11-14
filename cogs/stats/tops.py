@@ -30,7 +30,7 @@ class TopsCog(commands.Cog):
         except json.JSONDecodeError:
             return {}
 
-    @app_commands.command(name="top-servers", description="Display the top servers! 🏆")
+    @app_commands.command(name="top-servers", description="Display the top servers")
     async def top_servers_command(self, interaction: discord.Interaction):
         try:
             # Retrieve voice channel usage statistics and server names
@@ -71,7 +71,7 @@ class TopsCog(commands.Cog):
             # Handle command execution errors gracefully
             await interaction.response.send_message(f"An error occurred while executing the command: {e}", ephemeral=True)
 
-    @app_commands.command(name="top-users", description="View the top users! 🏆")
+    @app_commands.command(name="top-users", description="View the top users")
     async def top_users_command(self, interaction: discord.Interaction):
         leaderboard = cozy_gamification.get_leaderboard(10)
         
@@ -99,7 +99,7 @@ class TopsCog(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="top-sounds", description="View the most listened sounds! 🎵")
+    @app_commands.command(name="top-sounds", description="View the most listened sounds")
     async def top_sounds_command(self, interaction: discord.Interaction):
         try:
             # Load cozy points data to aggregate sound listening times

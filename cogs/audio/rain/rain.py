@@ -15,7 +15,7 @@ class RainCog(BaseSoundCog):
         }
         super().__init__(bot, "rain", sounds, sound_labels, "Play the sound of rain.🌧️")
 
-    @app_commands.command(name="rain", description="Play the sound of rain.🌧️")
+    @app_commands.command(name="rain", description="Play the sound of rain")
     async def rain_command(self, interaction: discord.Interaction):
         await self.play_sound_command(interaction, "Please select a rain sound:")
 
