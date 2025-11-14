@@ -207,8 +207,10 @@ async def periodic_backup():
                         # Validate session duration (max 30 minutes to prevent corrupted data)
                         max_session_duration = 30 * 60  # 30 minutes in seconds
                         if session_duration > max_session_duration:
-                            logging.warning(f"⚠️ Suspicious session duration for user {user_id}: {session_duration/60:.1f}min - capping to 30min")
-                            session_duration = max_session_duration
+                            username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                            logging.warning(f"⚠️ Removing corrupted session for {username}: {session_duration/60:.1f}min old")
+                            user_stats['current_sound'] = None
+                            continue
                         
                         if session_duration > 0:
                             # Update listening time
