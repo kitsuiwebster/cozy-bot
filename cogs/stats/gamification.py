@@ -141,7 +141,7 @@ class CozyGamification:
                                  list(self.changes_since_save['user_sound_time'].keys()) + 
                                  list(self.changes_since_save['user_points'].keys())):
                     
-                    username = self.usernames.get(str(user_id), {}).get('username', f'User {str(user_id)[:8]}')
+                    username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                     
                     # Total listening time for this user
                     if user_id in self.changes_since_save['user_listening_time']:
@@ -232,7 +232,7 @@ class CozyGamification:
             total_level_bonus_points += single_level_bonus
             user_stats['total_points'] += single_level_bonus
             
-            username = self.usernames.get(str(user_id), {}).get('username', f'User {str(user_id)[:8]}')
+            username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
             logging.info(f"⭐ Level bonus: {username} reached level {current_level} (+{single_level_bonus} points)")
             
             # Check for level achievements for THIS level
@@ -264,7 +264,7 @@ class CozyGamification:
             user_stats['level'] = new_level
             user_stats['level_progress'] = progress
             
-            username = self.usernames.get(str(user_id), {}).get('username', f'User {str(user_id)[:8]}')
+            username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
             logging.info(f"🏆 Achievement bonus: {username} +{achievement_bonus} points for {len(new_achievements)} new achievement(s)")
             
             # Track achievement bonus in breakdown
@@ -450,7 +450,7 @@ class CozyGamification:
                 # Log the sound tracking addition
                 from main import format_duration
                 duration_str = format_duration(duration)
-                username = self.usernames.get(str(user_id), {}).get('username', f'User {str(user_id)[:8]}')
+                username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                 total_points = points_added + bonus_points
                 points_str = f" (+{total_points} point{'s' if total_points != 1 else ''})" if total_points > 0 else ""
                 bonus_str = f" [+{bonus_points} bonus]" if bonus_points > 0 else ""
@@ -707,7 +707,8 @@ class CozyGamification:
                 user_stats['category_completions'].append(achievement_key)
                 
                 self.add_points(user_id, 50, f"Category completion: {category}")
-                logging.info(f"⭐ Category completion bonus: {self.usernames.get(str(user_id), {}).get('username', f'User {str(user_id)[:8]}')} completed {category} category (+50 points)")
+                username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
+                logging.info(f"⭐ Category completion bonus: {username} completed {category} category (+50 points)")
                 return 50
         
         return 0
