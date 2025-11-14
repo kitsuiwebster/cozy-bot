@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import asyncio
 import fcntl
+import aiohttp
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -189,10 +190,8 @@ async def periodic_backup():
                     # Accumulate time and save to database
                     if listening_duration > 0:
                         user_data['accumulated_time'] += listening_duration
-                        cozy_gamification.add_listening_time(user_id, listening_duration)
-                        points_to_add = int(listening_duration / 60)
-                        if points_to_add > 0:
-                            cozy_gamification.add_points(user_id, points_to_add, "Periodic listening time")
+                        result = cozy_gamification.add_listening_time(user_id, listening_duration)
+                        points_to_add = result['points_added'] if result else int(listening_duration / 60)
                         
                         total_session_time = user_data['accumulated_time']
                         logging.info(f'👉 {username}: +{format_duration(listening_duration)} (session total: {format_duration(total_session_time)}) +{points_to_add} points')
@@ -241,6 +240,44 @@ def save_current_stats_for_api():
             
     except Exception as e:
         logging.error(f'❌ Failed to save current stats: {e}')
+
+# API endpoints health check function
+async def check_api_endpoints():
+    """Check all API endpoints health during bot initialization"""
+    # Determine API base URL (try HTTPS first, fallback to HTTP)
+    api_base = "https://localhost:8000"
+    api_base_http = "http://localhost:8000"
+    
+    endpoints = [
+        "/",
+        "/health", 
+        "/api/total",
+        "/api/top-users",
+        "/api/top-sounds", 
+        "/api/top-servers"
+    ]
+    
+    logging.info("⚙️ Checking API endpoints...")
+    
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+        for endpoint in endpoints:
+            try:
+                # Try HTTPS first
+                async with session.get(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        logging.info(f"✨ {endpoint} - healthy")
+                    else:
+                        logging.error(f"🔥 {endpoint} - error (status: {response.status})")
+            except:
+                try:
+                    # Fallback to HTTP
+                    async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                        if response.status == 200:
+                            logging.info(f"✅ {endpoint} - healthy")
+                        else:
+                            logging.error(f"❌ {endpoint} - error (status: {response.status})")
+                except:
+                    logging.error(f"❌ {endpoint} - error")
 
 
 # Global error handler for unhandled exceptions
@@ -317,10 +354,8 @@ async def on_voice_state_update(member, before, after):
                     total_session_time = user_data['accumulated_time'] + final_duration
                     
                     if final_duration > 0:
-                        cozy_gamification.add_listening_time(user_id, final_duration)
-                        points_to_add = int(final_duration / 60)
-                        if points_to_add > 0:
-                            result = cozy_gamification.add_points(user_id, points_to_add, "Final listening time")
+                        result = cozy_gamification.add_listening_time(user_id, final_duration)
+                        points_to_add = result['points_added'] if result else int(final_duration / 60)
                         logging.info(f"👋 BOT DISCONNECT: {username} final session - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
                 
                 # Clean up session
@@ -365,10 +400,8 @@ async def on_voice_state_update(member, before, after):
             total_session_time = user_data['accumulated_time'] + final_duration
             
             if final_duration > 0:
-                cozy_gamification.add_listening_time(user_id, final_duration)
-                points_to_add = int(final_duration / 60)
-                if points_to_add > 0:
-                    result = cozy_gamification.add_points(user_id, points_to_add, "Listening time")
+                result = cozy_gamification.add_listening_time(user_id, final_duration)
+                points_to_add = result['points_added'] if result else int(final_duration / 60)
                 logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
             else:
                 logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - no additional time")
@@ -383,6 +416,23 @@ async def on_voice_state_update(member, before, after):
 # Bot ready event handler - initialization complete
 @bot.event
 async def on_ready():
+    # Display bot header
+    print("\n" + "="*60)
+    print("╔═════════════════════════════════════════════════════════════════╗")
+    print("║                                                                 ║")
+    print("║   ██████╗ ██████╗ ███████╗██╗   ██╗██████╗  ██████╗ ████████╗   ║")
+    print("║  ██╔════╝██╔═══██╗╚══███╔╝╚██╗ ██╔╝██╔══██╗██╔═══██╗╚══██╔══╝   ║")
+    print("║  ██║     ██║   ██║  ███╔╝  ╚████╔╝ ██████╔╝██║   ██║   ██║      ║")
+    print("║  ██║     ██║   ██║ ███╔╝    ╚██╔╝  ██╔══██╗██║   ██║   ██║      ║")
+    print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
+    print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
+    print("║                                                                 ║")
+    print("║                      Version 1.0.10                             ║")
+    print("║            by @kitsuiwebster & @BubbleXGum                      ║")
+    print("║                                                                 ║")
+    print("╚═════════════════════════════════════════════════════════════════╝")
+    print("="*60 + "\n")
+    
     # Set bot instance for API access
     try:
         from api.routes.stats import set_bot_instance
@@ -403,6 +453,9 @@ async def on_ready():
     
     logging.info('🚀 Bot startup complete - All systems operational')
     
+    # Check API endpoints health
+    await check_api_endpoints()
+    
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
     bot.loop.create_task(periodic_backup())
@@ -410,10 +463,10 @@ async def on_ready():
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
     total_member_count = sum(guild.member_count for guild in bot.guilds)
-    logging.info(f'📊 Serving {total_member_count:,} members across {server_count} servers')
+    logging.info(f'👉 Serving {total_member_count:,} members across {server_count} servers')
     logging.info('🏠 Connected servers:')
     for guild in bot.guilds:
-        logging.info(f'   └─ {guild.name} ({guild.member_count:,} members)')
+        logging.info(f'   ╰┈➤ {guild.name} ({guild.member_count:,} members)')
 
 # Message processing event handler
 @bot.event

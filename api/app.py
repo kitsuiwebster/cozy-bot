@@ -8,7 +8,7 @@ import logging
 app = FastAPI(
     title="CozyBot API",
     description="REST API for CozyBot Discord bot statistics",
-    version="1.0.9"
+    version="1.0.10"
 )
 
 # Configure CORS for web access
@@ -31,7 +31,7 @@ app.include_router(stats_router, prefix="/api", tags=["stats"])
 
 @app.get("/")
 async def root():
-    return {"message": "CozyBot API with LIVE Bot Access", "version": "1.0.9"}
+    return {"message": "CozyBot API with LIVE Bot Access", "version": "1.0.10"}
 
 @app.get("/health")
 async def health_check():
