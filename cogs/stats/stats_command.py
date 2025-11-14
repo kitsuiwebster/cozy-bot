@@ -10,8 +10,8 @@ class StatsCog(commands.Cog):
     async def stats(self, interaction: discord.Interaction):
         # Create embed with stats website info
         embed = discord.Embed(
-            title="📊 CozyBot Statistics",
-            description="Access comprehensive CozyBot statistics and leaderboards",
+            title="CozyBot Statistics",
+            description="Access CozyBot statistics",
             color=0x00ff00,  # Green
             url="https://kitsuiwebster.com/cozybot"
         )
@@ -30,8 +30,6 @@ class StatsCog(commands.Cog):
                   "**Real-time Statistics** - Live data updated continuously",
             inline=False
         )
-        
-        embed.set_footer(text="Click the title or link above to visit the website")
         
         await interaction.response.send_message(embed=embed)
 
