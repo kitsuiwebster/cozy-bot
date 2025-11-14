@@ -140,25 +140,25 @@ class CozyGamification:
                     if user_id in self.changes_since_save['user_listening_time']:
                         total_time = self.changes_since_save['user_listening_time'][user_id]
                         if total_time > 0:
-                            logging.info(f"  👉 +{format_duration(total_time)} pour {username}")
+                            logging.info(f"  👉 +{format_duration(total_time)} for {username}")
                     
                     # Points breakdown for this user
                     if user_id in self.changes_since_save['user_points_breakdown']:
                         breakdown = self.changes_since_save['user_points_breakdown'][user_id]
                         total_points = sum(item['points'] for item in breakdown)
-                        logging.info(f"  👉 +{total_points} points pour {username} - Détail:")
+                        logging.info(f"  👉 +{total_points} points for {username} - Details:")
                         for item in breakdown:
                             logging.info(f"    ├─ {item['reason']}: +{item['points']} pts")
                     elif user_id in self.changes_since_save['user_points']:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
-                            logging.info(f"  👉 +{points} points pour {username}")
+                            logging.info(f"  👉 +{points} points for {username}")
                     
                     # Sound-specific time for this user
                     if user_id in self.changes_since_save['user_sound_time']:
                         for sound_name, sound_time in self.changes_since_save['user_sound_time'][user_id].items():
                             if sound_time > 0:
-                                logging.info(f"  👉 +{format_duration(sound_time)} de {sound_name} pour {username}")
+                                logging.info(f"  👉 +{format_duration(sound_time)} of {sound_name} for {username}")
                 
                 # Reset tracking for next period
                 self.changes_since_save = {
@@ -220,7 +220,7 @@ class CozyGamification:
             user_stats['level_progress'] = progress
             
             username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"⭐ Level bonus: {username} reached level {old_level + 1} (+{level_bonus_points} points)")
+            logging.info(f"🆙 Level bonus: {username} reached level {old_level + 1} (+{level_bonus_points} points)")
         
         # Check other achievements
         new_achievements.extend(self.check_general_achievements(user_stats))
@@ -392,7 +392,7 @@ class CozyGamification:
                 total_points = points_added + bonus_points
                 points_str = f" (+{total_points} point{'s' if total_points != 1 else ''})" if total_points > 0 else ""
                 bonus_str = f" [+{bonus_points} bonus]" if bonus_points > 0 else ""
-                logging.info(f"👉 +{duration_str} de {sound_name} pour {username}{points_str}{bonus_str}")
+                logging.info(f"👉 +{duration_str} of {sound_name} for {username}{points_str}{bonus_str}")
                 
             except Exception as e:
                 logging.error(f'❌ Error finalizing sound session: {e}')
