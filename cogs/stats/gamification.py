@@ -5,6 +5,15 @@ from typing import Dict, List, Optional
 import asyncio
 import fcntl
 import logging
+import traceback
+
+def colorize_points(text):
+    """Colorize point values in blue"""
+    return f'\033[34m{text}\033[0m'
+
+def colorize_duration(text):
+    """Colorize duration values in cyan"""
+    return f'\033[36m{text}\033[0m'
 
 class CozyGamification:
     def __init__(self):
@@ -48,7 +57,7 @@ class CozyGamification:
                 backup_file = self.data_file + f'.corrupted.{datetime.now().strftime("%Y%m%d_%H%M%S")}'
                 os.rename(self.data_file, backup_file)
                 logging.info(f'❌ Corrupted file backed up as: {backup_file}')
-            except:
+            except Exception:
                 pass
             return {}
     
@@ -132,40 +141,45 @@ class CozyGamification:
             has_changes = any(self.changes_since_save['user_listening_time']) or any(self.changes_since_save['user_sound_time']) or any(self.changes_since_save['user_points'])
             
             if has_changes or force_detailed_log:
-                logging.info(f"✅️ PERIODIC SAVE - Changes since last save:")
+                save_type = "PERIODIC SAVE" if force_detailed_log else "EVENT SAVE"
+                logging.info(f"✅️ {save_type} - Changes since last save:")
                 
                 # Log user changes
                 for user_id in set(list(self.changes_since_save['user_listening_time'].keys()) + 
                                  list(self.changes_since_save['user_sound_time'].keys()) + 
                                  list(self.changes_since_save['user_points'].keys())):
                     
-                    username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+                    username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                     
                     # Total listening time for this user
                     if user_id in self.changes_since_save['user_listening_time']:
                         total_time = self.changes_since_save['user_listening_time'][user_id]
                         if total_time > 0:
-                            logging.info(f"  👉 +{format_duration(total_time)} for {username}")
+                            logging.info(f"  👉 {colorize_duration(f'+{format_duration(total_time)}')} for {username}")
                     
                     # Points breakdown for this user
                     if user_id in self.changes_since_save['user_points_breakdown']:
                         breakdown = self.changes_since_save['user_points_breakdown'][user_id]
                         if isinstance(breakdown, list):
                             total_points = sum(item['points'] for item in breakdown if isinstance(item, dict))
-                            logging.info(f"  👉 +{total_points} points for {username} - Details:")
+                            logging.info(f"  👉 {colorize_points(f'+{total_points} points')} for {username} - Details:")
                             for item in breakdown:
                                 if isinstance(item, dict):
-                                    logging.info(f"    ├─ {item['reason']}: +{item['points']} pts")
+                                    item_points = item["points"]
+                                    logging.info(f"    ├─ {item['reason']}: {colorize_points(f'+{item_points} pts')}")
                     elif user_id in self.changes_since_save['user_points']:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
-                            logging.info(f"  👉 +{points} points for {username}")
+                            logging.info(f"  👉 {colorize_points(f'+{points} points')} for {username}")
                     
-                    # Sound-specific time for this user
-                    if user_id in self.changes_since_save['user_sound_time']:
-                        for sound_name, sound_time in self.changes_since_save['user_sound_time'][user_id].items():
-                            if sound_time > 0:
-                                logging.info(f"  👉 +{format_duration(sound_time)} of {sound_name} for {username}")
+                    # Sound-specific time for this user - SAFE ACCESS
+                    if (isinstance(self.changes_since_save['user_sound_time'], dict) and 
+                        user_id in self.changes_since_save['user_sound_time']):
+                        user_sound_data = self.changes_since_save['user_sound_time'][user_id]
+                        if isinstance(user_sound_data, dict):
+                            for sound_name, sound_time in user_sound_data.items():
+                                if isinstance(sound_time, (int, float)) and sound_time > 0:
+                                    logging.info(f"  👉 {colorize_duration(f'+{format_duration(sound_time)}')} of {sound_name} for {username}")
                 
                 # Reset tracking for next period
                 self.changes_since_save = {
@@ -175,13 +189,13 @@ class CozyGamification:
                     'user_points_breakdown': {}
                 }
             else:
-                logging.info(f"🚫 PERIODIC SAVE - No changes since last save")
+                logging.info(f"🚫 EVENT SAVE - No changes since last save")
             
         except Exception as e:
             # Clean up temp file on error
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-            logging.error(f'❌ Failed to save gamification data: {e}')
+            logging.error(f'❌ Failed to save gamification data: {e}\n{traceback.format_exc()}')
     
     def get_user_stats(self, user_id: str) -> Dict:
         """Get or create user statistics"""
@@ -200,7 +214,7 @@ class CozyGamification:
             }
         return self.user_data[user_id]
     
-    def add_points(self, user_id: str, points: int, reason: str = "Listening") -> Dict:
+    def add_points(self, user_id: str, points: int, reason: str = "Listening", save_data: bool = True) -> Dict:
         """Add points to user and handle level progression"""
         user_stats = self.get_user_stats(user_id)
         user_stats['total_points'] += points
@@ -227,8 +241,8 @@ class CozyGamification:
             total_level_bonus_points += single_level_bonus
             user_stats['total_points'] += single_level_bonus
             
-            username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"⭐ Level bonus: {username} reached level {current_level} (+{single_level_bonus} points)")
+            username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
+            logging.info(f"⭐ Level bonus: {username} reached level {current_level} ({colorize_points(f'+{single_level_bonus} points')})")
             
             # Check for level achievements for THIS level
             level_achievements = self.check_level_achievements(current_level, user_stats)
@@ -259,8 +273,8 @@ class CozyGamification:
             user_stats['level'] = new_level
             user_stats['level_progress'] = progress
             
-            username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"🏆 Achievement bonus: {username} +{achievement_bonus} points for {len(new_achievements)} new achievement(s)")
+            username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
+            logging.info(f"🏆 Achievement bonus: {username} {colorize_points(f'+{achievement_bonus} points')} for {len(new_achievements)} new achievement(s)")
             
             # Track achievement bonus in breakdown
             if user_id not in self.changes_since_save['user_points_breakdown']:
@@ -271,15 +285,24 @@ class CozyGamification:
                     'points': 100
                 })
         
-        # Track points breakdown for regular points
-        if user_id not in self.changes_since_save['user_points_breakdown']:
-            self.changes_since_save['user_points_breakdown'][user_id] = []
-        self.changes_since_save['user_points_breakdown'][user_id].append({
-            'reason': reason,
-            'points': points
-        })
+        # Track points breakdown for regular points - SAFE ACCESS  
+        try:
+            if not isinstance(self.changes_since_save['user_points_breakdown'], dict):
+                self.changes_since_save['user_points_breakdown'] = {}
+            if user_id not in self.changes_since_save['user_points_breakdown']:
+                self.changes_since_save['user_points_breakdown'][user_id] = []
+            if not isinstance(self.changes_since_save['user_points_breakdown'][user_id], list):
+                self.changes_since_save['user_points_breakdown'][user_id] = []
+            self.changes_since_save['user_points_breakdown'][user_id].append({
+                'reason': reason,
+                'points': points
+            })
+        except Exception as e:
+            logging.warning(f"⚠️ Error tracking points breakdown: {e} - resetting structures")
+            self.changes_since_save['user_points_breakdown'] = {}
         
-        self.save_user_data()
+        if save_data:
+            self.save_user_data()
         
         return {
             'points_added': points + achievement_bonus + level_bonus_points,
@@ -320,7 +343,16 @@ class CozyGamification:
         points_to_add = int(seconds / 60)
         if points_to_add > 0:
             return self.add_points(user_id, points_to_add, "Listening time")
-        return None
+        else:
+            # Return valid dict even with 0 points to maintain consistency
+            return {
+                'points_added': 0,
+                'total_points': user_stats['total_points'],
+                'level_up': False,
+                'new_level': None,
+                'new_achievements': [],
+                'reason': "Listening time"
+            }
     
     def track_sound_start(self, user_id: str, sound_name: str):
         """Track when user starts listening to a sound"""
@@ -369,16 +401,31 @@ class CozyGamification:
                 user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
                 user_stats['current_sound'] = None
                 
-                # Track changes for periodic logging
-                if user_id not in self.changes_since_save['user_listening_time']:
-                    self.changes_since_save['user_listening_time'][user_id] = 0
-                self.changes_since_save['user_listening_time'][user_id] += duration
-                
-                if user_id not in self.changes_since_save['user_sound_time']:
-                    self.changes_since_save['user_sound_time'][user_id] = {}
-                if sound_name not in self.changes_since_save['user_sound_time'][user_id]:
-                    self.changes_since_save['user_sound_time'][user_id][sound_name] = 0
-                self.changes_since_save['user_sound_time'][user_id][sound_name] += duration
+                # Track changes for periodic logging - SAFE ACCESS
+                try:
+                    if not isinstance(self.changes_since_save['user_listening_time'], dict):
+                        self.changes_since_save['user_listening_time'] = {}
+                    if user_id not in self.changes_since_save['user_listening_time']:
+                        self.changes_since_save['user_listening_time'][user_id] = 0
+                    self.changes_since_save['user_listening_time'][user_id] += duration
+                    
+                    if not isinstance(self.changes_since_save['user_sound_time'], dict):
+                        self.changes_since_save['user_sound_time'] = {}
+                    if user_id not in self.changes_since_save['user_sound_time']:
+                        self.changes_since_save['user_sound_time'][user_id] = {}
+                    if not isinstance(self.changes_since_save['user_sound_time'][user_id], dict):
+                        self.changes_since_save['user_sound_time'][user_id] = {}
+                    if sound_name not in self.changes_since_save['user_sound_time'][user_id]:
+                        self.changes_since_save['user_sound_time'][user_id][sound_name] = 0
+                    self.changes_since_save['user_sound_time'][user_id][sound_name] += duration
+                except Exception as e:
+                    logging.warning(f"⚠️ Error updating changes tracking: {e} - resetting structures")
+                    self.changes_since_save = {
+                        'user_listening_time': {},
+                        'user_sound_time': {},
+                        'user_points': {},
+                        'user_points_breakdown': {}
+                    }
                 
                 # Award points for listening time
                 points_added = int(duration / 60)
@@ -386,41 +433,42 @@ class CozyGamification:
                 
                 # Check for loyalty bonuses (30min=+50pts, 1h=+100pts, 12h=+500pts)
                 duration_minutes = duration / 60
+                loyalty_bonus = 0
                 if duration_minutes >= 720:  # 12 hours
-                    bonus_points += 500
+                    loyalty_bonus = 500
                     reason = f"12h loyalty bonus on {sound_name}"
-                    self.add_points(user_id, 500, reason)
+                    self.add_points(user_id, 500, reason, save_data=False)
                 elif duration_minutes >= 60:  # 1 hour
-                    bonus_points += 100
+                    loyalty_bonus = 100
                     reason = f"1h loyalty bonus on {sound_name}"
-                    self.add_points(user_id, 100, reason)
+                    self.add_points(user_id, 100, reason, save_data=False)
                 elif duration_minutes >= 30:  # 30 minutes
-                    bonus_points += 50
+                    loyalty_bonus = 50
                     reason = f"30min loyalty bonus on {sound_name}"
-                    self.add_points(user_id, 50, reason)
+                    self.add_points(user_id, 50, reason, save_data=False)
                 
                 if points_added > 0:
-                    self.add_points(user_id, points_added, f"Listening to {sound_name}")
-                    if user_id not in self.changes_since_save['user_points']:
-                        self.changes_since_save['user_points'][user_id] = 0
-                    self.changes_since_save['user_points'][user_id] += points_added + bonus_points
+                    self.add_points(user_id, points_added, f"Listening to {sound_name}", save_data=False)
                 
                 # Check for category completion bonus
-                category_bonus = self.check_category_completion_bonus(user_id, sound_name)
-                if category_bonus > 0:
-                    bonus_points += category_bonus
+                category_bonus = self.check_category_completion_bonus(user_id, sound_name, save_data=False)
+                bonus_points = loyalty_bonus + category_bonus
                 
                 # Log the sound tracking addition
                 from main import format_duration
                 duration_str = format_duration(duration)
-                username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+                username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                 total_points = points_added + bonus_points
-                points_str = f" (+{total_points} point{'s' if total_points != 1 else ''})" if total_points > 0 else ""
-                bonus_str = f" [+{bonus_points} bonus]" if bonus_points > 0 else ""
-                logging.info(f"👉 +{duration_str} of {sound_name} for {username}{points_str}{bonus_str}")
+                point_word = "points" if total_points != 1 else "point"
+                points_str = f" ({colorize_points(f'+{total_points} {point_word}')})" if total_points > 0 else ""
+                bonus_str = f" [{colorize_points(f'+{bonus_points} bonus')}]" if bonus_points > 0 else ""
+                logging.info(f"👉 {colorize_duration(f'+{duration_str}')} of {sound_name} for {username}{points_str}{bonus_str}")
+                
+                # Single save at the end to avoid multiple EVENT SAVE logs
+                self.save_user_data()
                 
             except Exception as e:
-                logging.error(f'❌ Error finalizing sound session: {e}')
+                logging.error(f'❌ Error finalizing sound session: {e}\n{traceback.format_exc()}')
                 user_stats['current_sound'] = None
     
     def track_sound_preference(self, user_id: str, sound_name: str):
@@ -564,6 +612,20 @@ class CozyGamification:
                     logging.warning(f"⚠️ Resetting corrupted current_sound for {user_id}")
                     stats['current_sound'] = None
                     cleaned_count += 1
+                elif 'start_time' in stats['current_sound']:
+                    try:
+                        start_time = datetime.fromisoformat(stats['current_sound']['start_time'])
+                        session_duration = (datetime.now() - start_time).total_seconds()
+                        # If session is older than 12 hours, it's probably corrupted
+                        if session_duration > 12 * 3600:
+                            username = self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                            logging.warning(f"⚠️ Resetting old current_sound session for {username}: {session_duration/3600:.1f}h old")
+                            stats['current_sound'] = None
+                            cleaned_count += 1
+                    except Exception:
+                        logging.warning(f"⚠️ Resetting corrupted current_sound timestamp for {user_id}")
+                        stats['current_sound'] = None
+                        cleaned_count += 1
         
         # Clean changes_since_save
         for category, data in self.changes_since_save.items():
@@ -629,7 +691,7 @@ class CozyGamification:
         
         return achievements
     
-    def check_category_completion_bonus(self, user_id: str, sound_name: str) -> int:
+    def check_category_completion_bonus(self, user_id: str, sound_name: str, save_data: bool = True) -> int:
         """Check if user completed a sound category and award bonus"""
         user_stats = self.get_user_stats(user_id)
         listening_times = user_stats.get('listening_time_by_sound', {})
@@ -669,8 +731,9 @@ class CozyGamification:
                     user_stats['category_completions'] = []
                 user_stats['category_completions'].append(achievement_key)
                 
-                self.add_points(user_id, 50, f"Category completion: {category}")
-                logging.info(f"⭐ Category completion bonus: {self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')} completed {category} category (+50 points)")
+                self.add_points(user_id, 50, f"Category completion: {category}", save_data=save_data)
+                username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
+                logging.info(f"⭐ Category completion bonus: {username} completed {category} category ({colorize_points('+50 points')})")
                 return 50
         
         return 0

@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Sound tracking time calculation now properly counts listening time when user quits voice channel.
+- Duplicate point saves in finalize_current_sound function.
+- Session duration validation (30min cap) to prevent corrupted data in periodic backups.
 
 ## [1.0.9] - 2025-11-13
 
@@ -27,7 +29,7 @@ All notable changes to this project will be documented in this file.
 - `/top-sounds` command to display most listened sounds globally with formatted time and listener counts.
 - `/api/top-sounds` endpoint to retrieve sound popularity statistics with emoji display names.
 - HTTPS support with Let's Encrypt SSL certificates for secure API access.
-- Enhanced favorite sound calculation based on listening time instead of session count.
+- Favorite sound calculation based on listening time instead of session count.
 
 ### Changed
 
