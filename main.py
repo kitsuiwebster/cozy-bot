@@ -195,20 +195,36 @@ async def periodic_backup():
                     # Track this update for logging
                     active_session_updates[guild_id] = current_session_time
             
+            # Get list of users actually in voice channels with the bot
+            users_in_voice_with_bot = set()
+            for guild in bot.guilds:
+                if guild.voice_client and guild.voice_client.channel:
+                    # Bot is connected to a voice channel in this guild
+                    for member in guild.voice_client.channel.members:
+                        if not member.bot:  # Exclude bots
+                            users_in_voice_with_bot.add(str(member.id))
+            
             # Update gamification data for active user sessions
             for user_id, user_stats in cozy_gamification.user_data.items():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     try:
+                        # First check: is user actually in voice with bot?
+                        if str(user_id) not in users_in_voice_with_bot:
+                            username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                            logging.warning(f"⚠️ Removing session for {username}: not in voice with bot")
+                            user_stats['current_sound'] = None
+                            continue
+                        
                         start_time = datetime.fromisoformat(current_sound['start_time'])
                         session_duration = (datetime.now() - start_time).total_seconds()
                         sound_name = current_sound['name']
                         
-                        # Validate session duration (max 30 minutes to prevent corrupted data)
+                        # Backup validation: max 30 minutes to prevent corrupted data
                         max_session_duration = 30 * 60  # 30 minutes in seconds
                         if session_duration > max_session_duration:
                             username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
-                            logging.warning(f"⚠️ Removing corrupted session for {username}: {session_duration/60:.1f}min old")
+                            logging.warning(f"⚠️ Removing old session for {username}: {session_duration/60:.1f}min old")
                             user_stats['current_sound'] = None
                             continue
                         
