@@ -212,17 +212,23 @@ class CozyGamification:
         level_bonus_points = 0
         
         if level_up:
-            new_achievements.extend(self.check_level_achievements(new_level, user_stats))
             # Award level bonus: new_level * 10 points
             level_bonus_points = new_level * 10
             user_stats['total_points'] += level_bonus_points
+            
+            username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+            logging.info(f"🆙 Level bonus: {username} reached level {new_level} (+{level_bonus_points} points)")
+            
+            # Check for level achievements AFTER logging level bonus
+            level_achievements = self.check_level_achievements(new_level, user_stats)
+            if level_achievements:
+                logging.info(f"🏆 Level achievement: {username} unlocked {', '.join(level_achievements)}")
+            new_achievements.extend(level_achievements)
+            
             # Recalculate level after bonus (might level up again!)
             new_level, progress = self.calculate_level(user_stats['total_points'])
             user_stats['level'] = new_level
             user_stats['level_progress'] = progress
-            
-            username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"🆙 Level bonus: {username} reached level {old_level + 1} (+{level_bonus_points} points)")
         
         # Check other achievements
         new_achievements.extend(self.check_general_achievements(user_stats))
