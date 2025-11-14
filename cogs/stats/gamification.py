@@ -389,6 +389,11 @@ class CozyGamification:
                 start_time = datetime.fromisoformat(current_sound['start_time'])
                 duration = (datetime.now() - start_time).total_seconds()
                 
+                # Cap duration to 30 minutes to prevent corrupted data
+                max_duration = 30 * 60  # 30 minutes in seconds
+                if duration > max_duration:
+                    duration = max_duration
+                
                 sound_name = current_sound['name']
                 if 'listening_time_by_sound' not in user_stats:
                     user_stats['listening_time_by_sound'] = {}
