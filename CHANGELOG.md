@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Enhanced CozyPoints system with loyalty bonuses, streak bonuses and category completion.
 - Sound tracking logging system is now much more detailed and clean.
 
 ### Fixed

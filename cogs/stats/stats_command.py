@@ -31,6 +31,12 @@ class StatsCog(commands.Cog):
             inline=False
         )
         
+        embed.add_field(
+            name="How to earn points?",
+            value="[Complete CozyPoints Guide](https://kitsuiwebster.com/cozypoints)",
+            inline=False
+        )
+        
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):

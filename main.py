@@ -153,13 +153,38 @@ async def change_status():
             await bot.change_presence(activity=status)
             await asyncio.sleep(10)
 
-# Background task for periodic data backup
+# Background task for periodic data backup and streak bonuses
 async def periodic_backup():
     await bot.wait_until_ready()
     
     while not bot.is_closed():
-        # Save data every hour
-        await asyncio.sleep(3600)
+        # Save data every hour, but check for streak bonuses every 10 minutes
+        await asyncio.sleep(600)  # 10 minutes
+        
+        # Award streak bonuses every 10 minutes
+        try:
+            from cogs.stats.gamification import cozy_gamification
+            
+            for guild_id, session in user_voice_sessions.items():
+                for user_id, user_data in session['users'].items():
+                    # Get user's current streak
+                    streak = cozy_gamification.get_current_streak(user_id)
+                    if streak > 0:
+                        # Award streak points
+                        result = cozy_gamification.add_points(user_id, streak, f"Streak bonus ({streak} days)")
+                        username = cozy_gamification.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+                        logging.info(f"🔥 Streak bonus: {username} +{streak} points (streak: {streak} days)")
+        except Exception as e:
+            logging.error(f'❌ Streak bonus error: {e}')
+        
+        # Full backup every hour (6 cycles of 10 minutes)
+        if hasattr(periodic_backup, 'cycle_count'):
+            periodic_backup.cycle_count += 1
+        else:
+            periodic_backup.cycle_count = 1
+            
+        if periodic_backup.cycle_count >= 6:  # Every hour
+            periodic_backup.cycle_count = 0
         if guild_voice_time:
             save_voice_time_data()
             logging.info('✅ Periodic voice data backup completed')

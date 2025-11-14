@@ -19,7 +19,8 @@ class CozyGamification:
         self.changes_since_save = {
             'user_listening_time': {},  # user_id: added_seconds
             'user_sound_time': {},      # user_id: {sound_name: added_seconds}
-            'user_points': {}           # user_id: added_points
+            'user_points': {},          # user_id: added_points
+            'user_points_breakdown': {} # user_id: [{'reason': str, 'points': int}]
         }
         
     def load_user_data(self) -> Dict:
@@ -141,8 +142,14 @@ class CozyGamification:
                         if total_time > 0:
                             logging.info(f"  👉 +{format_duration(total_time)} pour {username}")
                     
-                    # Points for this user
-                    if user_id in self.changes_since_save['user_points']:
+                    # Points breakdown for this user
+                    if user_id in self.changes_since_save['user_points_breakdown']:
+                        breakdown = self.changes_since_save['user_points_breakdown'][user_id]
+                        total_points = sum(item['points'] for item in breakdown)
+                        logging.info(f"  👉 +{total_points} points pour {username} - Détail:")
+                        for item in breakdown:
+                            logging.info(f"    ├─ {item['reason']}: +{item['points']} pts")
+                    elif user_id in self.changes_since_save['user_points']:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
                             logging.info(f"  👉 +{points} points pour {username}")
@@ -157,7 +164,8 @@ class CozyGamification:
                 self.changes_since_save = {
                     'user_listening_time': {},
                     'user_sound_time': {},
-                    'user_points': {}
+                    'user_points': {},
+                    'user_points_breakdown': {}
                 }
             else:
                 logging.info(f"✅️ PERIODIC SAVE - No changes since last save")
@@ -199,17 +207,57 @@ class CozyGamification:
         # Check for level up achievements
         level_up = new_level > old_level
         new_achievements = []
+        level_bonus_points = 0
         
         if level_up:
             new_achievements.extend(self.check_level_achievements(new_level, user_stats))
+            # Award level bonus: new_level * 10 points
+            level_bonus_points = new_level * 10
+            user_stats['total_points'] += level_bonus_points
+            # Recalculate level after bonus (might level up again!)
+            new_level, progress = self.calculate_level(user_stats['total_points'])
+            user_stats['level'] = new_level
+            user_stats['level_progress'] = progress
+            
+            username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+            logging.info(f"🆙 Level bonus: {username} reached level {old_level + 1} (+{level_bonus_points} points)")
         
         # Check other achievements
         new_achievements.extend(self.check_general_achievements(user_stats))
         
+        # Award bonus points for achievements (+100 points per achievement)
+        achievement_bonus = len(new_achievements) * 100
+        if achievement_bonus > 0:
+            user_stats['total_points'] += achievement_bonus
+            # Recalculate level after achievement bonus
+            new_level, progress = self.calculate_level(user_stats['total_points'])
+            user_stats['level'] = new_level
+            user_stats['level_progress'] = progress
+            
+            username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
+            logging.info(f"🏆 Achievement bonus: {username} +{achievement_bonus} points for {len(new_achievements)} new achievement(s)")
+            
+            # Track achievement bonus in breakdown
+            if user_id not in self.changes_since_save['user_points_breakdown']:
+                self.changes_since_save['user_points_breakdown'][user_id] = []
+            for achievement in new_achievements:
+                self.changes_since_save['user_points_breakdown'][user_id].append({
+                    'reason': f'Achievement: {achievement}',
+                    'points': 100
+                })
+        
+        # Track points breakdown for regular points
+        if user_id not in self.changes_since_save['user_points_breakdown']:
+            self.changes_since_save['user_points_breakdown'][user_id] = []
+        self.changes_since_save['user_points_breakdown'][user_id].append({
+            'reason': reason,
+            'points': points
+        })
+        
         self.save_user_data()
         
         return {
-            'points_added': points,
+            'points_added': points + achievement_bonus + level_bonus_points,
             'total_points': user_stats['total_points'],
             'level_up': level_up,
             'new_level': new_level if level_up else None,
@@ -219,16 +267,23 @@ class CozyGamification:
     
     def calculate_level(self, total_points: int) -> tuple:
         """Calculate user level and progress based on total points"""
-        # Level progression: 100, 250, 500, 1000, 2000, 4000, etc.
+        # Level progression: level * 10 points needed for next level
+        # Level 1->2: 10 pts, Level 2->3: 20 pts, Level 3->4: 30 pts, etc.
         level = 1
-        points_needed = 100
+        accumulated_points = 0
         
-        while total_points >= points_needed:
-            total_points -= points_needed
+        while True:
+            points_needed_for_next = level * 10
+            if accumulated_points + points_needed_for_next > total_points:
+                break
+            accumulated_points += points_needed_for_next
             level += 1
-            points_needed = int(points_needed * 1.5)  # Exponential growth
         
-        progress = (total_points / points_needed) * 100
+        # Calculate progress towards next level
+        points_in_current_level = total_points - accumulated_points
+        points_needed_for_next = level * 10
+        progress = (points_in_current_level / points_needed_for_next) * 100
+        
         return level, round(progress, 1)
     
     def add_listening_time(self, user_id: str, seconds: float):
@@ -302,18 +357,42 @@ class CozyGamification:
                 
                 # Award points for listening time
                 points_added = int(duration / 60)
+                bonus_points = 0
+                
+                # Check for loyalty bonuses (30min=+50pts, 1h=+100pts, 12h=+500pts)
+                duration_minutes = duration / 60
+                if duration_minutes >= 720:  # 12 hours
+                    bonus_points += 500
+                    reason = f"12h loyalty bonus on {sound_name}"
+                    self.add_points(user_id, 500, reason)
+                elif duration_minutes >= 60:  # 1 hour
+                    bonus_points += 100
+                    reason = f"1h loyalty bonus on {sound_name}"
+                    self.add_points(user_id, 100, reason)
+                elif duration_minutes >= 30:  # 30 minutes
+                    bonus_points += 50
+                    reason = f"30min loyalty bonus on {sound_name}"
+                    self.add_points(user_id, 50, reason)
+                
                 if points_added > 0:
                     self.add_points(user_id, points_added, f"Listening to {sound_name}")
                     if user_id not in self.changes_since_save['user_points']:
                         self.changes_since_save['user_points'][user_id] = 0
-                    self.changes_since_save['user_points'][user_id] += points_added
+                    self.changes_since_save['user_points'][user_id] += points_added + bonus_points
+                
+                # Check for category completion bonus
+                category_bonus = self.check_category_completion_bonus(user_id, sound_name)
+                if category_bonus > 0:
+                    bonus_points += category_bonus
                 
                 # Log the sound tracking addition
                 from main import format_duration
                 duration_str = format_duration(duration)
                 username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-                points_str = f" (+{points_added} point{'s' if points_added != 1 else ''})" if points_added > 0 else ""
-                logging.info(f"👉 +{duration_str} de {sound_name} pour {username}{points_str}")
+                total_points = points_added + bonus_points
+                points_str = f" (+{total_points} point{'s' if total_points != 1 else ''})" if total_points > 0 else ""
+                bonus_str = f" [+{bonus_points} bonus]" if bonus_points > 0 else ""
+                logging.info(f"👉 +{duration_str} de {sound_name} pour {username}{points_str}{bonus_str}")
                 
             except Exception as e:
                 logging.error(f'❌ Error finalizing sound session: {e}')
@@ -494,6 +573,52 @@ class CozyGamification:
                         achievements.append(achievement)
         
         return achievements
+    
+    def check_category_completion_bonus(self, user_id: str, sound_name: str) -> int:
+        """Check if user completed a sound category and award bonus"""
+        user_stats = self.get_user_stats(user_id)
+        listening_times = user_stats.get('listening_time_by_sound', {})
+        
+        # Get category from sound name
+        category = None
+        if 'rain' in sound_name:
+            category = 'rain'
+        elif 'sea' in sound_name:
+            category = 'sea'
+        elif 'sparkles' in sound_name:
+            category = 'sparkles'
+        elif 'background-music' in sound_name:
+            category = 'background-music'
+        
+        if not category:
+            return 0
+            
+        # Define all sounds in each category
+        category_sounds = {
+            'rain': ['rain00.mp3', 'rain01.mp3', 'rain02.mp3', 'rain03.mp3', 'rain04.mp3'],
+            'sea': ['sea00.mp3', 'sea01.mp3', 'sea02.mp3', 'sea03.mp3', 'sea04.mp3'],
+            'sparkles': ['sparkles00.mp3', 'sparkles01.mp3', 'sparkles02.mp3', 'sparkles03.mp3', 'sparkles04.mp3'],
+            'background-music': ['background-music00.mp3', 'background-music01.mp3', 'background-music02.mp3', 'background-music03.mp3', 'background-music04.mp3']
+        }
+        
+        # Check if user has listened to all sounds in this category
+        required_sounds = category_sounds.get(category, [])
+        listened_sounds = [sound for sound in listening_times.keys() if sound in required_sounds]
+        
+        # Award bonus only if just completed the category
+        if len(listened_sounds) == len(required_sounds):
+            # Check if this is the first time completing this category
+            achievement_key = f"{category}_explorer"
+            if achievement_key not in user_stats.get('category_completions', []):
+                if 'category_completions' not in user_stats:
+                    user_stats['category_completions'] = []
+                user_stats['category_completions'].append(achievement_key)
+                
+                self.add_points(user_id, 50, f"Category completion: {category}")
+                logging.info(f"🎉 Category completion bonus: {self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')} completed {category} category (+50 points)")
+                return 50
+        
+        return 0
     
     def get_leaderboard(self, limit: int = 10) -> List[Dict]:
         """Get top users leaderboard"""
