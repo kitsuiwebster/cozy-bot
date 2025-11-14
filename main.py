@@ -170,15 +170,108 @@ async def periodic_backup():
             
             logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
             
+            # Process active sessions and calculate time since last save
+            active_session_updates = {}  # {guild_id: added_time}
+            active_user_updates = {}     # {user_id: {time: float, sound: str}}
+            
+            # Update voice time for active bot sessions
+            for guild_id, guild_data in guild_voice_time.items():
+                if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
+                    # Bot is active in this server
+                    start_time = datetime.fromisoformat(guild_data[0])
+                    accumulated_time = guild_data[1]
+                    current_session_time = (datetime.now() - start_time).total_seconds()
+                    
+                    # Update the accumulated time
+                    new_total = accumulated_time + current_session_time
+                    guild_voice_time[guild_id] = [datetime.now().isoformat(), new_total]
+                    
+                    # Track this update for logging
+                    active_session_updates[guild_id] = current_session_time
+            
+            # Update gamification data for active user sessions
+            for user_id, user_stats in cozy_gamification.user_data.items():
+                current_sound = user_stats.get('current_sound')
+                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                    try:
+                        start_time = datetime.fromisoformat(current_sound['start_time'])
+                        session_duration = (datetime.now() - start_time).total_seconds()
+                        sound_name = current_sound['name']
+                        
+                        if session_duration > 0:
+                            # Update listening time
+                            user_stats['listening_time'] += session_duration
+                            
+                            # Update sound-specific time
+                            if 'listening_time_by_sound' not in user_stats:
+                                user_stats['listening_time_by_sound'] = {}
+                            if sound_name not in user_stats['listening_time_by_sound']:
+                                user_stats['listening_time_by_sound'][sound_name] = {
+                                    'total_time': 0.0,
+                                    'session_count': 0
+                                }
+                            user_stats['listening_time_by_sound'][sound_name]['total_time'] += session_duration
+                            
+                            # Update tracking for logging
+                            if user_id not in cozy_gamification.changes_since_save['user_listening_time']:
+                                cozy_gamification.changes_since_save['user_listening_time'][user_id] = 0
+                            cozy_gamification.changes_since_save['user_listening_time'][user_id] += session_duration
+                            
+                            if user_id not in cozy_gamification.changes_since_save['user_sound_time']:
+                                cozy_gamification.changes_since_save['user_sound_time'][user_id] = {}
+                            if sound_name not in cozy_gamification.changes_since_save['user_sound_time'][user_id]:
+                                cozy_gamification.changes_since_save['user_sound_time'][user_id][sound_name] = 0
+                            cozy_gamification.changes_since_save['user_sound_time'][user_id][sound_name] += session_duration
+                            
+                            # Award points for listening time (1 point per minute)
+                            points_to_add = int(session_duration / 60)
+                            if points_to_add > 0:
+                                user_stats['total_points'] += points_to_add
+                                if user_id not in cozy_gamification.changes_since_save['user_points_breakdown']:
+                                    cozy_gamification.changes_since_save['user_points_breakdown'][user_id] = []
+                                cozy_gamification.changes_since_save['user_points_breakdown'][user_id].append({
+                                    'reason': f"Periodic save: listening to {sound_name}",
+                                    'points': points_to_add
+                                })
+                            
+                            # Reset start time for next period
+                            current_sound['start_time'] = datetime.now().isoformat()
+                            
+                            # Track for logging
+                            active_user_updates[user_id] = {
+                                'time': session_duration,
+                                'sound': sound_name,
+                                'points': points_to_add
+                            }
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error processing active session for user {user_id}: {e}")
+            
             # Log voice time changes for servers since last save
-            if guild_voice_time_changes:
+            if guild_voice_time_changes or active_session_updates:
                 from cogs.stats.gamification import cozy_gamification
+                
+                # Log completed session changes
                 for guild_id, added_time in guild_voice_time_changes.items():
                     if added_time > 0:
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
                         logging.info(f"  🏠 +{format_duration(added_time)} for {server_name}")
+                
+                # Log active session updates
+                for guild_id, added_time in active_session_updates.items():
+                    if added_time > 0:
+                        server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
+                        logging.info(f"  🏠 +{format_duration(added_time)} for {server_name} (active session)")
+                
                 # Reset changes tracking
                 guild_voice_time_changes.clear()
+            
+            # Log active user session updates
+            if active_user_updates:
+                for user_id, update_info in active_user_updates.items():
+                    username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
+                    time_str = f'\033[36m+{format_duration(update_info["time"])}\033[0m'
+                    points_str = f' (\033[34m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
+                    logging.info(f"  👉 {time_str} for {username} ({update_info['sound']} active session){points_str}")
             
             # Save voice time data for all servers (silently)
             if guild_voice_time:
