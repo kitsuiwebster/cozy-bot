@@ -8,8 +8,8 @@ import logging
 import traceback
 
 def colorize_points(text):
-    """Colorize point values in green"""
-    return f'\033[32m{text}\033[0m'
+    """Colorize point values in blue"""
+    return f'\033[34m{text}\033[0m'
 
 def colorize_duration(text):
     """Colorize duration values in cyan"""
