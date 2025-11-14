@@ -23,6 +23,9 @@ class CozyGamification:
             'user_points_breakdown': {} # user_id: [{'reason': str, 'points': int}]
         }
         
+        # Clean corrupted data on startup
+        self.clean_corrupted_data()
+        
     def load_user_data(self) -> Dict:
         """Load user gamification data from persistent storage with validation"""
         try:
@@ -530,6 +533,36 @@ class CozyGamification:
             achievements.append(achievement)
         
         return achievements
+    
+    def clean_corrupted_data(self):
+        """Clean corrupted data structures on startup"""
+        cleaned_count = 0
+        
+        # Clean user_data
+        for user_id, stats in list(self.user_data.items()):
+            if not isinstance(stats, dict):
+                logging.warning(f"⚠️ Removing corrupted user data for {user_id} (type: {type(stats)})")
+                del self.user_data[user_id]
+                cleaned_count += 1
+                continue
+                
+            # Clean current_sound field
+            if 'current_sound' in stats and stats['current_sound'] is not None:
+                if not isinstance(stats['current_sound'], dict):
+                    logging.warning(f"⚠️ Resetting corrupted current_sound for {user_id}")
+                    stats['current_sound'] = None
+                    cleaned_count += 1
+        
+        # Clean changes_since_save
+        for category, data in self.changes_since_save.items():
+            if not isinstance(data, dict):
+                logging.warning(f"⚠️ Resetting corrupted {category}")
+                self.changes_since_save[category] = {}
+                cleaned_count += 1
+                
+        if cleaned_count > 0:
+            logging.info(f"🧹 Cleaned {cleaned_count} corrupted data entries")
+            self.save_user_data()
     
     def check_general_achievements(self, user_stats: Dict) -> List[str]:
         """Check for general achievements based on stats"""

@@ -263,7 +263,12 @@ async def on_voice_state_update(member, before, after):
         # Bot joined a voice channel
         if before.channel is None and after.channel is not None:
             # Initialize server session timing
-            guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
+            existing_data = guild_voice_time.get(guild_id, [None, 0])
+            if isinstance(existing_data, list) and len(existing_data) >= 2:
+                accumulated_time = existing_data[1]
+            else:
+                accumulated_time = 0  # Reset corrupted data
+            guild_voice_time[guild_id] = [datetime.now().isoformat(), accumulated_time]
             
             # Cache server name
             from cogs.stats.gamification import cozy_gamification
@@ -293,13 +298,20 @@ async def on_voice_state_update(member, before, after):
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
             # Handle server timing (existing)
-            if guild_id in guild_voice_time and guild_voice_time[guild_id][0] is not None:
-                start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
-                accumulated_time = guild_voice_time[guild_id][1]
-                time_spent = datetime.now() - start_time
-                session_duration = time_spent.total_seconds()
-                total_time = accumulated_time + session_duration
-                guild_voice_time[guild_id] = [None, total_time]
+            if guild_id in guild_voice_time:
+                guild_data = guild_voice_time[guild_id]
+                if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
+                    start_time = datetime.fromisoformat(guild_data[0])
+                    accumulated_time = guild_data[1]
+                    time_spent = datetime.now() - start_time
+                    session_duration = time_spent.total_seconds()
+                    total_time = accumulated_time + session_duration
+                    guild_voice_time[guild_id] = [None, total_time]
+                else:
+                    # Reset corrupted data
+                    guild_voice_time[guild_id] = [None, 0]
+                    session_duration = 0
+                    total_time = 0
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: +{format_duration(session_duration)}, server total: {format_duration(total_time)}")
                 logging.info(f"🏠 +{format_duration(session_duration)} pour {before.channel.guild.name}")
                 save_voice_time_data()
@@ -310,6 +322,11 @@ async def on_voice_state_update(member, before, after):
                 session = user_voice_sessions[guild_id]
                 
                 for user_id, user_data in session['users'].items():
+                    # Validate user_data structure
+                    if not isinstance(user_data, dict) or 'join_time' not in user_data or 'accumulated_time' not in user_data:
+                        logging.warning(f"⚠️ Corrupted user data for {user_id} in final session, skipping")
+                        continue
+                        
                     # Get username for logging
                     try:
                         user = await bot.fetch_user(int(user_id))
@@ -364,8 +381,14 @@ async def on_voice_state_update(member, before, after):
     elif before.channel == bot_channel and after.channel != bot_channel:
         if user_id in session['users']:
             user_data = session['users'][user_id]
-            final_duration = (datetime.now() - user_data['join_time']).total_seconds()
-            total_session_time = user_data['accumulated_time'] + final_duration
+            if isinstance(user_data, dict) and 'join_time' in user_data and 'accumulated_time' in user_data:
+                final_duration = (datetime.now() - user_data['join_time']).total_seconds()
+                total_session_time = user_data['accumulated_time'] + final_duration
+            else:
+                # Reset corrupted user data
+                final_duration = 0
+                total_session_time = 0
+                logging.warning(f"⚠️ Corrupted user data for {user_id}, resetting")
             
             if final_duration > 0:
                 result = cozy_gamification.add_listening_time(user_id, final_duration)
