@@ -6,7 +6,7 @@ class StopCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="stop", description="Stop the sound and disconnect the bot 🛑")
+    @app_commands.command(name="stop", description="Stop the sound and disconnect the bot")
     async def stop_command(self, interaction: discord.Interaction):
         voice_client = interaction.guild.voice_client
         

@@ -27,7 +27,7 @@ class StartupMessageCog(commands.Cog):
             self.startup_message_sent = True
             await self.send_startup_messages()
         except Exception as e:
-            logging.error(f"📢 Error in startup message on_ready: {e}")
+            logging.error(f"❌ Error in startup message on_ready: {e}")
             import traceback
             traceback.print_exc()
     
@@ -49,10 +49,10 @@ class StartupMessageCog(commands.Cog):
             with open('cogs/notifications/config/startup_messages.json', 'r', encoding='utf-8') as file:
                 return json.load(file)
         except FileNotFoundError:
-            logging.warning("📢 startup_messages.json not found, using default message")
+            logging.warning("❌ startup_messages.json not found, using default message")
             return self.get_default_config()
         except json.JSONDecodeError as e:
-            logging.error(f"📢 Error parsing startup_messages.json: {e}")
+            logging.error(f"❌ Error parsing startup_messages.json: {e}")
             return self.get_default_config()
     
     def get_default_config(self):
@@ -82,7 +82,7 @@ class StartupMessageCog(commands.Cog):
             # Use the first available message type
             first_key = next(iter(config["messages"]))
             message_data = config["messages"][first_key]
-            logging.warning(f"📢 Message type '{message_type}' not found, using '{first_key}'")
+            logging.warning(f"⚠️ Message type '{message_type}' not found, using '{first_key}'")
         
         # Build the formatted message
         startup_message = self.format_message(message_data)

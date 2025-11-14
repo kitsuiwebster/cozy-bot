@@ -89,22 +89,18 @@ class BaseSoundCog(commands.Cog):
     def after_playing(self, error, guild_id):
         """Audio playback completion callback handler with automatic loop restart"""
         guild_state = self.get_guild_state(guild_id)
-        logging.info(f"🔄 after_playing called - guild_id: {guild_id}, error: {error}")
-        logging.info(f"🔄 Guild state - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
         
         if error:
-            logging.error(f"Player error: {error}")
+            logging.error(f"❌ Player error: {error}")
             # Retry after error if we were playing something
             if guild_state['current_sound'] and guild_state['is_playing']:
-                logging.info(f"🔄 Creating restart task after error for guild {guild_id}")
                 asyncio.create_task(self.restart_audio_loop(guild_id))
         else:
             # Automatically restart the same audio for continuous loop
             if guild_state['current_sound'] and guild_state['is_playing']:
-                logging.info(f"🔄 Creating restart task for normal loop in guild {guild_id}")
                 asyncio.create_task(self.restart_audio_loop(guild_id))
             else:
-                logging.warning(f"🔄 Not restarting - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
+                logging.warning(f"❌ Not restarting - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
 
     async def on_button_click(self, interaction):
         """Process audio file selection interactions"""
@@ -180,9 +176,11 @@ class BaseSoundCog(commands.Cog):
                 from cogs.stats.gamification import cozy_gamification
                 voice_client = interaction.guild.voice_client
                 if voice_client and voice_client.channel:
-                    current_users = [member.id for member in voice_client.channel.members if not member.bot]
-                    for user_id in current_users:
-                        cozy_gamification.track_sound_start(user_id, sound_filename)
+                    current_users = [member for member in voice_client.channel.members if not member.bot]
+                    logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
+                    for member in current_users:
+                        cozy_gamification.track_sound_start(member.id, sound_filename)
+                        logging.info(f"🎵 Tracking {sound_filename} for {member.name}")
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -230,7 +228,7 @@ class BaseSoundCog(commands.Cog):
                     guild_state['current_sound'] = None
                     guild_state['disconnect_timer'] = None
                     
-                    print(f"🤖 Auto-disconnected from empty voice channel in {guild.name}")
+                    logging.info(f"👋 AUTO-DISCONNECT: Left empty voice channel in {guild.name}")
                     break
                 else:
                     # Still has users, continue monitoring
@@ -240,7 +238,7 @@ class BaseSoundCog(commands.Cog):
             # Timer was cancelled (normal when new user joins or manual stop)
             pass
         except Exception as e:
-            print(f"Error in disconnect timer: {e}")
+            logging.error(f"❌ Error in disconnect timer: {e}")
 
     async def stop_sound(self, interaction, guild_id):
         """Terminate active audio playback session and disconnect"""
@@ -252,9 +250,11 @@ class BaseSoundCog(commands.Cog):
         # Finalize sound sessions for all users before stopping
         from cogs.stats.gamification import cozy_gamification
         if voice_client and voice_client.channel:
-            current_users = [member.id for member in voice_client.channel.members if not member.bot]
-            for user_id in current_users:
-                cozy_gamification.finalize_current_sound(user_id)
+            current_users = [member for member in voice_client.channel.members if not member.bot]
+            logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
+            for member in current_users:
+                cozy_gamification.finalize_current_sound(member.id)
+                logging.info(f"🛑 Finalized sound tracking for {member.name}")
         
         # Cancel disconnect timer
         if guild_state['disconnect_timer']:
@@ -307,7 +307,6 @@ class BaseSoundCog(commands.Cog):
             if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
                 audio_source = FFmpegPCMAudio(sound_path)
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
-                logging.info(f"🔄 Restarted audio loop: {current_sound} in guild {guild_id}")
             
         except Exception as e:
             logging.error(f"❌ Failed to restart audio loop: {e}")

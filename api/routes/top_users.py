@@ -139,9 +139,11 @@ async def get_top_sounds(limit: int = 10):
                         'unique_listeners': set()
                     }
                 
-                sound_aggregates[sound_name]['total_time'] += sound_data['total_time']
-                sound_aggregates[sound_name]['total_sessions'] += sound_data['session_count']
-                sound_aggregates[sound_name]['unique_listeners'].add(user_id)
+                # Safe access to sound_data with type validation
+                if isinstance(sound_data, dict):
+                    sound_aggregates[sound_name]['total_time'] += sound_data.get('total_time', 0.0)
+                    sound_aggregates[sound_name]['total_sessions'] += sound_data.get('session_count', 0)
+                    sound_aggregates[sound_name]['unique_listeners'].add(user_id)
         
         # Convert to list and sort by total time
         sounds_list = []
@@ -186,7 +188,7 @@ async def get_top_users(limit: int = None):
         for user_id, stats in user_data_raw.items():
             users_list.append({
                 'user_id': user_id,
-                'total_points': stats['total_points'],
+                'total_points': stats.get('total_points', 0),
                 'level': stats.get('level', 1),
                 'listening_time': stats.get('listening_time', 0),
                 'achievements_count': len(stats.get('achievements', [])),

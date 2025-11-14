@@ -15,7 +15,7 @@ class SparklesCog(BaseSoundCog):
         }
         super().__init__(bot, "sparkles", sounds, sound_labels, "Play the sound of sparkles.✨")
 
-    @app_commands.command(name="sparkles", description="Play the sound of sparkles.✨")
+    @app_commands.command(name="sparkles", description="Play the sound of sparkles")
     async def sparkles_command(self, interaction: discord.Interaction):
         await self.play_sound_command(interaction, "Please select a sparkles sound:")
 

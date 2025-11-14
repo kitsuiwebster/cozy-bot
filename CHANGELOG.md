@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10] - 2025-11-14
+
+### Added
+
+- API endpoints health check system during bot initialization with status validation for all routes.
+- Stylized ASCII banner header displaying at bot startup with version and developer credits.
+- `/stats` command to provide direct access to statistics website with user rankings and analytics.
+
+### Changed
+
+- Enhanced CozyPoints system with loyalty bonuses, streak bonuses and category completion.
+- Sound tracking logging system is now much more detailed and clean.
+
+### Fixed
+
+- Sound tracking time calculation now properly counts listening time when user quits voice channel.
+
 ## [1.0.9] - 2025-11-13
 
 ### Added

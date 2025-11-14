@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import asyncio
 import fcntl
+import aiohttp
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -26,8 +27,8 @@ class FancyFormatter(logging.Formatter):
     }
     
     EMOJIS = {
-        'DEBUG': '🔍',
-        'INFO': '✅', 
+        'DEBUG': '⚙️',
+        'INFO': '✨', 
         'WARNING': '⚠️',
         'ERROR': '❌',
         'CRITICAL': '💥'
@@ -39,15 +40,6 @@ class FancyFormatter(logging.Formatter):
         emoji = self.EMOJIS.get(record.levelname, '📝')
         reset = self.COLORS['RESET']
         
-        # Apply context-specific formatting based on logger namespace
-        if 'discord.gateway' in record.name:
-            emoji = '🌐'
-        elif 'discord.voice' in record.name:
-            emoji = '🎵'
-        elif 'discord.player' in record.name:
-            emoji = '🎶'
-        elif 'discord.client' in record.name:
-            emoji = '🤖'
             
         # Format timestamp for log entry
         timestamp = self.formatTime(record, '%H:%M:%S')
@@ -80,9 +72,29 @@ intents.voice_states = True  # Required to track user voice channel changes
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # Debug: Display connected guilds (development only)
-print(bot.guilds)
+logging.debug(f"⚔️ Bot guilds: {bot.guilds}")
 
 # Persist voice channel usage statistics to storage
+def format_duration(seconds):
+    """Format duration in seconds to human readable format"""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        if secs > 0:
+            return f"{minutes}m {secs}s"
+        return f"{minutes}m"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        if secs > 0:
+            return f"{hours}h {minutes}m {secs}s"
+        elif minutes > 0:
+            return f"{hours}h {minutes}m"
+        return f"{hours}h"
+
 def save_voice_time_data():
     data_file = 'data/voice_time_data.json'
     temp_file = data_file + '.tmp'
@@ -100,12 +112,13 @@ def save_voice_time_data():
         
         # Atomic rename to final file
         os.rename(temp_file, data_file)
+        logging.info('✅ Voice time data saved successfully')
         
     except Exception as e:
         # Clean up temp file on error
         if os.path.exists(temp_file):
             os.remove(temp_file)
-        logging.error(f'Failed to save voice time data: {e}')
+        logging.error(f'❌ Failed to save voice time data: {e}')
 
 # Load voice channel usage statistics from persistent storage
 def load_voice_time_data():
@@ -120,8 +133,8 @@ def load_voice_time_data():
 # Initialize guild-specific voice channel usage tracking
 guild_voice_time = load_voice_time_data()
 
-# Initialize user voice session tracking - simple structure
-user_voice_sessions = {}  # {guild_id: {bot_start_time: datetime, users: {user_id: join_time}}}
+# Initialize user voice session tracking - with accumulated time
+user_voice_sessions = {}  # {guild_id: {bot_start_time: datetime, users: {user_id: {join_time: datetime, accumulated_time: float}}}}
 
 # Background task for dynamic bot presence updates
 async def change_status():
@@ -140,28 +153,34 @@ async def change_status():
             await bot.change_presence(activity=status)
             await asyncio.sleep(10)
 
-# Background task for periodic data backup
+# Background task for hourly data backup
 async def periodic_backup():
     await bot.wait_until_ready()
     
     while not bot.is_closed():
-        # Save data every 5 minutes
-        await asyncio.sleep(300)
-        if guild_voice_time:
-            save_voice_time_data()
-            logging.info('💾 Periodic voice data backup completed')
+        # Full backup every 10 minutes
+        await asyncio.sleep(600)  # 10 minutes
         
-        # Also save gamification data periodically
         try:
             from cogs.stats.gamification import cozy_gamification
-            cozy_gamification.save_user_data()
-            logging.info('💾 Periodic gamification data backup completed')
+            
+            logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
+            
+            # Save voice time data for all servers
+            if guild_voice_time:
+                save_voice_time_data()
+                logging.info("✅ Voice time data saved for all servers")
+            
+            # Save gamification data (users, points, achievements, etc.) with detailed logging
+            cozy_gamification.save_user_data(force_detailed_log=True)
+            
+            logging.info("✅ PERIODIC BACKUP: Complete backup finished")
+            
         except Exception as e:
-            logging.error(f'💾 Failed to backup gamification data: {e}')
+            logging.error(f"❌ PERIODIC BACKUP FAILED: {e}")
         
         # Save current stats for API
         save_current_stats_for_api()
-
 def save_current_stats_for_api():
     """Save current bot stats for API access"""
     try:
@@ -188,13 +207,51 @@ def save_current_stats_for_api():
             json.dump(stats, f, indent=2)
             
     except Exception as e:
-        logging.error(f'💾 Failed to save current stats: {e}')
+        logging.error(f'❌ Failed to save current stats: {e}')
+
+# API endpoints health check function
+async def check_api_endpoints():
+    """Check all API endpoints health during bot initialization"""
+    # Determine API base URL (try HTTPS first, fallback to HTTP)
+    api_base = "https://localhost:8000"
+    api_base_http = "http://localhost:8000"
+    
+    endpoints = [
+        "/",
+        "/health", 
+        "/api/total",
+        "/api/top-users",
+        "/api/top-sounds", 
+        "/api/top-servers"
+    ]
+    
+    logging.info("⚙️ Checking API endpoints...")
+    
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+        for endpoint in endpoints:
+            try:
+                # Try HTTPS first
+                async with session.get(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status == 200:
+                        logging.info(f"✨ {endpoint} - healthy")
+                    else:
+                        logging.error(f"🔥 {endpoint} - error (status: {response.status})")
+            except:
+                try:
+                    # Fallback to HTTP
+                    async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                        if response.status == 200:
+                            logging.info(f"✅ {endpoint} - healthy")
+                        else:
+                            logging.error(f"❌ {endpoint} - error (status: {response.status})")
+                except:
+                    logging.error(f"❌ {endpoint} - error")
 
 
 # Global error handler for unhandled exceptions
 @bot.event
 async def on_error(event, *args, **kwargs):
-    print(f"An error occurred: {event}")
+    logging.error(f"An error occurred: {event}")
 
 # Voice state change event handler for usage tracking
 @bot.event
@@ -206,7 +263,12 @@ async def on_voice_state_update(member, before, after):
         # Bot joined a voice channel
         if before.channel is None and after.channel is not None:
             # Initialize server session timing
-            guild_voice_time[guild_id] = [datetime.now().isoformat(), guild_voice_time.get(guild_id, [None, 0])[1]]
+            existing_data = guild_voice_time.get(guild_id, [None, 0])
+            if isinstance(existing_data, list) and len(existing_data) >= 2:
+                accumulated_time = existing_data[1]
+            else:
+                accumulated_time = 0  # Reset corrupted data
+            guild_voice_time[guild_id] = [datetime.now().isoformat(), accumulated_time]
             
             # Cache server name
             from cogs.stats.gamification import cozy_gamification
@@ -221,24 +283,37 @@ async def on_voice_state_update(member, before, after):
             # Note all users currently in the channel
             from cogs.stats.gamification import cozy_gamification
             current_users = [m for m in after.channel.members if not m.bot]
+            logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
             for user in current_users:
                 user_id = str(user.id)
-                user_voice_sessions[guild_id]['users'][user_id] = datetime.now()
+                user_voice_sessions[guild_id]['users'][user_id] = {
+                    'join_time': datetime.now(),
+                    'accumulated_time': 0.0
+                }
                 # Award session join points - pass both username and display_name
                 result = cozy_gamification.join_session(user_id, user.name)  # real username
                 cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
-                logging.info(f"✅ {user.name} was already in channel when bot joined")
+                logging.info(f"👉 USER JOIN: {user.name} was already in channel when bot joined {after.channel.name} in {member.guild.name}")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
             # Handle server timing (existing)
-            if guild_id in guild_voice_time and guild_voice_time[guild_id][0] is not None:
-                start_time = datetime.fromisoformat(guild_voice_time[guild_id][0])
-                accumulated_time = guild_voice_time[guild_id][1]
-                time_spent = datetime.now() - start_time
-                total_time = accumulated_time + time_spent.total_seconds()
-                guild_voice_time[guild_id] = [None, total_time]
-                print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
+            if guild_id in guild_voice_time:
+                guild_data = guild_voice_time[guild_id]
+                if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
+                    start_time = datetime.fromisoformat(guild_data[0])
+                    accumulated_time = guild_data[1]
+                    time_spent = datetime.now() - start_time
+                    session_duration = time_spent.total_seconds()
+                    total_time = accumulated_time + session_duration
+                    guild_voice_time[guild_id] = [None, total_time]
+                else:
+                    # Reset corrupted data
+                    guild_voice_time[guild_id] = [None, 0]
+                    session_duration = 0
+                    total_time = 0
+                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: +{format_duration(session_duration)}, server total: {format_duration(total_time)}")
+                logging.info(f"🏠 +{format_duration(session_duration)} pour {before.channel.guild.name}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
@@ -246,14 +321,27 @@ async def on_voice_state_update(member, before, after):
                 from cogs.stats.gamification import cozy_gamification
                 session = user_voice_sessions[guild_id]
                 
-                for user_id, join_time in session['users'].items():
-                    listening_duration = (datetime.now() - join_time).total_seconds()
-                    if listening_duration > 0:
-                        cozy_gamification.add_listening_time(user_id, listening_duration)
-                        points_to_add = int(listening_duration / 60)
-                        if points_to_add > 0:
-                            result = cozy_gamification.add_points(user_id, points_to_add, "Listening time")
-                        logging.info(f"🎯 Final calculation: user {user_id} listened {listening_duration}s")
+                for user_id, user_data in session['users'].items():
+                    # Validate user_data structure
+                    if not isinstance(user_data, dict) or 'join_time' not in user_data or 'accumulated_time' not in user_data:
+                        logging.warning(f"⚠️ Corrupted user data for {user_id} in final session, skipping")
+                        continue
+                        
+                    # Get username for logging
+                    try:
+                        user = await bot.fetch_user(int(user_id))
+                        username = user.name if user else f"User {user_id[:8]}"
+                    except:
+                        username = f"User {user_id[:8]}"
+                    
+                    # Calculate final session time
+                    final_duration = (datetime.now() - user_data['join_time']).total_seconds()
+                    total_session_time = user_data['accumulated_time'] + final_duration
+                    
+                    if final_duration > 0:
+                        result = cozy_gamification.add_listening_time(user_id, final_duration)
+                        points_to_add = result['points_added'] if result else int(final_duration / 60)
+                        logging.info(f"👋 BOT DISCONNECT: {username} final session - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
                 
                 # Clean up session
                 del user_voice_sessions[guild_id]
@@ -281,23 +369,37 @@ async def on_voice_state_update(member, before, after):
     
     # User joined the bot's channel
     if after.channel == bot_channel and before.channel != bot_channel:
-        session['users'][user_id] = datetime.now()
+        session['users'][user_id] = {
+            'join_time': datetime.now(),
+            'accumulated_time': 0.0
+        }
         result = cozy_gamification.join_session(user_id, member.name)  # real username
         cozy_gamification.update_username(user_id, member.name, member.global_name or member.display_name)
-        logging.info(f"✅ {member.name} joined bot channel")
+        logging.info(f"✅ USER JOIN: {member.name} joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
     elif before.channel == bot_channel and after.channel != bot_channel:
         if user_id in session['users']:
-            join_time = session['users'][user_id]
-            listening_duration = (datetime.now() - join_time).total_seconds()
+            user_data = session['users'][user_id]
+            if isinstance(user_data, dict) and 'join_time' in user_data and 'accumulated_time' in user_data:
+                final_duration = (datetime.now() - user_data['join_time']).total_seconds()
+                total_session_time = user_data['accumulated_time'] + final_duration
+            else:
+                # Reset corrupted user data
+                final_duration = 0
+                total_session_time = 0
+                logging.warning(f"⚠️ Corrupted user data for {user_id}, resetting")
             
-            if listening_duration > 0:
-                cozy_gamification.add_listening_time(user_id, listening_duration)
-                points_to_add = int(listening_duration / 60)
-                if points_to_add > 0:
-                    result = cozy_gamification.add_points(user_id, points_to_add, "Listening time")
-                logging.info(f"❌ {member.name} left bot channel after {listening_duration}s")
+            if final_duration > 0:
+                result = cozy_gamification.add_listening_time(user_id, final_duration)
+                points_to_add = result['points_added'] if result else int(final_duration / 60)
+                logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
+            else:
+                logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - no additional time")
+            
+            # Finalize sound tracking when user leaves
+            cozy_gamification.finalize_current_sound(user_id)
+            logging.info(f"👉 SOUND TRACKING: Finalized current sound for {member.name}")
             
             # Remove user from session
             del session['users'][user_id] 
@@ -305,6 +407,23 @@ async def on_voice_state_update(member, before, after):
 # Bot ready event handler - initialization complete
 @bot.event
 async def on_ready():
+    # Display bot header
+    print("\n" + "="*60)
+    print("╔═════════════════════════════════════════════════════════════════╗")
+    print("║                                                                 ║")
+    print("║   ██████╗ ██████╗ ███████╗██╗   ██╗██████╗  ██████╗ ████████╗   ║")
+    print("║  ██╔════╝██╔═══██╗╚══███╔╝╚██╗ ██╔╝██╔══██╗██╔═══██╗╚══██╔══╝   ║")
+    print("║  ██║     ██║   ██║  ███╔╝  ╚████╔╝ ██████╔╝██║   ██║   ██║      ║")
+    print("║  ██║     ██║   ██║ ███╔╝    ╚██╔╝  ██╔══██╗██║   ██║   ██║      ║")
+    print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
+    print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
+    print("║                                                                 ║")
+    print("║                      Version 1.0.10                             ║")
+    print("║            by @kitsuiwebster & @BubbleXGum                      ║")
+    print("║                                                                 ║")
+    print("╚═════════════════════════════════════════════════════════════════╝")
+    print("="*60 + "\n")
+    
     # Set bot instance for API access
     try:
         from api.routes.stats import set_bot_instance
@@ -321,9 +440,12 @@ async def on_ready():
         synced = await bot.tree.sync()
         logging.info(f'✅ Synced {len(synced)} application commands!')
     except Exception as e:
-        logging.error(f'💥 Error syncing commands: {e}')
+        logging.error(f'❌ Error syncing commands: {e}')
     
     logging.info('🚀 Bot startup complete - All systems operational')
+    
+    # Check API endpoints health
+    await check_api_endpoints()
     
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
@@ -332,10 +454,10 @@ async def on_ready():
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
     total_member_count = sum(guild.member_count for guild in bot.guilds)
-    logging.info(f'📊 Serving {total_member_count:,} members across {server_count} servers')
+    logging.info(f'👉 Serving {total_member_count:,} members across {server_count} servers')
     logging.info('🏠 Connected servers:')
     for guild in bot.guilds:
-        logging.info(f'   └─ {guild.name} ({guild.member_count:,} members)')
+        logging.info(f'   ╰┈➤ {guild.name} ({guild.member_count:,} members)')
 
 # Message processing event handler
 @bot.event
@@ -359,6 +481,7 @@ async def run_bot():
             ('cogs.stats.profile', '🏅'),
             ('cogs.stats.tops', '🏆'),
             ('cogs.stats.total', '📊'),
+            ('cogs.stats.stats_command', '📈'),
             ('cogs.notifications.startup_message', '📢')
         ]
         
@@ -367,14 +490,22 @@ async def run_bot():
             await bot.load_extension(ext_name)
             # Add extra space for emojis that take 2 characters
             space = '  ' if emoji == '🌧️' else ' '
-            logging.info(f'   {emoji}{space} {ext_name} loaded successfully')
+            logging.info(f'✅️ {emoji}{space} {ext_name} loaded successfully')
         
     except Exception as e:
-        logging.error(f'💥 Error loading extension: {e}')
+        logging.error(f'❌ Error loading extension: {e}')
 
     # Initialize bot connection using authentication token
     bot_token = os.getenv("DISCORD_BOT_TOKEN")
-    await bot.start(bot_token)
+    if not bot_token:
+        logging.critical('💥 Discord token not found in environment variables')
+        return
+    
+    try:
+        await bot.start(bot_token)
+    except Exception as e:
+        logging.critical(f'💥 Failed to start bot: {e}')
+        raise
 
 # Application entry point - bot startup sequence
 if __name__ == "__main__":
@@ -383,14 +514,14 @@ if __name__ == "__main__":
     try:
         loop.run_until_complete(run_bot())
     except KeyboardInterrupt:
-        print("---> Bot stopped by user.")
+        logging.info("🛑 Bot stopped by user.")
         # Save all data on graceful shutdown
         save_voice_time_data()
         try:
             from cogs.stats.gamification import cozy_gamification
             cozy_gamification.save_user_data()
-            logging.info('💾 Gamification data saved on shutdown')
+            logging.info('✅ Gamification data saved on shutdown')
         except Exception as e:
-            logging.error(f'💾 Failed to save gamification data on shutdown: {e}')
+            logging.error(f'❌ Failed to save gamification data on shutdown: {e}')
     finally:
         loop.close()
