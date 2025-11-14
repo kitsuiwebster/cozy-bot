@@ -7,6 +7,14 @@ import fcntl
 import logging
 import traceback
 
+def colorize_points(text):
+    """Colorize point values in green"""
+    return f'\033[32m{text}\033[0m'
+
+def colorize_duration(text):
+    """Colorize duration values in cyan"""
+    return f'\033[36m{text}\033[0m'
+
 class CozyGamification:
     def __init__(self):
         self.data_file = 'data/cozy_points.json'
@@ -147,21 +155,21 @@ class CozyGamification:
                     if user_id in self.changes_since_save['user_listening_time']:
                         total_time = self.changes_since_save['user_listening_time'][user_id]
                         if total_time > 0:
-                            logging.info(f"  👉 +{format_duration(total_time)} for {username}")
+                            logging.info(f"  👉 {colorize_duration(f'+{format_duration(total_time)}')} for {username}")
                     
                     # Points breakdown for this user
                     if user_id in self.changes_since_save['user_points_breakdown']:
                         breakdown = self.changes_since_save['user_points_breakdown'][user_id]
                         if isinstance(breakdown, list):
                             total_points = sum(item['points'] for item in breakdown if isinstance(item, dict))
-                            logging.info(f"  👉 +{total_points} points for {username} - Details:")
+                            logging.info(f"  👉 {colorize_points(f'+{total_points} points')} for {username} - Details:")
                             for item in breakdown:
                                 if isinstance(item, dict):
-                                    logging.info(f"    ├─ {item['reason']}: +{item['points']} pts")
+                                    logging.info(f"    ├─ {item['reason']}: {colorize_points(f'+{item["points"]} pts')}")
                     elif user_id in self.changes_since_save['user_points']:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
-                            logging.info(f"  👉 +{points} points for {username}")
+                            logging.info(f"  👉 {colorize_points(f'+{points} points')} for {username}")
                     
                     # Sound-specific time for this user - SAFE ACCESS
                     if (isinstance(self.changes_since_save['user_sound_time'], dict) and 
@@ -170,7 +178,7 @@ class CozyGamification:
                         if isinstance(user_sound_data, dict):
                             for sound_name, sound_time in user_sound_data.items():
                                 if isinstance(sound_time, (int, float)) and sound_time > 0:
-                                    logging.info(f"  👉 +{format_duration(sound_time)} of {sound_name} for {username}")
+                                    logging.info(f"  👉 {colorize_duration(f'+{format_duration(sound_time)}')} of {sound_name} for {username}")
                 
                 # Reset tracking for next period
                 self.changes_since_save = {
@@ -233,7 +241,7 @@ class CozyGamification:
             user_stats['total_points'] += single_level_bonus
             
             username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-            logging.info(f"⭐ Level bonus: {username} reached level {current_level} (+{single_level_bonus} points)")
+            logging.info(f"⭐ Level bonus: {username} reached level {current_level} ({colorize_points(f'+{single_level_bonus} points')})")
             
             # Check for level achievements for THIS level
             level_achievements = self.check_level_achievements(current_level, user_stats)
@@ -265,7 +273,7 @@ class CozyGamification:
             user_stats['level_progress'] = progress
             
             username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-            logging.info(f"🏆 Achievement bonus: {username} +{achievement_bonus} points for {len(new_achievements)} new achievement(s)")
+            logging.info(f"🏆 Achievement bonus: {username} {colorize_points(f'+{achievement_bonus} points')} for {len(new_achievements)} new achievement(s)")
             
             # Track achievement bonus in breakdown
             if user_id not in self.changes_since_save['user_points_breakdown']:
@@ -452,9 +460,9 @@ class CozyGamification:
                 duration_str = format_duration(duration)
                 username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                 total_points = points_added + bonus_points
-                points_str = f" (+{total_points} point{'s' if total_points != 1 else ''})" if total_points > 0 else ""
-                bonus_str = f" [+{bonus_points} bonus]" if bonus_points > 0 else ""
-                logging.info(f"👉 +{duration_str} of {sound_name} for {username}{points_str}{bonus_str}")
+                points_str = f" ({colorize_points(f'+{total_points} point{\"s\" if total_points != 1 else \"\"}')}" if total_points > 0 else ""
+                bonus_str = f" [{colorize_points(f'+{bonus_points} bonus')}]" if bonus_points > 0 else ""
+                logging.info(f"👉 {colorize_duration(f'+{duration_str}')} of {sound_name} for {username}{points_str}{bonus_str}")
                 
             except Exception as e:
                 logging.error(f'❌ Error finalizing sound session: {e}\n{traceback.format_exc()}')
@@ -708,7 +716,7 @@ class CozyGamification:
                 
                 self.add_points(user_id, 50, f"Category completion: {category}")
                 username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-                logging.info(f"⭐ Category completion bonus: {username} completed {category} category (+50 points)")
+                logging.info(f"⭐ Category completion bonus: {username} completed {category} category ({colorize_points('+50 points')})")
                 return 50
         
         return 0
