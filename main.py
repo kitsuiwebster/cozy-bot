@@ -95,7 +95,7 @@ def format_duration(seconds):
             return f"{hours}h {minutes}m"
         return f"{hours}h"
 
-def save_voice_time_data():
+def save_voice_time_data(silent=False):
     data_file = 'data/voice_time_data.json'
     temp_file = data_file + '.tmp'
     
@@ -112,7 +112,8 @@ def save_voice_time_data():
         
         # Atomic rename to final file
         os.rename(temp_file, data_file)
-        logging.info('✅ Voice time data saved successfully')
+        if not silent:
+            logging.info('✅ Voice time data saved successfully')
         
     except Exception as e:
         # Clean up temp file on error
@@ -166,10 +167,9 @@ async def periodic_backup():
             
             logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
             
-            # Save voice time data for all servers
+            # Save voice time data for all servers (silently)
             if guild_voice_time:
-                save_voice_time_data()
-                logging.info("✅ Voice time data saved for all servers")
+                save_voice_time_data(silent=True)
             
             # Save gamification data (users, points, achievements, etc.) with detailed logging
             cozy_gamification.save_user_data(force_detailed_log=True)

@@ -57,7 +57,7 @@ class CozyGamification:
                 backup_file = self.data_file + f'.corrupted.{datetime.now().strftime("%Y%m%d_%H%M%S")}'
                 os.rename(self.data_file, backup_file)
                 logging.info(f'❌ Corrupted file backed up as: {backup_file}')
-            except:
+            except Exception:
                 pass
             return {}
     
@@ -165,7 +165,8 @@ class CozyGamification:
                             logging.info(f"  👉 {colorize_points(f'+{total_points} points')} for {username} - Details:")
                             for item in breakdown:
                                 if isinstance(item, dict):
-                                    logging.info(f"    ├─ {item['reason']}: {colorize_points(f'+{item["points"]} pts')}")
+                                    item_points = item["points"]
+                                    logging.info(f"    ├─ {item['reason']}: {colorize_points(f'+{item_points} pts')}")
                     elif user_id in self.changes_since_save['user_points']:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
@@ -460,7 +461,8 @@ class CozyGamification:
                 duration_str = format_duration(duration)
                 username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                 total_points = points_added + bonus_points
-                points_str = f" ({colorize_points(f'+{total_points} point{\"s\" if total_points != 1 else \"\"}')}" if total_points > 0 else ""
+                point_word = "points" if total_points != 1 else "point"
+                points_str = f" ({colorize_points(f'+{total_points} {point_word}')})" if total_points > 0 else ""
                 bonus_str = f" [{colorize_points(f'+{bonus_points} bonus')}]" if bonus_points > 0 else ""
                 logging.info(f"👉 {colorize_duration(f'+{duration_str}')} of {sound_name} for {username}{points_str}{bonus_str}")
                 
