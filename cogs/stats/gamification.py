@@ -331,7 +331,16 @@ class CozyGamification:
         points_to_add = int(seconds / 60)
         if points_to_add > 0:
             return self.add_points(user_id, points_to_add, "Listening time")
-        return None
+        else:
+            # Return valid dict even with 0 points to maintain consistency
+            return {
+                'points_added': 0,
+                'total_points': user_stats['total_points'],
+                'level_up': False,
+                'new_level': None,
+                'new_achievements': [],
+                'reason': "Listening time"
+            }
     
     def track_sound_start(self, user_id: str, sound_name: str):
         """Track when user starts listening to a sound"""
