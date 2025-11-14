@@ -648,3 +648,4 @@ if __name__ == "__main__":
             logging.error(f'❌ Failed to save gamification data on shutdown: {e}')
     finally:
         loop.close()
+
