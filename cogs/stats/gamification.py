@@ -145,10 +145,12 @@ class CozyGamification:
                     # Points breakdown for this user
                     if user_id in self.changes_since_save['user_points_breakdown']:
                         breakdown = self.changes_since_save['user_points_breakdown'][user_id]
-                        total_points = sum(item['points'] for item in breakdown)
-                        logging.info(f"  👉 +{total_points} points for {username} - Details:")
-                        for item in breakdown:
-                            logging.info(f"    ├─ {item['reason']}: +{item['points']} pts")
+                        if isinstance(breakdown, list):
+                            total_points = sum(item['points'] for item in breakdown if isinstance(item, dict))
+                            logging.info(f"  👉 +{total_points} points for {username} - Details:")
+                            for item in breakdown:
+                                if isinstance(item, dict):
+                                    logging.info(f"    ├─ {item['reason']}: +{item['points']} pts")
                     elif user_id in self.changes_since_save['user_points']:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
@@ -327,7 +329,7 @@ class CozyGamification:
         user_stats = self.get_user_stats(user_id)
         current_sound = user_stats.get('current_sound')
         
-        if current_sound and 'start_time' in current_sound:
+        if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
             try:
                 start_time = datetime.fromisoformat(current_sound['start_time'])
                 duration = (datetime.now() - start_time).total_seconds()
