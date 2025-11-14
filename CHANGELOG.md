@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
 
 - Sound tracking time calculation now properly counts listening time when user quits voice channel.
 - Duplicate point saves in finalize_current_sound function.
-- Session duration validation (30min cap) to prevent corrupted data in periodic backups.
+- Session duration validation (30min cap) to prevent corrupted data in periodic and event backups.
 
 ## [1.0.9] - 2025-11-13
 
