@@ -83,6 +83,26 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 print(bot.guilds)
 
 # Persist voice channel usage statistics to storage
+def format_duration(seconds):
+    """Format duration in seconds to human readable format"""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        if secs > 0:
+            return f"{minutes}m {secs}s"
+        return f"{minutes}m"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        if secs > 0:
+            return f"{hours}h {minutes}m {secs}s"
+        elif minutes > 0:
+            return f"{hours}h {minutes}m"
+        return f"{hours}h"
+
 def save_voice_time_data():
     data_file = 'data/voice_time_data.json'
     temp_file = data_file + '.tmp'
@@ -100,12 +120,13 @@ def save_voice_time_data():
         
         # Atomic rename to final file
         os.rename(temp_file, data_file)
+        logging.info('✅ Voice time data saved successfully')
         
     except Exception as e:
         # Clean up temp file on error
         if os.path.exists(temp_file):
             os.remove(temp_file)
-        logging.error(f'Failed to save voice time data: {e}')
+        logging.error(f'❌ Failed to save voice time data: {e}')
 
 # Load voice channel usage statistics from persistent storage
 def load_voice_time_data():
@@ -149,7 +170,7 @@ async def periodic_backup():
         await asyncio.sleep(3600)
         if guild_voice_time:
             save_voice_time_data()
-            logging.info('💾 Periodic voice data backup completed')
+            logging.info('✅ Periodic voice data backup completed')
         
         # Calculate and save listening time for active users
         try:
@@ -158,9 +179,21 @@ async def periodic_backup():
             
             # Process active sessions
             for guild_id, session in user_voice_sessions.items():
+                guild = bot.get_guild(int(guild_id))
+                guild_name = guild.name if guild else f"Guild {guild_id}"
+                
+                logging.info(f'✅ Processing active sessions in {guild_name}:')
+                
                 for user_id, user_data in session['users'].items():
                     # Calculate current listening duration since last check
                     listening_duration = (datetime.now() - user_data['join_time']).total_seconds()
+                    
+                    # Get username from bot cache
+                    try:
+                        user = await bot.fetch_user(int(user_id))
+                        username = user.name if user else f"User {user_id[:8]}"
+                    except:
+                        username = f"User {user_id[:8]}"
                     
                     # Accumulate time and save to database
                     if listening_duration > 0:
@@ -170,6 +203,9 @@ async def periodic_backup():
                         if points_to_add > 0:
                             cozy_gamification.add_points(user_id, points_to_add, "Periodic listening time")
                         
+                        total_session_time = user_data['accumulated_time']
+                        logging.info(f'👉 {username}: +{format_duration(listening_duration)} (session total: {format_duration(total_session_time)}) +{points_to_add} points')
+                        
                         # Reset join time to now for next calculation
                         user_data['join_time'] = datetime.now()
                         active_users_updated += 1
@@ -177,10 +213,12 @@ async def periodic_backup():
             # Save all data
             cozy_gamification.save_user_data()
             if active_users_updated > 0:
-                logging.info(f'💾 Updated {active_users_updated} active users listening time')
-            logging.info('💾 Periodic gamification data backup completed')
+                logging.info(f'✅ PERIODIC BACKUP: Updated {active_users_updated} active users listening time')
+            else:
+                logging.info('🚫 PERIODIC BACKUP: No active users to update')
+            logging.info('✅ Periodic gamification data backup completed')
         except Exception as e:
-            logging.error(f'💾 Failed to backup gamification data: {e}')
+            logging.error(f'❌ PERIODIC BACKUP FAILED: {e}')
         
         # Save current stats for API
         save_current_stats_for_api()
@@ -244,6 +282,7 @@ async def on_voice_state_update(member, before, after):
             # Note all users currently in the channel
             from cogs.stats.gamification import cozy_gamification
             current_users = [m for m in after.channel.members if not m.bot]
+            logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
             for user in current_users:
                 user_id = str(user.id)
                 user_voice_sessions[guild_id]['users'][user_id] = {
@@ -253,7 +292,7 @@ async def on_voice_state_update(member, before, after):
                 # Award session join points - pass both username and display_name
                 result = cozy_gamification.join_session(user_id, user.name)  # real username
                 cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
-                logging.info(f"✅ {user.name} was already in channel when bot joined")
+                logging.info(f"👉 USER JOIN: {user.name} was already in channel when bot joined {after.channel.name} in {member.guild.name}")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
@@ -264,7 +303,7 @@ async def on_voice_state_update(member, before, after):
                 time_spent = datetime.now() - start_time
                 total_time = accumulated_time + time_spent.total_seconds()
                 guild_voice_time[guild_id] = [None, total_time]
-                print(f"Time spent in {before.channel.guild.name}: {total_time} seconds")
+                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} after {format_duration(total_time)}")
                 save_voice_time_data()
             
             # Calculate final listening time for all remaining users
@@ -273,6 +312,13 @@ async def on_voice_state_update(member, before, after):
                 session = user_voice_sessions[guild_id]
                 
                 for user_id, user_data in session['users'].items():
+                    # Get username for logging
+                    try:
+                        user = await bot.fetch_user(int(user_id))
+                        username = user.name if user else f"User {user_id[:8]}"
+                    except:
+                        username = f"User {user_id[:8]}"
+                    
                     # Calculate final session time
                     final_duration = (datetime.now() - user_data['join_time']).total_seconds()
                     total_session_time = user_data['accumulated_time'] + final_duration
@@ -282,7 +328,7 @@ async def on_voice_state_update(member, before, after):
                         points_to_add = int(final_duration / 60)
                         if points_to_add > 0:
                             result = cozy_gamification.add_points(user_id, points_to_add, "Final listening time")
-                        logging.info(f"🎯 Final calculation: user {user_id} listened {total_session_time:.1f}s total ({final_duration:.1f}s final)")
+                        logging.info(f"👋 BOT DISCONNECT: {username} final session - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
                 
                 # Clean up session
                 del user_voice_sessions[guild_id]
@@ -316,7 +362,7 @@ async def on_voice_state_update(member, before, after):
         }
         result = cozy_gamification.join_session(user_id, member.name)  # real username
         cozy_gamification.update_username(user_id, member.name, member.global_name or member.display_name)
-        logging.info(f"✅ {member.name} joined bot channel")
+        logging.info(f"✅ USER JOIN: {member.name} joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
     elif before.channel == bot_channel and after.channel != bot_channel:
@@ -330,10 +376,13 @@ async def on_voice_state_update(member, before, after):
                 points_to_add = int(final_duration / 60)
                 if points_to_add > 0:
                     result = cozy_gamification.add_points(user_id, points_to_add, "Listening time")
-                logging.info(f"❌ {member.name} left bot channel after {total_session_time:.1f}s total ({final_duration:.1f}s final)")
+                logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - total: {format_duration(total_session_time)}, final chunk: {format_duration(final_duration)}, +{points_to_add} points")
+            else:
+                logging.info(f"👋 USER LEAVE: {member.name} left bot channel {before.channel.name} in {member.guild.name} - no additional time")
             
             # Finalize sound tracking when user leaves
             cozy_gamification.finalize_current_sound(user_id)
+            logging.info(f"👉 SOUND TRACKING: Finalized current sound for {member.name}")
             
             # Remove user from session
             del session['users'][user_id] 
@@ -425,8 +474,8 @@ if __name__ == "__main__":
         try:
             from cogs.stats.gamification import cozy_gamification
             cozy_gamification.save_user_data()
-            logging.info('💾 Gamification data saved on shutdown')
+            logging.info('✅ Gamification data saved on shutdown')
         except Exception as e:
-            logging.error(f'💾 Failed to save gamification data on shutdown: {e}')
+            logging.error(f'❌ Failed to save gamification data on shutdown: {e}')
     finally:
         loop.close()
