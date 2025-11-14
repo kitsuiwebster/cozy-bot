@@ -220,7 +220,7 @@ class CozyGamification:
             user_stats['level_progress'] = progress
             
             username = self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')
-            logging.info(f"🆙 Level bonus: {username} reached level {old_level + 1} (+{level_bonus_points} points)")
+            logging.info(f"⭐ Level bonus: {username} reached level {old_level + 1} (+{level_bonus_points} points)")
         
         # Check other achievements
         new_achievements.extend(self.check_general_achievements(user_stats))
@@ -615,7 +615,7 @@ class CozyGamification:
                 user_stats['category_completions'].append(achievement_key)
                 
                 self.add_points(user_id, 50, f"Category completion: {category}")
-                logging.info(f"🎉 Category completion bonus: {self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')} completed {category} category (+50 points)")
+                logging.info(f"⭐ Category completion bonus: {self.usernames.get(user_id, {}).get('username', f'User {user_id[:8]}')} completed {category} category (+50 points)")
                 return 50
         
         return 0
