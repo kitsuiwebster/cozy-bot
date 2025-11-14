@@ -612,6 +612,20 @@ class CozyGamification:
                     logging.warning(f"⚠️ Resetting corrupted current_sound for {user_id}")
                     stats['current_sound'] = None
                     cleaned_count += 1
+                elif 'start_time' in stats['current_sound']:
+                    try:
+                        start_time = datetime.fromisoformat(stats['current_sound']['start_time'])
+                        session_duration = (datetime.now() - start_time).total_seconds()
+                        # If session is older than 12 hours, it's probably corrupted
+                        if session_duration > 12 * 3600:
+                            username = self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                            logging.warning(f"⚠️ Resetting old current_sound session for {username}: {session_duration/3600:.1f}h old")
+                            stats['current_sound'] = None
+                            cleaned_count += 1
+                    except Exception:
+                        logging.warning(f"⚠️ Resetting corrupted current_sound timestamp for {user_id}")
+                        stats['current_sound'] = None
+                        cleaned_count += 1
         
         # Clean changes_since_save
         for category, data in self.changes_since_save.items():

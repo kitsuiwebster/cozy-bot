@@ -113,7 +113,7 @@ def save_voice_time_data(silent=False):
         # Atomic rename to final file
         os.rename(temp_file, data_file)
         if not silent:
-            logging.info('✅ Voice time data saved successfully')
+            logging.info('✅ SERVER TIME SAVE: Saved successfully')
         
     except Exception as e:
         # Clean up temp file on error
@@ -182,6 +182,12 @@ async def periodic_backup():
                     accumulated_time = guild_data[1]
                     current_session_time = (datetime.now() - start_time).total_seconds()
                     
+                    # Validate server session duration (max 30 minutes to prevent corrupted data)
+                    max_session_duration = 30 * 60  # 30 minutes in seconds
+                    if current_session_time > max_session_duration:
+                        logging.warning(f"⚠️ Suspicious server session duration for guild {guild_id}: {current_session_time/60:.1f}min - capping to 30min")
+                        current_session_time = max_session_duration
+                    
                     # Update the accumulated time
                     new_total = accumulated_time + current_session_time
                     guild_voice_time[guild_id] = [datetime.now().isoformat(), new_total]
@@ -197,6 +203,12 @@ async def periodic_backup():
                         start_time = datetime.fromisoformat(current_sound['start_time'])
                         session_duration = (datetime.now() - start_time).total_seconds()
                         sound_name = current_sound['name']
+                        
+                        # Validate session duration (max 30 minutes to prevent corrupted data)
+                        max_session_duration = 30 * 60  # 30 minutes in seconds
+                        if session_duration > max_session_duration:
+                            logging.warning(f"⚠️ Suspicious session duration for user {user_id}: {session_duration/60:.1f}min - capping to 30min")
+                            session_duration = max_session_duration
                         
                         if session_duration > 0:
                             # Update listening time
