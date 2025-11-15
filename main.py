@@ -3,7 +3,6 @@ import logging
 from dotenv import load_dotenv
 import os
 from discord.ext import commands
-from cogs.reactions.reactions import handle_reactions
 from datetime import datetime
 import json
 import asyncio
@@ -64,7 +63,7 @@ logger.addHandler(handler)
 intents = discord.Intents.default()
 intents.typing = False
 intents.members = False
-intents.message_content = True
+intents.message_content = False
 intents.guilds = True
 intents.voice_states = True  # Required to track user voice channel changes
 
@@ -662,8 +661,6 @@ async def on_message(message):
     if message.author == bot.user:
         return
     await bot.process_commands(message)
-
-    await handle_reactions(message)
 
 # Bot initialization and startup routine
 async def run_bot():

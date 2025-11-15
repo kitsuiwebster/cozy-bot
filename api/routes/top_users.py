@@ -120,7 +120,7 @@ class TopSoundsResponse(BaseModel):
     total_sounds: int
 
 @router.get("/top-sounds", response_model=TopSoundsResponse)
-async def get_top_sounds(limit: int = 10):
+async def get_top_sounds(limit: int = None):
     """Get most listened sounds globally"""
     try:
         user_data = load_cozy_points_data()
