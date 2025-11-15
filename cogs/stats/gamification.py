@@ -8,12 +8,12 @@ import logging
 import traceback
 
 def colorize_points(text):
-    """Colorize point values in blue"""
-    return f'\033[34m{text}\033[0m'
+    """Colorize point values in green"""
+    return f'\033[32m{text}\033[0m'
 
 def colorize_duration(text):
-    """Colorize duration values in cyan"""
-    return f'\033[36m{text}\033[0m'
+    """Colorize duration values in blue"""
+    return f'\033[94m{text}\033[0m'
 
 class CozyGamification:
     def __init__(self):
@@ -189,7 +189,7 @@ class CozyGamification:
                     'user_points_breakdown': {}
                 }
             else:
-                logging.info(f"🚫 EVENT SAVE - No changes since last save")
+                logging.debug(f"🚫 EVENT SAVE - No changes since last save")
             
         except Exception as e:
             # Clean up temp file on error
@@ -236,8 +236,7 @@ class CozyGamification:
         
         while level_up:
             current_level += 1
-            # Award level bonus for THIS specific level: current_level * 20 points (plus généreux pour compenser)
-            single_level_bonus = current_level * 20
+            single_level_bonus = current_level * 10
             total_level_bonus_points += single_level_bonus
             user_stats['total_points'] += single_level_bonus
             
@@ -404,6 +403,7 @@ class CozyGamification:
                     }
                 
                 user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
+                user_stats['listening_time'] += duration  # Update total listening time
                 user_stats['current_sound'] = None
                 
                 # Track changes for periodic logging - SAFE ACCESS
@@ -524,10 +524,28 @@ class CozyGamification:
             return self.get_sound_display_name(favorite[0])
         return None
     
-    def join_session(self, user_id: str, username: str = None):
+    def join_session(self, user_id: str, username: str = None, force_bonus: bool = False):
         """Track when user joins a listening session"""
         user_stats = self.get_user_stats(user_id)
+        
+        # Check for recent join to prevent duplicate points from reconnections
+        last_join_time = user_stats.get('last_join_time')
+        current_time = datetime.now()
+        
+        # Prevent duplicate join points within 2 minutes (120 seconds)
+        award_join_points = True
+        if not force_bonus and last_join_time:
+            try:
+                last_join = datetime.fromisoformat(last_join_time)
+                time_since_last_join = (current_time - last_join).total_seconds()
+                if time_since_last_join < 120:  # Less than 2 minutes
+                    award_join_points = False
+            except Exception:
+                # Invalid timestamp, reset and award points
+                award_join_points = True
+        
         user_stats['sessions_joined'] += 1
+        user_stats['last_join_time'] = current_time.isoformat()
         
         # Update username cache if provided
         if username:
@@ -545,8 +563,21 @@ class CozyGamification:
                 user_stats['daily_streak'] = 1
             user_stats['last_active_date'] = today
         
-        # Award session join points
-        result = self.add_points(user_id, 5, "Joining session")
+        # Award session join points only if not a recent duplicate
+        result = None
+        if award_join_points:
+            result = self.add_points(user_id, 5, "Joining session")
+        else:
+            # Return a valid dict even with 0 points to maintain consistency
+            result = {
+                'points_added': 0,
+                'total_points': user_stats['total_points'],
+                'level_up': False,
+                'new_level': None,
+                'new_achievements': [],
+                'reason': "Joining session (duplicate prevention)"
+            }
+        
         self.save_user_data()
         return result
     
@@ -579,6 +610,19 @@ class CozyGamification:
                 pass
         
         # Only reset streak to 0 if more than 1 day inactive
+        return 0
+    
+    def calculate_streak_bonus(self, user_id: str, listening_duration_minutes: float) -> int:
+        """Calculate streak bonus points based on current streak and listening time"""
+        current_streak = self.get_current_streak(user_id)
+        if current_streak <= 0:
+            return 0
+        
+        # +[streak days] points every 10 minutes of listening
+        ten_minute_periods = int(listening_duration_minutes / 10)
+        if ten_minute_periods > 0:
+            return current_streak * ten_minute_periods
+        
         return 0
     
     def check_level_achievements(self, level: int, user_stats: Dict) -> List[str]:

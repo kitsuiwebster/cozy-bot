@@ -128,13 +128,25 @@ class BaseSoundCog(commands.Cog):
         if voice_client is None:
             # Not connected, connect to user's channel
             if user_channel:
-                try:
-                    voice_client = await user_channel.connect()
-                    # Start disconnect timer for empty channel monitoring
-                    await self.start_disconnect_timer(guild_id)
-                except Exception as e:
-                    await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
-                    return
+                # Retry logic for Discord voice connection issues
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        # Add timeout to prevent hanging connections
+                        voice_client = await asyncio.wait_for(user_channel.connect(), timeout=20.0)
+                        # Start disconnect timer for empty channel monitoring
+                        await self.start_disconnect_timer(guild_id)
+                        break  # Success, exit retry loop
+                    except asyncio.TimeoutError:
+                        if attempt == max_retries - 1:  # Last attempt
+                            await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
+                            return
+                        await asyncio.sleep(3)  # Wait before retry
+                    except Exception as e:
+                        if attempt == max_retries - 1:  # Last attempt
+                            await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
+                            return
+                        await asyncio.sleep(2)  # Wait before retry
             else:
                 await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
                 return
@@ -142,7 +154,11 @@ class BaseSoundCog(commands.Cog):
             # Already connected, move to user's channel if different
             if user_channel and voice_client.channel != user_channel:
                 try:
-                    await voice_client.move_to(user_channel)
+                    # Add timeout to prevent hanging on move operations
+                    await asyncio.wait_for(voice_client.move_to(user_channel), timeout=10.0)
+                except asyncio.TimeoutError:
+                    await interaction.followup.send("❌ Failed to move to voice channel: timeout. Please try again.", ephemeral=True)
+                    return
                 except Exception as e:
                     await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
                     return
@@ -180,7 +196,7 @@ class BaseSoundCog(commands.Cog):
                     logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
                     for member in current_users:
                         cozy_gamification.track_sound_start(member.id, sound_filename)
-                        logging.info(f"🎵 Tracking {sound_filename} for {member.name}")
+                        logging.info(f"🎵 Tracking {sound_filename} for \033[35m{member.name}\033[0m")
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
