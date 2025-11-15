@@ -59,12 +59,9 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 
-# Configure Discord Gateway intents for bot permissions
-intents = discord.Intents.default()
-intents.typing = False
-intents.members = False
-intents.message_content = False
-intents.guilds = True
+# Configure Discord Gateway intents for bot permissions - ALL DISABLED
+intents = discord.Intents.none()
+intents.guilds = True  # Required to see servers
 intents.voice_states = True  # Required to track user voice channel changes
 
 # Initialize Discord bot instance with configuration
@@ -614,7 +611,7 @@ async def on_ready():
     print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
     print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
     print("║                                                                 ║")
-    print("║                      Version 1.0.11                             ║")
+    print("║                      Version 1.0.12                             ║")
     print("║            by @kitsuiwebster & @BubbleXGum                      ║")
     print("║                                                                 ║")
     print("╚═════════════════════════════════════════════════════════════════╝")

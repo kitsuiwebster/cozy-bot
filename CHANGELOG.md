@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.12] - 2025-11-15
+
+### Changed
+
+- Top sounds API endpoint now returns all sounds instead of limiting results to 10 entries.
+
+### Removed
+
+- Complete reactions system including multilingual rain keyword detection for enhanced security.
+- Message content intent requirement by eliminating message processing functionality.
+
+### Security
+
+- Minimized Discord bot permissions to essential voice and command interactions only.
+- Reduced required intents to guilds and voice states for optimal security posture.
+
 ## [1.0.11] - 2025-11-15
 
 ### Added
