@@ -533,11 +533,11 @@ async def on_voice_state_update(member, before, after):
         
         if current_sound:
             cozy_gamification.track_sound_start(user_id, current_sound)
-            logging.info(f"🎵 Assigned current sound {current_sound} to \033[35m{member.name}\033[0m")
+            logging.info(f"🎵 Tracking {current_sound} for \033[35m{member.name}\033[0m")
         else:
             logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
         
-        logging.info(f"✅ USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
+        logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
     elif before.channel == bot_channel and after.channel != bot_channel:

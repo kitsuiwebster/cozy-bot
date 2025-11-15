@@ -189,7 +189,7 @@ class CozyGamification:
                     'user_points_breakdown': {}
                 }
             else:
-                logging.info(f"🚫 EVENT SAVE - No changes since last save")
+                logging.debug(f"🚫 EVENT SAVE - No changes since last save")
             
         except Exception as e:
             # Clean up temp file on error
