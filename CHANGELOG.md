@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.11] - 2025-11-15
+
+### Added
+
+- Streak bonus system awarding additional points based on daily activity streaks during periodic saves.
+- Voice connection retry logic with exponential backoff to handle Discord API instability and timeouts.
+- Duplicate joining session prevention system with 2-minute cooldown to avoid spam during reconnections.
+
+### Fixed
+
+- Server time accumulation when bot is not connected to voice channels preventing phantom active sessions.
+- Discord voice connection timeouts with improved retry mechanisms and connection stability.
+- Bot disconnect logging accuracy showing correct final chunk duration and points awarded.
+
 ## [1.0.10] - 2025-11-14
 
 ### Added
