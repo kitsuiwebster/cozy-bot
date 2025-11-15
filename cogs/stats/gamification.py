@@ -403,6 +403,7 @@ class CozyGamification:
                     }
                 
                 user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
+                user_stats['listening_time'] += duration  # Update total listening time
                 user_stats['current_sound'] = None
                 
                 # Track changes for periodic logging - SAFE ACCESS
