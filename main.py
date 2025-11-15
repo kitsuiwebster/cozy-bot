@@ -516,6 +516,21 @@ async def on_voice_state_update(member, before, after):
         }
         result = cozy_gamification.join_session(user_id, member.name)  # real username
         cozy_gamification.update_username(user_id, member.name, member.global_name or member.display_name)
+        
+        # Check if there's a currently playing sound and assign it to the new user
+        current_sound = None
+        for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog']:
+            cog = bot.get_cog(cog_name)
+            if cog and hasattr(cog, 'guild_states'):
+                guild_state = cog.guild_states.get(guild_id, {})
+                if guild_state.get('is_playing') and guild_state.get('current_sound'):
+                    current_sound = guild_state['current_sound']
+                    break
+        
+        if current_sound:
+            cozy_gamification.track_sound_start(user_id, current_sound)
+            logging.info(f"🎵 Assigned current sound {current_sound} to \033[35m{member.name}\033[0m")
+        
         logging.info(f"✅ USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
