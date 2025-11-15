@@ -163,7 +163,7 @@ async def periodic_backup():
     
     while not bot.is_closed():
         # Full backup every 10 minutes
-        await asyncio.sleep(600)  # 10 minutes
+        await asyncio.sleep(120)  # 10 minutes
         
         try:
             from cogs.stats.gamification import cozy_gamification
@@ -285,6 +285,13 @@ async def periodic_backup():
                             
                             # Reset start time for next period
                             current_sound['start_time'] = datetime.now().isoformat()
+                            
+                            # Update accumulated time in user_voice_sessions for correct disconnect logging
+                            for guild_id, session_data in user_voice_sessions.items():
+                                if user_id in session_data.get('users', {}):
+                                    session_data['users'][user_id]['accumulated_time'] += session_duration
+                                    session_data['users'][user_id]['join_time'] = datetime.now()
+                                    break
                             
                             # Track for logging
                             total_points_awarded = points_to_add + streak_bonus
