@@ -483,6 +483,9 @@ async def on_voice_state_update(member, before, after):
                         result = cozy_gamification.add_listening_time(user_id, final_duration)
                         points_to_add = result['points_added'] if result else int(final_duration / 60)
                         logging.info(f"👋 BOT DISCONNECT: {username} final session - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
+                    
+                    # Finalize current sound to award loyalty bonuses
+                    cozy_gamification.finalize_current_sound(user_id)
                 
                 # Clean up session
                 del user_voice_sessions[guild_id]
@@ -519,17 +522,21 @@ async def on_voice_state_update(member, before, after):
         
         # Check if there's a currently playing sound and assign it to the new user
         current_sound = None
+        guild_id_int = int(guild_id)  # Convert string to int for guild_states lookup
         for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog']:
             cog = bot.get_cog(cog_name)
             if cog and hasattr(cog, 'guild_states'):
-                guild_state = cog.guild_states.get(guild_id, {})
+                guild_state = cog.guild_states.get(guild_id_int, {})
                 if guild_state.get('is_playing') and guild_state.get('current_sound'):
                     current_sound = guild_state['current_sound']
+                    logging.info(f"🔍 Found current sound {current_sound} in {cog_name} for guild {guild_id}")
                     break
         
         if current_sound:
             cozy_gamification.track_sound_start(user_id, current_sound)
             logging.info(f"🎵 Assigned current sound {current_sound} to \033[35m{member.name}\033[0m")
+        else:
+            logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
         
         logging.info(f"✅ USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
     
