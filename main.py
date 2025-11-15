@@ -480,11 +480,10 @@ async def on_voice_state_update(member, before, after):
                     total_session_time = user_data['accumulated_time'] + final_duration
                     
                     if final_duration > 0:
-                        result = cozy_gamification.add_listening_time(user_id, final_duration)
-                        points_to_add = result['points_added'] if result else int(final_duration / 60)
+                        points_to_add = int(final_duration / 60)
                         logging.info(f"👋 BOT DISCONNECT: {username} final session - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
                     
-                    # Finalize current sound to award loyalty bonuses
+                    # Finalize current sound to award loyalty bonuses (this handles the actual point calculation)
                     cozy_gamification.finalize_current_sound(user_id)
                 
                 # Clean up session
@@ -554,13 +553,12 @@ async def on_voice_state_update(member, before, after):
                 logging.warning(f"⚠️ Corrupted user data for {user_id}, resetting")
             
             if final_duration > 0:
-                result = cozy_gamification.add_listening_time(user_id, final_duration)
-                points_to_add = result['points_added'] if result else int(final_duration / 60)
+                points_to_add = int(final_duration / 60)
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
             
-            # Finalize sound tracking when user leaves
+            # Finalize sound tracking when user leaves (this handles the actual point calculation)
             cozy_gamification.finalize_current_sound(user_id)
             logging.info(f"👉 SOUND TRACKING: Finalized current sound for \033[35m{member.name}\033[0m")
             
