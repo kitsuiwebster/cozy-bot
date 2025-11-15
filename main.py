@@ -271,14 +271,27 @@ async def periodic_backup():
                                     'points': points_to_add
                                 })
                             
+                            # Award streak bonus (+[streak days] points every 10 minutes)
+                            streak_bonus = cozy_gamification.calculate_streak_bonus(user_id, session_duration / 60)
+                            if streak_bonus > 0:
+                                user_stats['total_points'] += streak_bonus
+                                current_streak = cozy_gamification.get_current_streak(user_id)
+                                if user_id not in cozy_gamification.changes_since_save['user_points_breakdown']:
+                                    cozy_gamification.changes_since_save['user_points_breakdown'][user_id] = []
+                                cozy_gamification.changes_since_save['user_points_breakdown'][user_id].append({
+                                    'reason': f"Streak bonus: {current_streak}-day streak",
+                                    'points': streak_bonus
+                                })
+                            
                             # Reset start time for next period
                             current_sound['start_time'] = datetime.now().isoformat()
                             
                             # Track for logging
+                            total_points_awarded = points_to_add + streak_bonus
                             active_user_updates[user_id] = {
                                 'time': session_duration,
                                 'sound': sound_name,
-                                'points': points_to_add
+                                'points': total_points_awarded
                             }
                     except Exception as e:
                         logging.warning(f"⚠️ Error processing active session for user {user_id}: {e}")
