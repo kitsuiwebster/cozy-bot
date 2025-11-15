@@ -524,7 +524,7 @@ class CozyGamification:
             return self.get_sound_display_name(favorite[0])
         return None
     
-    def join_session(self, user_id: str, username: str = None):
+    def join_session(self, user_id: str, username: str = None, force_bonus: bool = False):
         """Track when user joins a listening session"""
         user_stats = self.get_user_stats(user_id)
         
@@ -534,7 +534,7 @@ class CozyGamification:
         
         # Prevent duplicate join points within 2 minutes (120 seconds)
         award_join_points = True
-        if last_join_time:
+        if not force_bonus and last_join_time:
             try:
                 last_join = datetime.fromisoformat(last_join_time)
                 time_since_last_join = (current_time - last_join).total_seconds()
