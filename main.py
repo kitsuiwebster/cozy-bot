@@ -3,7 +3,6 @@ import logging
 from dotenv import load_dotenv
 import os
 from discord.ext import commands
-from cogs.reactions.reactions import handle_reactions
 from datetime import datetime
 import json
 import asyncio
@@ -60,12 +59,9 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 
-# Configure Discord Gateway intents for bot permissions
-intents = discord.Intents.default()
-intents.typing = False
-intents.members = False
-intents.message_content = True
-intents.guilds = True
+# Configure Discord Gateway intents for bot permissions - ALL DISABLED
+intents = discord.Intents.none()
+intents.guilds = True  # Required to see servers
 intents.voice_states = True  # Required to track user voice channel changes
 
 # Initialize Discord bot instance with configuration
@@ -615,7 +611,7 @@ async def on_ready():
     print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
     print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
     print("║                                                                 ║")
-    print("║                      Version 1.0.11                             ║")
+    print("║                      Version 1.0.12                             ║")
     print("║            by @kitsuiwebster & @BubbleXGum                      ║")
     print("║                                                                 ║")
     print("╚═════════════════════════════════════════════════════════════════╝")
@@ -662,8 +658,6 @@ async def on_message(message):
     if message.author == bot.user:
         return
     await bot.process_commands(message)
-
-    await handle_reactions(message)
 
 # Bot initialization and startup routine
 async def run_bot():
