@@ -527,7 +527,25 @@ class CozyGamification:
     def join_session(self, user_id: str, username: str = None):
         """Track when user joins a listening session"""
         user_stats = self.get_user_stats(user_id)
+        
+        # Check for recent join to prevent duplicate points from reconnections
+        last_join_time = user_stats.get('last_join_time')
+        current_time = datetime.now()
+        
+        # Prevent duplicate join points within 2 minutes (120 seconds)
+        award_join_points = True
+        if last_join_time:
+            try:
+                last_join = datetime.fromisoformat(last_join_time)
+                time_since_last_join = (current_time - last_join).total_seconds()
+                if time_since_last_join < 120:  # Less than 2 minutes
+                    award_join_points = False
+            except Exception:
+                # Invalid timestamp, reset and award points
+                award_join_points = True
+        
         user_stats['sessions_joined'] += 1
+        user_stats['last_join_time'] = current_time.isoformat()
         
         # Update username cache if provided
         if username:
@@ -545,8 +563,21 @@ class CozyGamification:
                 user_stats['daily_streak'] = 1
             user_stats['last_active_date'] = today
         
-        # Award session join points
-        result = self.add_points(user_id, 5, "Joining session")
+        # Award session join points only if not a recent duplicate
+        result = None
+        if award_join_points:
+            result = self.add_points(user_id, 5, "Joining session")
+        else:
+            # Return a valid dict even with 0 points to maintain consistency
+            result = {
+                'points_added': 0,
+                'total_points': user_stats['total_points'],
+                'level_up': False,
+                'new_level': None,
+                'new_achievements': [],
+                'reason': "Joining session (duplicate prevention)"
+            }
+        
         self.save_user_data()
         return result
     

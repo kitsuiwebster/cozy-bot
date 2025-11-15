@@ -177,6 +177,13 @@ async def periodic_backup():
             # Update voice time for active bot sessions
             for guild_id, guild_data in guild_voice_time.items():
                 if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
+                    # Check if bot is actually connected to voice in this guild
+                    guild = bot.get_guild(int(guild_id))
+                    if not guild or not guild.voice_client or not guild.voice_client.channel:
+                        # Bot is not in voice, reset the session start time to None
+                        guild_voice_time[guild_id] = [None, guild_data[1]]  # Keep accumulated time, reset session
+                        continue
+                    
                     # Bot is active in this server
                     start_time = datetime.fromisoformat(guild_data[0])
                     accumulated_time = guild_data[1]
@@ -286,11 +293,19 @@ async def periodic_backup():
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
                         logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name}")
                 
-                # Log active session updates
+                # Log active session updates only if users are present
                 for guild_id, added_time in active_session_updates.items():
                     if added_time > 0:
-                        server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                        logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
+                        # Check if any users are actually in voice with the bot in this guild
+                        guild = bot.get_guild(int(guild_id))
+                        has_users = False
+                        if guild and guild.voice_client and guild.voice_client.channel:
+                            human_members = [m for m in guild.voice_client.channel.members if not m.bot]
+                            has_users = len(human_members) > 0
+                        
+                        if has_users:
+                            server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
+                            logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
                 
                 # Reset changes tracking
                 guild_voice_time_changes.clear()

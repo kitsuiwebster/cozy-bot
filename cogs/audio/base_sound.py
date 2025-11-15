@@ -129,9 +129,13 @@ class BaseSoundCog(commands.Cog):
             # Not connected, connect to user's channel
             if user_channel:
                 try:
-                    voice_client = await user_channel.connect()
+                    # Add timeout to prevent hanging connections
+                    voice_client = await asyncio.wait_for(user_channel.connect(), timeout=15.0)
                     # Start disconnect timer for empty channel monitoring
                     await self.start_disconnect_timer(guild_id)
+                except asyncio.TimeoutError:
+                    await interaction.followup.send("❌ Connection to voice channel timed out. Please try again.", ephemeral=True)
+                    return
                 except Exception as e:
                     await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
                     return
@@ -142,7 +146,11 @@ class BaseSoundCog(commands.Cog):
             # Already connected, move to user's channel if different
             if user_channel and voice_client.channel != user_channel:
                 try:
-                    await voice_client.move_to(user_channel)
+                    # Add timeout to prevent hanging on move operations
+                    await asyncio.wait_for(voice_client.move_to(user_channel), timeout=10.0)
+                except asyncio.TimeoutError:
+                    await interaction.followup.send("❌ Failed to move to voice channel: timeout. Please try again.", ephemeral=True)
+                    return
                 except Exception as e:
                     await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
                     return
