@@ -180,7 +180,7 @@ class BaseSoundCog(commands.Cog):
                     logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
                     for member in current_users:
                         cozy_gamification.track_sound_start(member.id, sound_filename)
-                        logging.info(f"🎵 Tracking {sound_filename} for {member.name}")
+                        logging.info(f"🎵 Tracking {sound_filename} for \033[35m{member.name}\033[0m")
                 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
