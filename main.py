@@ -49,7 +49,7 @@ class FancyFormatter(logging.Formatter):
 
 # Initialize enhanced logging system
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Clear existing log handlers
 for handler in logger.handlers[:]:
