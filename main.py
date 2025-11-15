@@ -163,7 +163,7 @@ async def periodic_backup():
     
     while not bot.is_closed():
         # Full backup every 10 minutes
-        await asyncio.sleep(600)  # 10 minutes
+        await asyncio.sleep(60)  # 10 minutes
         
         try:
             from cogs.stats.gamification import cozy_gamification
