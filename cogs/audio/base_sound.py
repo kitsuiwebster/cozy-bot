@@ -128,17 +128,25 @@ class BaseSoundCog(commands.Cog):
         if voice_client is None:
             # Not connected, connect to user's channel
             if user_channel:
-                try:
-                    # Add timeout to prevent hanging connections
-                    voice_client = await asyncio.wait_for(user_channel.connect(), timeout=15.0)
-                    # Start disconnect timer for empty channel monitoring
-                    await self.start_disconnect_timer(guild_id)
-                except asyncio.TimeoutError:
-                    await interaction.followup.send("❌ Connection to voice channel timed out. Please try again.", ephemeral=True)
-                    return
-                except Exception as e:
-                    await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
-                    return
+                # Retry logic for Discord voice connection issues
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        # Add timeout to prevent hanging connections
+                        voice_client = await asyncio.wait_for(user_channel.connect(), timeout=20.0)
+                        # Start disconnect timer for empty channel monitoring
+                        await self.start_disconnect_timer(guild_id)
+                        break  # Success, exit retry loop
+                    except asyncio.TimeoutError:
+                        if attempt == max_retries - 1:  # Last attempt
+                            await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
+                            return
+                        await asyncio.sleep(3)  # Wait before retry
+                    except Exception as e:
+                        if attempt == max_retries - 1:  # Last attempt
+                            await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
+                            return
+                        await asyncio.sleep(2)  # Wait before retry
             else:
                 await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
                 return
