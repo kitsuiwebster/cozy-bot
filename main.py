@@ -69,10 +69,10 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 
-# Force discord logger to use our handler
+# Force discord logger to use our handler and suppress intent warnings
 discord_logger.propagate = False
 discord_logger.addHandler(handler)
-discord_logger.setLevel(logging.WARNING)  # Only show warnings/errors from discord
+discord_logger.setLevel(logging.ERROR)  # Skip warnings, only show errors from discord
 
 # Configure Discord Gateway intents for bot permissions
 intents = discord.Intents.default()
