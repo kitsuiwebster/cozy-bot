@@ -348,8 +348,8 @@ async def periodic_backup():
             if active_user_updates:
                 for user_id, update_info in active_user_updates.items():
                     username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-                    time_str = f'\033[36m+{format_duration(update_info["time"])}\033[0m'
-                    points_str = f' (\033[94m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
+                    time_str = f'\033[94m+{format_duration(update_info["time"])}\033[0m'
+                    points_str = f' (\033[32m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
                     logging.info(f"  👉 {time_str} for {username} ({update_info['sound']} active session){points_str}")
             
             # Save voice time data for all servers (silently)

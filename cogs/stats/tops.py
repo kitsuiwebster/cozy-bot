@@ -82,20 +82,31 @@ class TopsCog(commands.Cog):
         # Create embed with top-servers style
         embed = discord.Embed(title="Top Users by cozy points 🥇", description="", color=0x00ff00)
         
-        # Format leaderboard like top-servers
+        # Format leaderboard like top-servers  
         for i, user_data in enumerate(leaderboard, start=1):
-            try:
-                user = await self.bot.fetch_user(int(user_data['user_id']))
-                username = user.name if user else f"User {user_data['user_id'][:8]}"
-            except:
+            user_id = user_data['user_id']
+            
+            # Get display name from cache first
+            display_name = None
+            if user_id in cozy_gamification.usernames:
+                cached_info = cozy_gamification.usernames[user_id]
+                if isinstance(cached_info, dict):
+                    display_name = cached_info.get('display_name')
+            
+            # Fallback to fetching user if no cached display name
+            if not display_name:
                 try:
-                    user = self.bot.get_user(int(user_data['user_id']))
-                    username = user.name if user else f"User {user_data['user_id'][:8]}"
+                    user = await self.bot.fetch_user(int(user_id))
+                    display_name = user.global_name or user.display_name if user else f"User {user_id[:8]}"
                 except:
-                    username = f"User {user_data['user_id'][:8]}"
+                    try:
+                        user = self.bot.get_user(int(user_id))
+                        display_name = user.global_name or user.display_name if user else f"User {user_id[:8]}"
+                    except:
+                        display_name = f"User {user_id[:8]}"
             
             user_info = f"{user_data['total_points']:,} points"
-            embed.add_field(name=f"{i}. {username}", value=user_info, inline=False)
+            embed.add_field(name=f"{i}. {display_name}", value=user_info, inline=False)
         
         await interaction.response.send_message(embed=embed)
 
