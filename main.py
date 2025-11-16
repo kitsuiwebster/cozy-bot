@@ -159,17 +159,26 @@ async def change_status():
     await bot.wait_until_ready()
 
     while not bot.is_closed():
-        server_count = len(bot.guilds)
-        total_member_count = sum(guild.member_count for guild in bot.guilds)
-        statuses = [
-            discord.Game(name=f"in {server_count} servers"),
-            discord.Game(name=f"with {total_member_count} members"),
-        ]
+        try:
+            server_count = len(bot.guilds)
+            total_member_count = sum(guild.member_count or 0 for guild in bot.guilds)
+            statuses = [
+                discord.Game(name=f"in {server_count} servers"),
+                discord.Game(name=f"with {total_member_count} members"),
+            ]
 
-        # Rotate through presence states with configured interval
-        for status in statuses:
-            await bot.change_presence(activity=status)
-            await asyncio.sleep(10)
+            # Rotate through presence states with configured interval
+            for status in statuses:
+                if bot.is_closed():
+                    return
+                await bot.change_presence(activity=status)
+                await asyncio.sleep(10)
+        except (ConnectionResetError, OSError, discord.ConnectionClosed):
+            # Connection issues during reconnection, wait and retry
+            await asyncio.sleep(30)
+        except Exception as e:
+            logging.error(f"❌ Error updating bot status: {e}")
+            await asyncio.sleep(60)
 
 # Background task for hourly data backup
 async def periodic_backup():
