@@ -191,6 +191,8 @@ async def periodic_backup():
         try:
             from cogs.stats.gamification import cozy_gamification
             
+            logging.info("")
+            logging.info("")
             logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
             
             # Process active sessions and calculate time since last save
@@ -482,6 +484,8 @@ async def on_voice_state_update(member, before, after):
             # Note all users currently in the channel
             from cogs.stats.gamification import cozy_gamification
             current_users = [m for m in after.channel.members if not m.bot]
+            logging.info("")
+            logging.info("")
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
             for user in current_users:
                 user_id = str(user.id)
@@ -493,7 +497,7 @@ async def on_voice_state_update(member, before, after):
                 # Force bonus for users already present when bot joins (new session start)
                 result = cozy_gamification.join_session(user_id, user.name, force_bonus=True)
                 cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
-                logging.info(f"✌️ USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
+                logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
@@ -517,6 +521,8 @@ async def on_voice_state_update(member, before, after):
                     guild_voice_time[guild_id] = [None, 0]
                     session_duration = 0
                     total_time = 0
+                logging.info("")
+                logging.info("")
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
                 logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
                 save_voice_time_data()
@@ -592,6 +598,8 @@ async def on_voice_state_update(member, before, after):
                 guild_state = cog.guild_states.get(guild_id_int, {})
                 if guild_state.get('is_playing') and guild_state.get('current_sound'):
                     current_sound = guild_state['current_sound']
+                    logging.info("")
+                    logging.info("")
                     logging.info(f"🔍 Found current sound {current_sound} in {cog_name} for guild {guild_id}")
                     break
         
@@ -603,7 +611,7 @@ async def on_voice_state_update(member, before, after):
         else:
             logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
         
-        logging.info(f"✌️ USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
+        logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
     elif before.channel == bot_channel and after.channel != bot_channel:
@@ -620,6 +628,8 @@ async def on_voice_state_update(member, before, after):
             
             if final_duration > 0:
                 points_to_add = int(final_duration / 60)
+                logging.info("")
+                logging.info("")
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")

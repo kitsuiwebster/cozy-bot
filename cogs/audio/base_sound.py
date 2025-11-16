@@ -193,6 +193,8 @@ class BaseSoundCog(commands.Cog):
                 voice_client = interaction.guild.voice_client
                 if voice_client and voice_client.channel:
                     current_users = [member for member in voice_client.channel.members if not member.bot]
+                    logging.info("")
+                    logging.info("")
                     logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
                     
                     # First, finalize current sounds for all users (calculates loyalty bonuses)
@@ -277,6 +279,8 @@ class BaseSoundCog(commands.Cog):
         from cogs.stats.gamification import cozy_gamification
         if voice_client and voice_client.channel:
             current_users = [member for member in voice_client.channel.members if not member.bot]
+            logging.info("")
+            logging.info("")
             logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
             for member in current_users:
                 cozy_gamification.finalize_current_sound(member.id)

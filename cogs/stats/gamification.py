@@ -480,7 +480,7 @@ class CozyGamification:
         
         if reset_count > 0:
             server_name = self.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-            logging.info(f"🔄 Sound change: Reset consecutive time for {reset_count} users in {server_name}")
+            logging.info(f"👉 Sound change: Reset consecutive time for {reset_count} users in {server_name}")
             self.save_user_data()
     
     def finalize_current_sound(self, user_id: str):
