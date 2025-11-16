@@ -59,9 +59,12 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 
-# Configure Discord Gateway intents for bot permissions - ALL DISABLED
-intents = discord.Intents.none()
-intents.guilds = True  # Required to see servers
+# Configure Discord Gateway intents for bot permissions
+intents = discord.Intents.default()
+intents.typing = False
+intents.members = True  # Required for global display names and complete user data
+intents.message_content = False
+intents.guilds = True
 intents.voice_states = True  # Required to track user voice channel changes
 
 # Initialize Discord bot instance with configuration
