@@ -28,7 +28,7 @@ class FancyFormatter(logging.Formatter):
     EMOJIS = {
         'DEBUG': '⚙️',
         'INFO': '✨', 
-        'WARNING': '⚠️',
+        'WARNING': '⚡',
         'ERROR': '❌',
         'CRITICAL': '💥'
     }
@@ -44,7 +44,12 @@ class FancyFormatter(logging.Formatter):
         timestamp = self.formatTime(record, '%H:%M:%S')
         
         # Generate formatted log message
-        return f"{color}{emoji} [{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
+        # Pad emoji to consistent width
+        if len(emoji) == 1:
+            emoji_padded = f"{emoji}  "  # Single char emoji + 2 spaces
+        else:
+            emoji_padded = f"{emoji} "   # Other multi char emoji + 1 space
+        return f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
 
 # Initialize enhanced logging system
 logger = logging.getLogger()
@@ -54,10 +59,20 @@ logger.setLevel(logging.INFO)
 for handler in logger.handlers[:]:
     logger.removeHandler(handler)
 
-# Install custom log formatter
+# Configure Discord.py logger to use our formatter too
+discord_logger = logging.getLogger('discord')
+for handler in discord_logger.handlers[:]:
+    discord_logger.removeHandler(handler)
+
+# Install custom log formatter - single handler for all loggers
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
+
+# Force discord logger to use our handler
+discord_logger.propagate = False
+discord_logger.addHandler(handler)
+discord_logger.setLevel(logging.WARNING)  # Only show warnings/errors from discord
 
 # Configure Discord Gateway intents for bot permissions
 intents = discord.Intents.default()
