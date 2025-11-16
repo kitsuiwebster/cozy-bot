@@ -2,21 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.13] - 2025-11-16
+
+### Added
+
+- AES-256 encryption with PBKDF2 key derivation for GDPR-compliant data storage protection.
+- GDPR deletion request command (`/delete-request`) with 30-day data retention notice.
+
+### Changed
+
+- Server members intent restored for global display name access while maintaining security posture.
+
+### Fixed
+
+- Loyalty bonus calculation now based on consecutive session time instead of total accumulated time.
+- Empty data handling for fresh container deployments preventing AttributeError crashes.
+- Development deployment port conflicts by using separate port 8001 for dev environment.
+- CI/CD deployment stability with improved error handling and volume mount corrections.
+
 ## [1.0.12] - 2025-11-15
 
 ### Changed
 
 - Top sounds API endpoint now returns all sounds instead of limiting results to 10 entries.
+- Minimized Discord bot permissions to essential voice and command interactions only.
+- Reduced required intents to guilds and voice states for optimal security posture.
 
 ### Removed
 
 - Complete reactions system including multilingual rain keyword detection for enhanced security.
 - Message content intent requirement by eliminating message processing functionality.
-
-### Security
-
-- Minimized Discord bot permissions to essential voice and command interactions only.
-- Reduced required intents to guilds and voice states for optimal security posture.
 
 ## [1.0.11] - 2025-11-15
 
