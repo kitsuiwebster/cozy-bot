@@ -541,9 +541,9 @@ async def on_voice_state_update(member, before, after):
                     # Get username for logging
                     try:
                         user = await bot.fetch_user(int(user_id))
-                        username = user.name if user else f"User {user_id[:8]}"
+                        username = f'\033[35m{user.name if user else f"User {user_id[:8]}"}\033[0m'
                     except:
-                        username = f"User {user_id[:8]}"
+                        username = f'\033[35m{f"User {user_id[:8]}"}\033[0m'
                     
                     # Calculate final session time
                     final_duration = (datetime.now() - user_data['join_time']).total_seconds()
