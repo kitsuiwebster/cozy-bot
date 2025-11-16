@@ -104,7 +104,7 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
 else
     echo -e "${RED}❌ Container failed to start${NC}"
     echo -e "${YELLOW}🔍 Checking logs for errors...${NC}"
-    docker compose --env-file .env.dev logs --tail=20 discord-bot
+    docker compose --env-file .env.dev logs
     exit 1
 fi
 
