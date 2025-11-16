@@ -75,6 +75,15 @@ else
     echo -e "${YELLOW}ℹ️  No images to clean${NC}"
 fi
 
+# Create necessary directories
+echo -e "${BLUE}📁 Creating required directories...${NC}"
+mkdir -p /tmp/empty
+
+# Fix data directory permissions for dev
+echo -e "${BLUE}🔧 Setting up data directory permissions...${NC}"
+mkdir -p data
+sudo chown -R $USER:$USER data/ 2>/dev/null || chown -R $USER:$USER data/
+
 # Build and start container
 echo -e "${BLUE}🏗️  Building and starting development container...${NC}"
 echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"
@@ -104,7 +113,7 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
 else
     echo -e "${RED}❌ Container failed to start${NC}"
     echo -e "${YELLOW}🔍 Checking logs for errors...${NC}"
-    docker compose --env-file .env.dev logs --tail=20 discord-bot
+    docker compose --env-file .env.dev logs
     exit 1
 fi
 

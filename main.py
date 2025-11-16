@@ -28,7 +28,7 @@ class FancyFormatter(logging.Formatter):
     EMOJIS = {
         'DEBUG': '⚙️',
         'INFO': '✨', 
-        'WARNING': '⚠️',
+        'WARNING': '⚡',
         'ERROR': '❌',
         'CRITICAL': '💥'
     }
@@ -44,7 +44,12 @@ class FancyFormatter(logging.Formatter):
         timestamp = self.formatTime(record, '%H:%M:%S')
         
         # Generate formatted log message
-        return f"{color}{emoji} [{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
+        # Pad emoji to consistent width
+        if len(emoji) == 1:
+            emoji_padded = f"{emoji}  "  # Single char emoji + 2 spaces
+        else:
+            emoji_padded = f"{emoji} "   # Other multi char emoji + 1 space
+        return f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
 
 # Initialize enhanced logging system
 logger = logging.getLogger()
@@ -54,14 +59,27 @@ logger.setLevel(logging.INFO)
 for handler in logger.handlers[:]:
     logger.removeHandler(handler)
 
-# Install custom log formatter
+# Configure Discord.py logger to use our formatter too
+discord_logger = logging.getLogger('discord')
+for handler in discord_logger.handlers[:]:
+    discord_logger.removeHandler(handler)
+
+# Install custom log formatter - single handler for all loggers
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 
-# Configure Discord Gateway intents for bot permissions - ALL DISABLED
-intents = discord.Intents.none()
-intents.guilds = True  # Required to see servers
+# Force discord logger to use our handler and suppress intent warnings
+discord_logger.propagate = False
+discord_logger.addHandler(handler)
+discord_logger.setLevel(logging.ERROR)  # Skip warnings, only show errors from discord
+
+# Configure Discord Gateway intents for bot permissions
+intents = discord.Intents.default()
+intents.typing = False
+intents.members = True  # Required for global display names and complete user data
+intents.message_content = False
+intents.guilds = True
 intents.voice_states = True  # Required to track user voice channel changes
 
 # Initialize Discord bot instance with configuration
@@ -141,17 +159,26 @@ async def change_status():
     await bot.wait_until_ready()
 
     while not bot.is_closed():
-        server_count = len(bot.guilds)
-        total_member_count = sum(guild.member_count for guild in bot.guilds)
-        statuses = [
-            discord.Game(name=f"in {server_count} servers"),
-            discord.Game(name=f"with {total_member_count} members"),
-        ]
+        try:
+            server_count = len(bot.guilds)
+            total_member_count = sum(guild.member_count or 0 for guild in bot.guilds)
+            statuses = [
+                discord.Game(name=f"in {server_count} servers"),
+                discord.Game(name=f"with {total_member_count} members"),
+            ]
 
-        # Rotate through presence states with configured interval
-        for status in statuses:
-            await bot.change_presence(activity=status)
-            await asyncio.sleep(10)
+            # Rotate through presence states with configured interval
+            for status in statuses:
+                if bot.is_closed():
+                    return
+                await bot.change_presence(activity=status)
+                await asyncio.sleep(10)
+        except (ConnectionResetError, OSError, discord.ConnectionClosed):
+            # Connection issues during reconnection, wait and retry
+            await asyncio.sleep(30)
+        except Exception as e:
+            logging.error(f"❌ Error updating bot status: {e}")
+            await asyncio.sleep(60)
 
 # Background task for hourly data backup
 async def periodic_backup():
@@ -164,6 +191,8 @@ async def periodic_backup():
         try:
             from cogs.stats.gamification import cozy_gamification
             
+            logging.info("")
+            logging.info("")
             logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
             
             # Process active sessions and calculate time since last save
@@ -241,9 +270,14 @@ async def periodic_backup():
                             if sound_name not in user_stats['listening_time_by_sound']:
                                 user_stats['listening_time_by_sound'][sound_name] = {
                                     'total_time': 0.0,
-                                    'session_count': 0
+                                    'session_count': 0,
+                                    'consecutive_time': 0.0
                                 }
                             user_stats['listening_time_by_sound'][sound_name]['total_time'] += session_duration
+                            # Update consecutive time during periodic backup
+                            if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
+                                user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                            user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += session_duration
                             
                             # Update tracking for logging
                             if user_id not in cozy_gamification.changes_since_save['user_listening_time']:
@@ -330,8 +364,8 @@ async def periodic_backup():
             if active_user_updates:
                 for user_id, update_info in active_user_updates.items():
                     username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-                    time_str = f'\033[36m+{format_duration(update_info["time"])}\033[0m'
-                    points_str = f' (\033[94m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
+                    time_str = f'\033[94m+{format_duration(update_info["time"])}\033[0m'
+                    points_str = f' (\033[32m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
                     logging.info(f"  👉 {time_str} for {username} ({update_info['sound']} active session){points_str}")
             
             # Save voice time data for all servers (silently)
@@ -408,7 +442,7 @@ async def check_api_endpoints():
                     # Fallback to HTTP
                     async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
-                            logging.info(f"✅ {endpoint} - healthy")
+                            logging.info(f"✨ {endpoint} - healthy")
                         else:
                             logging.error(f"❌ {endpoint} - error (status: {response.status})")
                 except:
@@ -450,6 +484,8 @@ async def on_voice_state_update(member, before, after):
             # Note all users currently in the channel
             from cogs.stats.gamification import cozy_gamification
             current_users = [m for m in after.channel.members if not m.bot]
+            logging.info("")
+            logging.info("")
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
             for user in current_users:
                 user_id = str(user.id)
@@ -485,6 +521,8 @@ async def on_voice_state_update(member, before, after):
                     guild_voice_time[guild_id] = [None, 0]
                     session_duration = 0
                     total_time = 0
+                logging.info("")
+                logging.info("")
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
                 logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
                 save_voice_time_data()
@@ -560,10 +598,14 @@ async def on_voice_state_update(member, before, after):
                 guild_state = cog.guild_states.get(guild_id_int, {})
                 if guild_state.get('is_playing') and guild_state.get('current_sound'):
                     current_sound = guild_state['current_sound']
+                    logging.info("")
+                    logging.info("")
                     logging.info(f"🔍 Found current sound {current_sound} in {cog_name} for guild {guild_id}")
                     break
         
         if current_sound:
+            # Finalize any existing sound before starting new one
+            cozy_gamification.finalize_current_sound(user_id)
             cozy_gamification.track_sound_start(user_id, current_sound)
             logging.info(f"🎵 Tracking {current_sound} for \033[35m{member.name}\033[0m")
         else:
@@ -586,6 +628,8 @@ async def on_voice_state_update(member, before, after):
             
             if final_duration > 0:
                 points_to_add = int(final_duration / 60)
+                logging.info("")
+                logging.info("")
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
@@ -625,7 +669,7 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with API: {e}')
     
-    logging.info(f'🎉 {bot.user.name} is ready and connected!')
+    logging.info(f'✨ {bot.user.name} is ready and connected!')
     
     # Synchronize application commands with Discord API
     try:
@@ -673,7 +717,8 @@ async def run_bot():
             ('cogs.stats.tops', '🏆'),
             ('cogs.stats.total', '📊'),
             ('cogs.stats.stats', '📈'),
-            ('cogs.notifications.startup_message', '📢')
+            ('cogs.notifications.startup_message', '📢'),
+            ('cogs.privacy.privacy', '🗑️')
         ]
         
         logging.info('🔧 Loading bot extensions...')

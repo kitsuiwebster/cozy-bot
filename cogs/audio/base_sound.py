@@ -193,7 +193,19 @@ class BaseSoundCog(commands.Cog):
                 voice_client = interaction.guild.voice_client
                 if voice_client and voice_client.channel:
                     current_users = [member for member in voice_client.channel.members if not member.bot]
+                    logging.info("")
+                    logging.info("")
                     logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
+                    
+                    # First, finalize current sounds for all users (calculates loyalty bonuses)
+                    for member in current_users:
+                        cozy_gamification.finalize_current_sound(str(member.id))
+                    
+                    # Then reset consecutive time for all users in this vocal when sound changes
+                    user_ids = [str(member.id) for member in current_users]
+                    cozy_gamification.reset_consecutive_time_for_guild(interaction.guild.id, user_ids)
+                    
+                    # Finally, start tracking new sound
                     for member in current_users:
                         cozy_gamification.track_sound_start(member.id, sound_filename)
                         logging.info(f"🎵 Tracking {sound_filename} for \033[35m{member.name}\033[0m")
@@ -267,6 +279,8 @@ class BaseSoundCog(commands.Cog):
         from cogs.stats.gamification import cozy_gamification
         if voice_client and voice_client.channel:
             current_users = [member for member in voice_client.channel.members if not member.bot]
+            logging.info("")
+            logging.info("")
             logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
             for member in current_users:
                 cozy_gamification.finalize_current_sound(member.id)
