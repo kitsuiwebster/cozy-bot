@@ -79,6 +79,11 @@ fi
 echo -e "${BLUE}📁 Creating required directories...${NC}"
 mkdir -p /tmp/empty
 
+# Fix data directory permissions for dev
+echo -e "${BLUE}🔧 Setting up data directory permissions...${NC}"
+mkdir -p data
+sudo chown -R $USER:$USER data/ 2>/dev/null || chown -R $USER:$USER data/
+
 # Build and start container
 echo -e "${BLUE}🏗️  Building and starting development container...${NC}"
 echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"

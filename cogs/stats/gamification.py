@@ -65,7 +65,8 @@ class CozyGamification:
                             self._migrate_to_encrypted(data)
                             return data
                 except FileNotFoundError:
-                    pass
+                    logging.info('❌ No existing unencrypted data found, starting fresh')
+                    return {}
             else:
                 # Standard JSON loading
                 with open(self.data_file, 'r') as file:
