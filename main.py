@@ -426,7 +426,7 @@ async def check_api_endpoints():
                     # Fallback to HTTP
                     async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
-                            logging.info(f"✅ {endpoint} - healthy")
+                            logging.info(f"✨ {endpoint} - healthy")
                         else:
                             logging.error(f"❌ {endpoint} - error (status: {response.status})")
                 except:
@@ -643,7 +643,7 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with API: {e}')
     
-    logging.info(f'🎉 {bot.user.name} is ready and connected!')
+    logging.info(f'✨ {bot.user.name} is ready and connected!')
     
     # Synchronize application commands with Discord API
     try:

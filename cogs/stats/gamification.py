@@ -7,6 +7,15 @@ import fcntl
 import logging
 import traceback
 
+# Import encryption utilities
+try:
+    from utils.encryption import encryption
+    ENCRYPTION_ENABLED = True
+    logging.info("🔒 Encryption enabled for data storage")
+except ImportError:
+    ENCRYPTION_ENABLED = False
+    logging.warning("⚡ Encryption disabled - install cryptography for data encryption")
+
 def colorize_points(text):
     """Colorize point values in green"""
     return f'\033[32m{text}\033[0m'
@@ -39,14 +48,34 @@ class CozyGamification:
         """Load user gamification data from persistent storage with validation"""
         try:
             os.makedirs('data', exist_ok=True)
-            with open(self.data_file, 'r') as file:
-                data = json.load(file)
-                # Validate data structure
-                if isinstance(data, dict):
+            
+            if ENCRYPTION_ENABLED:
+                # Try to load encrypted data first
+                data = encryption.load_encrypted_json(self.data_file)
+                if data:
+                    logging.info('🔒 Loaded encrypted gamification data')
                     return data
-                else:
-                    logging.warning('❌ Invalid gamification data structure, starting fresh')
-                    return {}
+                
+                # If no encrypted data, try to migrate from unencrypted
+                try:
+                    with open(self.data_file, 'r') as file:
+                        data = json.load(file)
+                        if isinstance(data, dict):
+                            logging.info('👉 Migrating unencrypted data to encrypted format...')
+                            self._migrate_to_encrypted(data)
+                            return data
+                except FileNotFoundError:
+                    pass
+            else:
+                # Standard JSON loading
+                with open(self.data_file, 'r') as file:
+                    data = json.load(file)
+                    if isinstance(data, dict):
+                        return data
+                    else:
+                        logging.warning('❌ Invalid gamification data structure, starting fresh')
+                        return {}
+                        
         except FileNotFoundError:
             logging.info('❌ No existing gamification data found, starting fresh')
             return {}
@@ -60,23 +89,75 @@ class CozyGamification:
             except Exception:
                 pass
             return {}
+        except Exception as e:
+            logging.error(f'❌ Error loading gamification data: {e}')
+            return {}
+    
+    def _migrate_to_encrypted(self, data: Dict):
+        """Migrate unencrypted data to encrypted format"""
+        try:
+            # Save as encrypted
+            encryption.save_encrypted_json(data, self.data_file)
+            # Remove old unencrypted file
+            os.remove(self.data_file)
+            logging.info('✅ Data migration to encrypted format completed')
+        except Exception as e:
+            logging.error(f'❌ Failed to migrate data to encrypted format: {e}')
     
     def load_usernames(self) -> Dict:
         """Load username cache from persistent storage"""
         try:
-            with open(self.usernames_file, 'r') as file:
-                return json.load(file)
+            if ENCRYPTION_ENABLED:
+                # Try to load encrypted usernames first
+                data = encryption.load_encrypted_json(self.usernames_file)
+                if data:
+                    logging.info('🔒 Loaded encrypted usernames cache')
+                    return data
+                
+                # If no encrypted data, try to migrate from unencrypted
+                try:
+                    with open(self.usernames_file, 'r') as file:
+                        data = json.load(file)
+                        if isinstance(data, dict):
+                            logging.info('👉 Migrating usernames to encrypted format...')
+                            self._migrate_usernames_to_encrypted(data)
+                            return data
+                except FileNotFoundError:
+                    pass
+            else:
+                # Standard JSON loading
+                with open(self.usernames_file, 'r') as file:
+                    return json.load(file)
         except FileNotFoundError:
             return {}
         except json.JSONDecodeError:
             return {}
+        except Exception as e:
+            logging.error(f'❌ Error loading usernames: {e}')
+            return {}
+    
+    def _migrate_usernames_to_encrypted(self, data: Dict):
+        """Migrate unencrypted usernames to encrypted format"""
+        try:
+            # Save as encrypted
+            encryption.save_encrypted_json(data, self.usernames_file)
+            # Remove old unencrypted file
+            os.remove(self.usernames_file)
+            logging.info('✅ Usernames migration to encrypted format completed')
+        except Exception as e:
+            logging.error(f'❌ Failed to migrate usernames to encrypted format: {e}')
     
     def save_usernames(self):
         """Save username cache to persistent storage"""
         try:
             os.makedirs('data', exist_ok=True)
-            with open(self.usernames_file, 'w') as file:
-                json.dump(self.usernames, file, indent=2)
+            if ENCRYPTION_ENABLED:
+                # Save encrypted usernames
+                encryption.save_encrypted_json(self.usernames, self.usernames_file)
+            else:
+                # Standard JSON saving
+                with open(self.usernames_file, 'w') as file:
+                    json.dump(self.usernames, file, indent=2)
         except Exception as e:
             logging.error(f'❌ Failed to save usernames: {e}')
     
@@ -119,21 +200,24 @@ class CozyGamification:
     
     def save_user_data(self, force_detailed_log=False):
         """Save user gamification data to persistent storage with atomic writes"""
-        temp_file = self.data_file + '.tmp'
-        
         # Ensure data directory exists
         os.makedirs('data', exist_ok=True)
         
         try:
-            # Write to temporary file with exclusive lock
-            with open(temp_file, 'w') as file:
-                fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-                json.dump(self.user_data, file, indent=2)
-                file.flush()
-                os.fsync(file.fileno())
-            
-            # Atomic rename to final file
-            os.rename(temp_file, self.data_file)
+            if ENCRYPTION_ENABLED:
+                # Save encrypted data
+                encryption.save_encrypted_json(self.user_data, self.data_file)
+            else:
+                # Standard JSON saving with atomic writes
+                temp_file = self.data_file + '.tmp'
+                with open(temp_file, 'w') as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+                    json.dump(self.user_data, file, indent=2)
+                    file.flush()
+                    os.fsync(file.fileno())
+                
+                # Atomic rename to final file
+                os.rename(temp_file, self.data_file)
             
             # Log changes since last save (or force detailed log for hourly backup)
             from main import format_duration

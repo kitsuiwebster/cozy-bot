@@ -114,11 +114,26 @@ class TopsCog(commands.Cog):
     async def top_sounds_command(self, interaction: discord.Interaction):
         try:
             # Load cozy points data to aggregate sound listening times
-            data_file = 'data/cozy_points.json'
+            user_data = None
+            
+            # Try to load encrypted data first
             try:
-                with open(data_file, 'r') as file:
-                    user_data = json.load(file)
-            except FileNotFoundError:
+                from utils.encryption import encryption
+                user_data = encryption.load_encrypted_json('data/cozy_points.json')
+            except ImportError:
+                pass
+            
+            # Fallback to standard JSON if encryption not available
+            if not user_data:
+                data_file = 'data/cozy_points.json'
+                try:
+                    with open(data_file, 'r') as file:
+                        user_data = json.load(file)
+                except FileNotFoundError:
+                    await interaction.response.send_message("No listening data found yet! Start playing some sounds! 🎵")
+                    return
+                    
+            if not user_data:
                 await interaction.response.send_message("No listening data found yet! Start playing some sounds! 🎵")
                 return
             
