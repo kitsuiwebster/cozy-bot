@@ -130,3 +130,4 @@ echo -e "${BLUE}📝 Useful commands:${NC}"
 echo -e "${PURPLE}👉 View logs: make logs-dev${NC}"
 echo -e "${PURPLE}👉 Stop container: make stop-dev${NC}"
 echo -e "${PURPLE}👉 Check status: make status${NC}"
+
