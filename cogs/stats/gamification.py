@@ -441,8 +441,7 @@ class CozyGamification:
         """Track when user starts listening to a sound"""
         user_stats = self.get_user_stats(user_id)
         
-        # Finalize previous sound if any
-        self.finalize_current_sound(user_id)
+        # Note: finalize_current_sound is now handled at the calling site to control timing
         
         # Start tracking new sound
         user_stats['current_sound'] = {
@@ -456,11 +455,33 @@ class CozyGamification:
         if sound_name not in user_stats['listening_time_by_sound']:
             user_stats['listening_time_by_sound'][sound_name] = {
                 'total_time': 0.0,
-                'session_count': 0
+                'session_count': 0,
+                'consecutive_time': 0.0
             }
+        
+        # Note: consecutive time reset is now handled at guild level via reset_consecutive_time_for_guild
         
         user_stats['listening_time_by_sound'][sound_name]['session_count'] += 1
         self.save_user_data()
+    
+    def reset_consecutive_time_for_guild(self, guild_id: str, users_in_vocal: List[str]):
+        """Reset consecutive time for all users in the same vocal when sound changes"""
+        reset_count = 0
+        for user_id in users_in_vocal:
+            user_id = str(user_id)
+            if user_id in self.user_data:
+                user_stats = self.user_data[user_id]
+                if 'listening_time_by_sound' in user_stats:
+                    for sound_name in user_stats['listening_time_by_sound']:
+                        if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
+                            user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                        user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                    reset_count += 1
+        
+        if reset_count > 0:
+            server_name = self.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
+            logging.info(f"🔄 Sound change: Reset consecutive time for {reset_count} users in {server_name}")
+            self.save_user_data()
     
     def finalize_current_sound(self, user_id: str):
         """Finalize current sound listening session and add time"""
@@ -483,10 +504,15 @@ class CozyGamification:
                 if sound_name not in user_stats['listening_time_by_sound']:
                     user_stats['listening_time_by_sound'][sound_name] = {
                         'total_time': 0.0,
-                        'session_count': 0
+                        'session_count': 0,
+                        'consecutive_time': 0.0  # Track consecutive session time
                     }
                 
                 user_stats['listening_time_by_sound'][sound_name]['total_time'] += duration
+                # Add to consecutive time for this sound session
+                if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
+                    user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += duration
                 user_stats['listening_time'] += duration  # Update total listening time
                 user_stats['current_sound'] = None
                 
@@ -521,17 +547,21 @@ class CozyGamification:
                 bonus_points = 0
                 
                 # Check for loyalty bonuses (30min=+50pts, 1h=+100pts, 12h=+500pts)
-                duration_minutes = duration / 60
+                # Use TOTAL CONSECUTIVE session time (including current duration)
+                consecutive_sound_time = user_stats['listening_time_by_sound'][sound_name]['consecutive_time']
+                consecutive_minutes = consecutive_sound_time / 60
+                
+                # Calculate loyalty bonuses based on consecutive time milestones
                 loyalty_bonus = 0
-                if duration_minutes >= 720:  # 12 hours
+                if consecutive_minutes >= 720:  # 12 hours
                     loyalty_bonus = 500
                     reason = f"12h loyalty bonus on {sound_name}"
                     self.add_points(user_id, 500, reason, save_data=False)
-                elif duration_minutes >= 60:  # 1 hour
+                elif consecutive_minutes >= 60:  # 1 hour
                     loyalty_bonus = 100
                     reason = f"1h loyalty bonus on {sound_name}"
                     self.add_points(user_id, 100, reason, save_data=False)
-                elif duration_minutes >= 30:  # 30 minutes
+                elif consecutive_minutes >= 30:  # 30 minutes
                     loyalty_bonus = 50
                     reason = f"30min loyalty bonus on {sound_name}"
                     self.add_points(user_id, 50, reason, save_data=False)
@@ -627,6 +657,13 @@ class CozyGamification:
             except Exception:
                 # Invalid timestamp, reset and award points
                 award_join_points = True
+        
+        # Reset consecutive time for all sounds when user joins a new session
+        if 'listening_time_by_sound' in user_stats:
+            for sound_name in user_stats['listening_time_by_sound']:
+                if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
+                    user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
         
         user_stats['sessions_joined'] += 1
         user_stats['last_join_time'] = current_time.isoformat()

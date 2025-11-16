@@ -268,9 +268,14 @@ async def periodic_backup():
                             if sound_name not in user_stats['listening_time_by_sound']:
                                 user_stats['listening_time_by_sound'][sound_name] = {
                                     'total_time': 0.0,
-                                    'session_count': 0
+                                    'session_count': 0,
+                                    'consecutive_time': 0.0
                                 }
                             user_stats['listening_time_by_sound'][sound_name]['total_time'] += session_duration
+                            # Update consecutive time during periodic backup
+                            if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
+                                user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                            user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += session_duration
                             
                             # Update tracking for logging
                             if user_id not in cozy_gamification.changes_since_save['user_listening_time']:
@@ -488,7 +493,7 @@ async def on_voice_state_update(member, before, after):
                 # Force bonus for users already present when bot joins (new session start)
                 result = cozy_gamification.join_session(user_id, user.name, force_bonus=True)
                 cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
-                logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
+                logging.info(f"✌️ USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
@@ -591,12 +596,14 @@ async def on_voice_state_update(member, before, after):
                     break
         
         if current_sound:
+            # Finalize any existing sound before starting new one
+            cozy_gamification.finalize_current_sound(user_id)
             cozy_gamification.track_sound_start(user_id, current_sound)
             logging.info(f"🎵 Tracking {current_sound} for \033[35m{member.name}\033[0m")
         else:
             logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
         
-        logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
+        logging.info(f"✌️ USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
     
     # User left the bot's channel  
     elif before.channel == bot_channel and after.channel != bot_channel:
