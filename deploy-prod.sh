@@ -152,7 +152,7 @@
     else
         echo -e "${RED}❌ Container failed to start${NC}"
         echo -e "${YELLOW}🔍 Checking logs for errors...${NC}"
-        docker compose --env-file .env.prod logs
+        docker compose --env-file .env.prod logs --tail=20 discord-bot
         exit 1
     fi
 

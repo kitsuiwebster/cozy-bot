@@ -16,7 +16,7 @@ services:
       - voice-data:/app/data
       - bot-logs:/app/logs
       # Volume conditionnel pour le développement
-      - ${DEV_CODE_MOUNT:-/tmp/empty}:/app/code:rw
+      - ${DEV_CODE_MOUNT:-/tmp/empty}:/app:rw
       # Fichier d'environnement spécifique
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
       # SSL certificates from Let's Encrypt

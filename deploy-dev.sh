@@ -75,6 +75,10 @@ else
     echo -e "${YELLOW}ℹ️  No images to clean${NC}"
 fi
 
+# Create necessary directories
+echo -e "${BLUE}📁 Creating required directories...${NC}"
+mkdir -p /tmp/empty
+
 # Build and start container
 echo -e "${BLUE}🏗️  Building and starting development container...${NC}"
 echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"
