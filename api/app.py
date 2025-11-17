@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import top_users, top_servers
+from .routes import top_users, top_servers, admin
 from .routes.stats import router as stats_router
 import logging
 
@@ -20,7 +20,7 @@ app.add_middleware(
         "http://90.60.191.159:8000",
     ],
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(top_users.router, prefix="/api", tags=["users"])
 app.include_router(top_servers.router, prefix="/api", tags=["servers"])
 app.include_router(stats_router, prefix="/api", tags=["stats"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 @app.get("/")
 async def root():
