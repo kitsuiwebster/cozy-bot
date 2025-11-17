@@ -25,6 +25,7 @@ class UserStats(BaseModel):
     level_progress: float
     sessions_joined: int
     achievements_count: int
+    favorite_sound: Optional[str] = None
 
 class TopUsersResponse(BaseModel):
     users: List[UserStats]
@@ -242,6 +243,23 @@ async def get_top_users(limit: int = None):
             # Get current valid streak (respects 24h rule)
             current_streak = cozy_gamification.get_current_streak(user_data['user_id'])
             
+            # Get favorite sound (most listened sound)
+            favorite_sound_emoji = None
+            listening_times = original_stats.get('listening_time_by_sound', {})
+            if listening_times:
+                # Find sound with most total_time
+                max_time = 0
+                favorite_sound = None
+                for sound_name, sound_data in listening_times.items():
+                    if isinstance(sound_data, dict):
+                        sound_time = sound_data.get('total_time', 0.0)
+                        if sound_time > max_time:
+                            max_time = sound_time
+                            favorite_sound = sound_name
+                
+                if favorite_sound:
+                    favorite_sound_emoji = get_sound_display_name(favorite_sound)
+            
             user_stats = UserStats(
                 user_id=user_data['user_id'],
                 username=username,
@@ -254,7 +272,8 @@ async def get_top_users(limit: int = None):
                 level=original_stats.get('level', 1),
                 level_progress=original_stats.get('level_progress', 0.0),
                 sessions_joined=original_stats.get('sessions_joined', 0),
-                achievements_count=len(original_stats.get('achievements', []))
+                achievements_count=len(original_stats.get('achievements', [])),
+                favorite_sound=favorite_sound_emoji
             )
             users.append(user_stats)
         
