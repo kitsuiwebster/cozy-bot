@@ -178,6 +178,8 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/sparkles/{sound_filename}"
             elif sound_filename.startswith('background-music'):
                 sound_path = f"cogs/audio/background_music/{sound_filename}"
+            elif sound_filename.startswith('white-noise'):
+                sound_path = f"cogs/audio/noise/{sound_filename}"
             else:
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
