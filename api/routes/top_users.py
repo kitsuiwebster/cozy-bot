@@ -124,13 +124,13 @@ def get_sound_display_name(sound_filename: str) -> str:
         'background-music01.mp3': '🎶🍃🌩️',
         'background-music02.mp3': '🎶🏺💦',
         'background-music03.mp3': '🎶🌸💦',
-        'background-music04.mp3': '🎶🌿💦'
+        'background-music04.mp3': '🎶🌿💦',
         # White noise sounds (from actual Discord buttons)
-        'white-noise00.mp3': '🤍',
+        'white-noise00.mp3': '🤍⏳🔜',
         'white-noise01.mp3': '🤍🌌🌕',
-        'white-noise02.mp3': '🤍',
-        'white-noise03.mp3': '🤍',
-        'white-noise04.mp3': '🤍',
+        'white-noise02.mp3': '🤍⏳🔜',
+        'white-noise03.mp3': '🤍⏳🔜',
+        'white-noise04.mp3': '🤍⏳🔜',
     }
     return sound_mapping.get(sound_filename, sound_filename)
 
