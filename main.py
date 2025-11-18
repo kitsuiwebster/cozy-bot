@@ -527,6 +527,19 @@ async def on_voice_state_update(member, before, after):
                 result = cozy_gamification.join_session(user_id, user.name, force_bonus=True)
                 cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
                 logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
+            
+            # RECONNECTION FIX: Immediately restart sound tracking for users already present
+            if current_users:
+                # Check if bot is currently playing audio in this guild
+                voice_client = member.guild.voice_client
+                if voice_client and voice_client.is_playing():
+                    # Reset consecutive time for all users (sound change behavior) 
+                    current_user_ids = [str(u.id) for u in current_users]
+                    cozy_gamification.reset_consecutive_time_for_guild(guild_id, current_user_ids)
+                    
+                    logging.info("🔄 RECONNECT FIX: Bot is playing audio, will restart user tracking when sound command is used")
+                else:
+                    logging.info("🔄 RECONNECT INFO: No active audio playing, users will start tracking when sound begins")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
