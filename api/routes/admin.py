@@ -11,6 +11,21 @@ from cogs.stats.gamification import cozy_gamification
 
 router = APIRouter()
 
+def get_user_id_by_username(username: str) -> Optional[str]:
+    """Find user_id by username from the usernames cache"""
+    try:
+        # Search through usernames data to find matching username
+        for user_id, user_info in cozy_gamification.usernames.items():
+            if isinstance(user_info, dict):
+                if user_info.get('username', '').lower() == username.lower():
+                    return user_id
+            elif isinstance(user_info, str):
+                if user_info.lower() == username.lower():
+                    return user_id
+        return None
+    except Exception:
+        return None
+
 # API Key validation
 async def validate_api_key(x_api_key: Optional[str] = Header(None)):
     """Validate API key from header"""
@@ -27,59 +42,66 @@ async def validate_api_key(x_api_key: Optional[str] = Header(None)):
     return True
 
 class PointsRequest(BaseModel):
-    user_id: str
+    username: str
     points: int
-    reason: Optional[str] = "Admin adjustment"
 
 class PointsResponse(BaseModel):
     success: bool
+    username: str
     user_id: str
     points_added: int
     new_total: int
     message: str
 
 class TimeRequest(BaseModel):
-    user_id: str
+    username: str
     seconds: int
-    reason: Optional[str] = "Admin adjustment"
 
 class TimeResponse(BaseModel):
     success: bool
+    username: str
     user_id: str
     seconds_added: int
     new_total: float
     message: str
 
 class AddSoundRequest(BaseModel):
-    user_id: str
+    username: str
     sound_name: str
     total_time: float
     session_count: int = 1
 
 class AddSoundResponse(BaseModel):
     success: bool
+    username: str
     user_id: str
     sound_name: str
     message: str
 
 @router.post("/points", response_model=PointsResponse, dependencies=[Depends(validate_api_key)])
 async def modify_user_points(request: PointsRequest):
-    """Add or remove points from a user (protected by API key)"""
+    """Add or remove points from a user by username (protected by API key)"""
     try:
+        # Convert username to user_id
+        user_id = get_user_id_by_username(request.username)
+        if not user_id:
+            raise HTTPException(status_code=404, detail=f"User '{request.username}' not found")
+        
         # Get current user stats
-        user_stats = cozy_gamification.get_user_stats(request.user_id)
+        user_stats = cozy_gamification.get_user_stats(user_id)
         current_points = user_stats.get('total_points', 0)
         
         # Add points (can be negative to remove)
-        cozy_gamification.add_points(request.user_id, request.points, request.reason)
+        cozy_gamification.add_points(user_id, request.points, "Admin adjustment")
         
         # Get updated stats
-        updated_stats = cozy_gamification.get_user_stats(request.user_id)
+        updated_stats = cozy_gamification.get_user_stats(user_id)
         new_total = updated_stats.get('total_points', 0)
         
         return PointsResponse(
             success=True,
-            user_id=request.user_id,
+            username=request.username,
+            user_id=user_id,
             points_added=request.points,
             new_total=new_total,
             message=f"Successfully {'added' if request.points >= 0 else 'removed'} {abs(request.points)} points"
@@ -90,10 +112,15 @@ async def modify_user_points(request: PointsRequest):
 
 @router.post("/time", response_model=TimeResponse, dependencies=[Depends(validate_api_key)])
 async def modify_user_time(request: TimeRequest):
-    """Add or remove listening time (in seconds) from a user (protected by API key)"""
+    """Add or remove listening time (in seconds) from a user by username (protected by API key)"""
     try:
+        # Convert username to user_id
+        user_id = get_user_id_by_username(request.username)
+        if not user_id:
+            raise HTTPException(status_code=404, detail=f"User '{request.username}' not found")
+        
         # Get current user stats
-        user_stats = cozy_gamification.get_user_stats(request.user_id)
+        user_stats = cozy_gamification.get_user_stats(user_id)
         if user_stats is None:
             raise HTTPException(status_code=500, detail="Failed to get user stats")
         current_time = user_stats.get('listening_time', 0)
@@ -116,7 +143,8 @@ async def modify_user_time(request: TimeRequest):
         
         return TimeResponse(
             success=True,
-            user_id=request.user_id,
+            username=request.username,
+            user_id=user_id,
             seconds_added=seconds_actually_added,
             new_total=new_time,
             message=f"Successfully {'added' if request.seconds >= 0 else 'removed'} {abs(seconds_actually_added)} seconds"
@@ -172,10 +200,15 @@ async def get_all_raw_data(api_key: str = Depends(validate_api_key)):
 
 @router.post("/add-sound", response_model=AddSoundResponse, dependencies=[Depends(validate_api_key)])
 async def add_user_sound(request: AddSoundRequest):
-    """Add listening_time_by_sound data to a user manually (protected by API key)"""
+    """Add listening_time_by_sound data to a user by username (protected by API key)"""
     try:
+        # Convert username to user_id
+        user_id = get_user_id_by_username(request.username)
+        if not user_id:
+            raise HTTPException(status_code=404, detail=f"User '{request.username}' not found")
+        
         # Get user stats
-        user_stats = cozy_gamification.get_user_stats(request.user_id)
+        user_stats = cozy_gamification.get_user_stats(user_id)
         if user_stats is None:
             raise HTTPException(status_code=500, detail="Failed to get user stats")
         
@@ -195,7 +228,8 @@ async def add_user_sound(request: AddSoundRequest):
         
         return AddSoundResponse(
             success=True,
-            user_id=request.user_id,
+            username=request.username,
+            user_id=user_id,
             sound_name=request.sound_name,
             message=f"Successfully added {request.sound_name} with {request.total_time}s total time"
         )
