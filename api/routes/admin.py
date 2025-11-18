@@ -38,6 +38,18 @@ class PointsResponse(BaseModel):
     new_total: int
     message: str
 
+class TimeRequest(BaseModel):
+    user_id: str
+    seconds: int
+    reason: Optional[str] = "Admin adjustment"
+
+class TimeResponse(BaseModel):
+    success: bool
+    user_id: str
+    seconds_added: int
+    new_total: float
+    message: str
+
 @router.post("/points", response_model=PointsResponse, dependencies=[Depends(validate_api_key)])
 async def modify_user_points(request: PointsRequest):
     """Add or remove points from a user (protected by API key)"""
@@ -63,3 +75,40 @@ async def modify_user_points(request: PointsRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error modifying points: {str(e)}")
+
+@router.post("/time", response_model=TimeResponse, dependencies=[Depends(validate_api_key)])
+async def modify_user_time(request: TimeRequest):
+    """Add or remove listening time (in seconds) from a user (protected by API key)"""
+    try:
+        # Get current user stats
+        user_stats = cozy_gamification.get_user_stats(request.user_id)
+        if user_stats is None:
+            raise HTTPException(status_code=500, detail="Failed to get user stats")
+        current_time = user_stats.get('listening_time', 0)
+        
+        # Add time (can be negative to remove)
+        new_time = current_time + request.seconds
+        
+        # Prevent negative listening time
+        if new_time < 0:
+            new_time = 0
+            seconds_actually_added = -current_time
+        else:
+            seconds_actually_added = request.seconds
+        
+        # Update user stats directly
+        user_stats['listening_time'] = new_time
+        
+        # Save the changes
+        cozy_gamification.save_user_data()
+        
+        return TimeResponse(
+            success=True,
+            user_id=request.user_id,
+            seconds_added=seconds_actually_added,
+            new_total=new_time,
+            message=f"Successfully {'added' if request.seconds >= 0 else 'removed'} {abs(seconds_actually_added)} seconds"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error modifying time: {str(e)}")
