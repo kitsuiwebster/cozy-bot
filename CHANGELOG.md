@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.14] - 2025-11-18
+
+### Added
+
+- New `/credits` command displaying attribution links for all sound creators with a clean embed interface.
+
+### Fixed
+
+- Bot reconnection system properly restores user tracking sessions after timeout disconnections preventing users from disappearing from periodic saves.
+- Sound state contamination between different audio cogs (rain, music, sea, etc.) causing false duplicate playback errors.
+- User data protection against null pointer exceptions in gamification system initialization.
+
 ## [1.0.13] - 2025-11-16
 
 ### Added
