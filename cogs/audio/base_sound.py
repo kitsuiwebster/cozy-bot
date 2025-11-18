@@ -8,6 +8,9 @@ import asyncio
 import logging
 from ..stats.gamification import cozy_gamification
 
+# Global state to track which cog is currently playing in each guild
+global_playing_states = {}
+
 # Abstract base view component for audio command interfaces
 class BaseSoundView(View):
     def __init__(self, sounds, sound_labels, user_id, bot, cog_name):
@@ -73,6 +76,26 @@ class BaseSoundCog(commands.Cog):
         # Render interactive sound selection interface (bot connects when sound is chosen)
         view = BaseSoundView(self.sounds, self.sound_labels, interaction.user.id, self.bot, self.__class__.__name__)
         await interaction.followup.send(prompt_message, view=view)
+
+    def clear_other_cog_states(self, guild_id):
+        """Clear the playing state of all other audio cogs for this guild"""
+        global global_playing_states
+        
+        # Get all audio cogs from the bot
+        audio_cogs = []
+        for cog_name in self.bot.cogs:
+            cog = self.bot.get_cog(cog_name)
+            if hasattr(cog, 'guild_states') and cog != self:  # Don't clear own state
+                audio_cogs.append(cog)
+        
+        # Clear their states for this guild
+        for cog in audio_cogs:
+            if guild_id in cog.guild_states:
+                cog.guild_states[guild_id]['is_playing'] = False
+                cog.guild_states[guild_id]['current_sound'] = None
+        
+        # Update global state to track current cog
+        global_playing_states[guild_id] = self.__class__.__name__
 
     def get_guild_state(self, guild_id):
         """Retrieve or initialize guild-specific state management"""
@@ -162,6 +185,9 @@ class BaseSoundCog(commands.Cog):
                 except Exception as e:
                     await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
                     return
+        
+        # Clear states of all other audio cogs for this guild
+        self.clear_other_cog_states(interaction.guild.id)
         
         # Stop current audio and play new sound
         if voice_client.is_playing():
