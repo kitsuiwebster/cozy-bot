@@ -761,7 +761,8 @@ async def run_bot():
             ('cogs.stats.total', '📊'),
             ('cogs.stats.stats', '📈'),
             ('cogs.notifications.startup_message', '📢'),
-            ('cogs.privacy.privacy', '🗑️')
+            ('cogs.privacy.privacy', '🗑️'),
+            ('cogs.credits', '🎵')
         ]
         
         logging.info('🔧 Loading bot extensions...')
