@@ -1,0 +1,39 @@
+import discord
+from discord import app_commands
+from discord.ext import commands
+from ..base_sound import BaseSoundCog
+
+class WhiteNoiseCog(BaseSoundCog):
+    def __init__(self, bot):
+        sounds = ["white-noise00.mp3", "white-noise01.mp3", "white-noise02.mp3", "white-noise03.mp3", "white-noise04.mp3"]
+        sound_labels = {
+            "white-noise00.mp3": "🤍⏳🔜",
+            "white-noise01.mp3": "🤍🌌🌕",
+            "white-noise02.mp3": "🤍⏳🔜",
+            "white-noise03.mp3": "🤍⏳🔜",
+            "white-noise04.mp3": "🤍⏳🔜",
+        }
+        super().__init__(bot, "white-noise", sounds, sound_labels, "Play differnet types of white noises.🤍")
+
+    async def on_button_click(self, interaction):
+        """Override to add work in progress message for unavailable sounds"""
+        sound_filename = interaction.data.get('custom_id')
+        
+        # Check if this is a work in progress sound
+        wip_sounds = ["white-noise00.mp3", "white-noise02.mp3", "white-noise03.mp3", "white-noise04.mp3"]
+        if sound_filename in wip_sounds:
+            await interaction.response.send_message(
+                "🚧 **Work in Progress** 🚧\n\nThis white noise sound is currently being prepared and will be available soon!\n\nTry **🤍🌌🌕** in the meantime.", 
+                ephemeral=True
+            )
+            return
+        
+        # For available sounds, use parent method
+        await super().on_button_click(interaction)
+
+    @app_commands.command(name="white-noise", description="Play differnet types of white noises")
+    async def noise_command(self, interaction: discord.Interaction):
+        await self.play_sound_command(interaction, "Please select a white noise sound:")
+
+async def setup(bot):
+    await bot.add_cog(WhiteNoiseCog(bot))

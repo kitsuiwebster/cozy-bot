@@ -333,6 +333,35 @@ async def periodic_backup():
                     except Exception as e:
                         logging.warning(f"⚠️ Error processing active session for user {user_id}: {e}")
             
+            # RECONNECTION FIX: Restart sessions for users in voice who lost tracking
+            from cogs.stats.gamification import cozy_gamification
+            users_with_active_sessions = set()
+            for user_id, user_stats in cozy_gamification.user_data.items():
+                current_sound = user_stats.get('current_sound')
+                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                    users_with_active_sessions.add(str(user_id))
+            
+            # Find users in voice but without active sessions (lost after reconnection)
+            users_missing_sessions = users_in_voice_with_bot - users_with_active_sessions
+            if users_missing_sessions:
+                for guild in bot.guilds:
+                    if guild.voice_client and guild.voice_client.channel:
+                        guild_id = str(guild.id)
+                        # Get current sound playing in this guild
+                        from cogs.audio.base_sound import BaseSoundCog
+                        sound_cog = bot.get_cog('BaseSoundCog')
+                        if sound_cog:
+                            guild_state = sound_cog.get_guild_state(guild.id)
+                            current_guild_sound = guild_state.get('current_sound')
+                            
+                            if current_guild_sound and guild_state.get('is_playing'):
+                                # Restart sessions for users in this guild who lost tracking
+                                for member in guild.voice_client.channel.members:
+                                    if not member.bot and str(member.id) in users_missing_sessions:
+                                        cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
+                                        logging.info(f"🔄 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
+                                        users_missing_sessions.remove(str(member.id))
+            
             # Log voice time changes for servers since last save
             if guild_voice_time_changes or active_session_updates:
                 from cogs.stats.gamification import cozy_gamification
@@ -712,6 +741,7 @@ async def run_bot():
             ('cogs.audio.sea.sea', '🌊'), 
             ('cogs.audio.sparkles.sparkles', '✨'),
             ('cogs.audio.background_music.background-music', '🎵'),
+            ('cogs.audio.noise.white-noise', '🤍'),
             ('cogs.audio.stop', '🛑'),
             ('cogs.stats.profile', '🏅'),
             ('cogs.stats.tops', '🏆'),
