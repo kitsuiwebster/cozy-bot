@@ -285,6 +285,8 @@ class CozyGamification:
     def get_user_stats(self, user_id: str) -> Dict:
         """Get or create user statistics"""
         user_id = str(user_id)
+        if self.user_data is None:
+            self.user_data = {}
         if user_id not in self.user_data:
             self.user_data[user_id] = {
                 'total_points': 0,
