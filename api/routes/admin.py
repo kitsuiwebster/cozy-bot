@@ -78,6 +78,14 @@ class AddSoundResponse(BaseModel):
     sound_name: str
     message: str
 
+class DeleteUserRequest(BaseModel):
+    user_id: str
+
+class DeleteUserResponse(BaseModel):
+    success: bool
+    user_id: str
+    message: str
+
 @router.post("/points", response_model=PointsResponse, dependencies=[Depends(validate_api_key)])
 async def modify_user_points(request: PointsRequest):
     """Add or remove points from a user by username (protected by API key)"""
@@ -236,3 +244,33 @@ async def add_user_sound(request: AddSoundRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding sound data: {str(e)}")
+
+@router.delete("/user", response_model=DeleteUserResponse, dependencies=[Depends(validate_api_key)])
+async def delete_user(request: DeleteUserRequest):
+    """Delete a user completely from the database by user_id (protected by API key)"""
+    try:
+        user_id = request.user_id
+        
+        # Check if user exists in user_data
+        if user_id not in cozy_gamification.user_data:
+            raise HTTPException(status_code=404, detail=f"User with ID '{user_id}' not found")
+        
+        # Delete user from cozy_points data
+        del cozy_gamification.user_data[user_id]
+        
+        # Delete user from usernames cache
+        if user_id in cozy_gamification.usernames:
+            del cozy_gamification.usernames[user_id]
+        
+        # Save both files
+        cozy_gamification.save_user_data()
+        cozy_gamification.save_usernames()
+        
+        return DeleteUserResponse(
+            success=True,
+            user_id=user_id,
+            message=f"Successfully deleted user '{user_id}' and all associated data"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
