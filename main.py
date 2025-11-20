@@ -537,7 +537,23 @@ async def on_voice_state_update(member, before, after):
                     current_user_ids = [str(u.id) for u in current_users]
                     cozy_gamification.reset_consecutive_time_for_guild(guild_id, current_user_ids)
                     
-                    logging.info("🔄 RECONNECT FIX: Bot is playing audio, will restart user tracking when sound command is used")
+                    # Find which sound is currently playing by checking all audio cogs
+                    current_guild_sound = None
+                    for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'WhiteNoiseCog']:
+                        cog = bot.get_cog(cog_name)
+                        if cog and hasattr(cog, 'guild_states'):
+                            guild_state = cog.guild_states.get(guild_id, {})
+                            if guild_state.get('is_playing') and guild_state.get('current_sound'):
+                                current_guild_sound = guild_state['current_sound']
+                                break
+                    
+                    if current_guild_sound:
+                        # Immediately restart tracking for all users
+                        for user in current_users:
+                            cozy_gamification.track_sound_start(str(user.id), current_guild_sound)
+                            logging.info(f"🔄 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
+                    else:
+                        logging.info("🔄 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
                 else:
                     logging.info("🔄 RECONNECT INFO: No active audio playing, users will start tracking when sound begins")
 
