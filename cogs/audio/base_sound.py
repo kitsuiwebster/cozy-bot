@@ -11,6 +11,9 @@ from ..stats.gamification import cozy_gamification
 # Global state to track which cog is currently playing in each guild
 global_playing_states = {}
 
+# Global state to track current sound in each guild (survives reconnections)
+global_current_sounds = {}
+
 # Abstract base view component for audio command interfaces
 class BaseSoundView(View):
     def __init__(self, sounds, sound_labels, user_id, bot, cog_name):
@@ -216,6 +219,10 @@ class BaseSoundCog(commands.Cog):
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
                 
+                # Store globally to survive reconnections
+                global global_current_sounds
+                global_current_sounds[interaction.guild.id] = sound_filename
+                
                 # Track sound start for current users
                 from cogs.stats.gamification import cozy_gamification
                 voice_client = interaction.guild.voice_client
@@ -325,6 +332,12 @@ class BaseSoundCog(commands.Cog):
             await voice_client.disconnect()
             guild_state['is_playing'] = False
             guild_state['current_sound'] = None
+            
+            # Clear global state
+            global global_current_sounds
+            if interaction.guild.id in global_current_sounds:
+                del global_current_sounds[interaction.guild.id]
+            
             await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
         else:
             await interaction.followup.send("❌ No sound is currently playing.", ephemeral=True)

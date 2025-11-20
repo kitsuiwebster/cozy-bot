@@ -195,6 +195,24 @@ async def periodic_backup():
             logging.info("")
             logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
             
+            # DEBUG: Log all users with active sessions at start of periodic backup
+            users_with_sessions = []
+            if hasattr(cozy_gamification, 'user_data'):
+                for user_id, user_stats in cozy_gamification.user_data.items():
+                    current_sound = user_stats.get('current_sound')
+                    if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                        users_with_sessions.append(user_id)
+            logging.info(f"🔍 DEBUG: PERIODIC users with active sessions at start: {len(users_with_sessions)} - {users_with_sessions}")
+            
+            # DEBUG: Log all users currently in voice with bot
+            users_in_voice = []
+            for guild in bot.guilds:
+                if guild.voice_client and guild.voice_client.channel:
+                    current_users = [member for member in guild.voice_client.channel.members if not member.bot]
+                    for user in current_users:
+                        users_in_voice.append(str(user.id))
+            logging.info(f"🔍 DEBUG: PERIODIC users currently in voice with bot: {len(users_in_voice)} - {users_in_voice}")
+            
             # Process active sessions and calculate time since last save
             active_session_updates = {}  # {guild_id: added_time}
             active_user_updates = {}     # {user_id: {time: float, sound: str}}
@@ -237,16 +255,21 @@ async def periodic_backup():
                             users_in_voice_with_bot.add(str(member.id))
             
             # Update gamification data for active user sessions
+            logging.info(f"🔍 DEBUG: PERIODIC processing user sessions - total users in data: {len(cozy_gamification.user_data)}")
             for user_id, user_stats in cozy_gamification.user_data.items():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                    logging.info(f"🔍 DEBUG: PERIODIC processing user {user_id} with active session: {current_sound.get('name')}")
                     try:
                         # First check: is user actually in voice with bot?
                         if str(user_id) not in users_in_voice_with_bot:
                             username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
                             logging.warning(f"⚠️ Removing session for {username}: not in voice with bot")
+                            logging.info(f"🔍 DEBUG: PERIODIC user {user_id} not in voice, removing session")
                             user_stats['current_sound'] = None
                             continue
+                        
+                        logging.info(f"🔍 DEBUG: PERIODIC user {user_id} is in voice, processing session")
                         
                         start_time = datetime.fromisoformat(current_sound['start_time'])
                         session_duration = (datetime.now() - start_time).total_seconds()
@@ -537,23 +560,22 @@ async def on_voice_state_update(member, before, after):
                     current_user_ids = [str(u.id) for u in current_users]
                     cozy_gamification.reset_consecutive_time_for_guild(guild_id, current_user_ids)
                     
-                    # Find which sound is currently playing by checking all audio cogs
-                    current_guild_sound = None
-                    for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'WhiteNoiseCog']:
-                        cog = bot.get_cog(cog_name)
-                        if cog and hasattr(cog, 'guild_states'):
-                            guild_state = cog.guild_states.get(guild_id, {})
-                            if guild_state.get('is_playing') and guild_state.get('current_sound'):
-                                current_guild_sound = guild_state['current_sound']
-                                break
+                    # Get current sound from global state (survives reconnections)
+                    from cogs.audio.base_sound import global_current_sounds
+                    current_guild_sound = global_current_sounds.get(guild_id)
                     
                     if current_guild_sound:
                         # Immediately restart tracking for all users
+                        logging.info(f"🔍 DEBUG: RECONNECT attempting to restart tracking for {len(current_users)} users with sound {current_guild_sound}")
                         for user in current_users:
+                            logging.info(f"🔍 DEBUG: RECONNECT calling track_sound_start({user.id}, {current_guild_sound}) for {user.name}")
                             cozy_gamification.track_sound_start(str(user.id), current_guild_sound)
+                            logging.info(f"🔍 DEBUG: RECONNECT track_sound_start completed for {user.name}")
                             logging.info(f"🔄 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
+                        logging.info(f"🔍 DEBUG: RECONNECT all track_sound_start calls completed")
                     else:
                         logging.info("🔄 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
+                        logging.info(f"🔍 DEBUG: RECONNECT no current_guild_sound found, global_current_sounds: {global_current_sounds}")
                 else:
                     logging.info("🔄 RECONNECT INFO: No active audio playing, users will start tracking when sound begins")
 
