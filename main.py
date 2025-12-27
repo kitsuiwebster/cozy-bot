@@ -370,20 +370,17 @@ async def periodic_backup():
                 for guild in bot.guilds:
                     if guild.voice_client and guild.voice_client.channel:
                         guild_id = str(guild.id)
-                        # Get current sound playing in this guild
-                        from cogs.audio.base_sound import BaseSoundCog
-                        sound_cog = bot.get_cog('BaseSoundCog')
-                        if sound_cog:
-                            guild_state = sound_cog.get_guild_state(guild.id)
-                            current_guild_sound = guild_state.get('current_sound')
-                            
-                            if current_guild_sound and guild_state.get('is_playing'):
-                                # Restart sessions for users in this guild who lost tracking
-                                for member in guild.voice_client.channel.members:
-                                    if not member.bot and str(member.id) in users_missing_sessions:
-                                        cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
-                                        logging.info(f"🔄 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
-                                        users_missing_sessions.remove(str(member.id))
+                        # Get current sound playing in this guild from global state
+                        from cogs.audio.base_sound import global_current_sounds
+                        current_guild_sound = global_current_sounds.get(guild.id)
+                        
+                        if current_guild_sound:
+                            # Restart sessions for users in this guild who lost tracking
+                            for member in guild.voice_client.channel.members:
+                                if not member.bot and str(member.id) in users_missing_sessions:
+                                    cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
+                                    logging.info(f"🔄 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
+                                    users_missing_sessions.remove(str(member.id))
             
             # Log voice time changes for servers since last save
             if guild_voice_time_changes or active_session_updates:
@@ -562,7 +559,7 @@ async def on_voice_state_update(member, before, after):
                     
                     # Get current sound from global state (survives reconnections)
                     from cogs.audio.base_sound import global_current_sounds
-                    current_guild_sound = global_current_sounds.get(guild_id)
+                    current_guild_sound = global_current_sounds.get(int(guild_id))
                     
                     if current_guild_sound:
                         # Immediately restart tracking for all users
