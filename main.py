@@ -266,7 +266,10 @@ async def periodic_backup():
                             username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
                             logging.warning(f"⚠️ Removing session for {username}: not in voice with bot")
                             logging.info(f"🔍 DEBUG: PERIODIC user {user_id} not in voice, removing session")
-                            user_stats['current_sound'] = None
+                            
+                            # Finalize the current sound before removing session to award remaining points
+                            cozy_gamification.finalize_current_sound(user_id)
+                            logging.info(f"👉 PERIODIC CLEANUP: Finalized session for {username}")
                             continue
                         
                         logging.info(f"🔍 DEBUG: PERIODIC user {user_id} is in voice, processing session")
