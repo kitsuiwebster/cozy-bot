@@ -77,7 +77,7 @@ discord_logger.setLevel(logging.ERROR)  # Skip warnings, only show errors from d
 # Configure Discord Gateway intents for bot permissions
 intents = discord.Intents.default()
 intents.typing = False
-intents.members = True  # Required for global display names and complete user data
+intents.members = False  # Test: Désactivé pour voir si le bot fonctionne toujours
 intents.message_content = False
 intents.guilds = True
 intents.voice_states = True  # Required to track user voice channel changes

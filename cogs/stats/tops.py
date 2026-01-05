@@ -97,11 +97,11 @@ class TopsCog(commands.Cog):
             if not display_name:
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                    display_name = user.global_name or user.display_name if user else f"User {user_id[:8]}"
+                    display_name = user.global_name or user.name if user else f"User {user_id[:8]}"
                 except:
                     try:
                         user = self.bot.get_user(int(user_id))
-                        display_name = user.global_name or user.display_name if user else f"User {user_id[:8]}"
+                        display_name = user.global_name or user.name if user else f"User {user_id[:8]}"
                     except:
                         display_name = f"User {user_id[:8]}"
             
