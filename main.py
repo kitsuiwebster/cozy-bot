@@ -154,6 +154,9 @@ guild_voice_time_changes = {}  # {guild_id: added_seconds_since_last_save}
 # Initialize user voice session tracking - with accumulated time
 user_voice_sessions = {}  # {guild_id: {bot_start_time: datetime, users: {user_id: {join_time: datetime, accumulated_time: float}}}}
 
+# Global variable to track periodic backup task
+periodic_backup_task = None
+
 # Background task for dynamic bot presence updates
 async def change_status():
     await bot.wait_until_ready()
@@ -766,7 +769,14 @@ async def on_ready():
     
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
-    bot.loop.create_task(periodic_backup())
+    
+    # Only create periodic backup task if it doesn't exist
+    global periodic_backup_task
+    if periodic_backup_task is None or periodic_backup_task.done():
+        periodic_backup_task = bot.loop.create_task(periodic_backup())
+        logging.info('🕐 Started periodic backup task')
+    else:
+        logging.info('🕐 Periodic backup task already running')
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
