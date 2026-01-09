@@ -63,11 +63,9 @@ class DeploymentNotifier:
                     message = (
                         f"🔄 **CozyBot Update {version}**\n"
                         f"Hey {mentions_text}!\n\n"
-                        f"📢 Bot update will deploy in **{delay_seconds} seconds**\n"
-                        f"⏱️ Expected downtime: **<1 minute**\n"
-                        f"🎵 **Please restart your audio after the update!**\n"
-                        f"💡 Just use the same `/rain`, `/sea` or `/sparkles` command\n\n"
-                        f"*Thank you for your patience* ✨"
+                        f"📢 Bot update will deploy very soon\n"
+                        f"⏱️ Expected downtime: **<1 minute**\n\n"
+                        f"*Sorry for the brief disruption* ✨"
                     )
                     
                     # Find the text channel associated with the voice channel
