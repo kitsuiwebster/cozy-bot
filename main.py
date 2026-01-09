@@ -8,8 +8,9 @@ import json
 import asyncio
 import fcntl
 import aiohttp
-from utils.deployment.deployment_notifier import DeploymentNotifier
-from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
+# TEMPORARY: Disable imports to debug API issues
+# from utils.deployment.deployment_notifier import DeploymentNotifier
+# from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -788,15 +789,16 @@ async def on_ready():
     else:
         logging.info('🕐 Periodic backup task already running')
     
+    # TEMPORARY: Disable to debug API issues
     # Start deployment notifier
-    deployment_notifier = DeploymentNotifier(bot)
-    bot.loop.create_task(deployment_notifier.start_monitoring())
-    logging.info('📢 Started deployment notifier task')
+    # deployment_notifier = DeploymentNotifier(bot)
+    # bot.loop.create_task(deployment_notifier.start_monitoring())
+    # logging.info('📢 Started deployment notifier task')
     
-    # Start audio restoration monitor
-    audio_monitor = AudioRestorationMonitor(bot)
-    bot.loop.create_task(audio_monitor.start_monitoring())
-    logging.info('🎵 Started audio restoration monitor task')
+    # Start audio restoration monitor  
+    # audio_monitor = AudioRestorationMonitor(bot)
+    # bot.loop.create_task(audio_monitor.start_monitoring())
+    # logging.info('🎵 Started audio restoration monitor task')
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
