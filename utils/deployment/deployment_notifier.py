@@ -65,7 +65,7 @@ class DeploymentNotifier:
                         f"Hey {mentions_text}!\n\n"
                         f"📢 Bot update will deploy very soon\n"
                         f"⏱️ Expected downtime: **<1 minute**\n\n"
-                        f"*Sorry for the brief disruption* ✨"
+                        f"*Sorry for the brief disruption*"
                     )
                     
                     # Find the text channel associated with the voice channel
