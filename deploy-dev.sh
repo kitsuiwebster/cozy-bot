@@ -57,14 +57,14 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     # Check API health before proceeding
     echo -e "${BLUE}🔍 Checking API availability...${NC}"
     set +e
-    API_HEALTH=$(curl -s "http://localhost:8001/health" 2>/dev/null)
+    API_HEALTH=$(curl -k -s "https://localhost:8001/health" 2>/dev/null)
     API_EXIT_CODE=$?
     set -e
     
     if [ $API_EXIT_CODE -eq 0 ] && echo "$API_HEALTH" | grep -q "healthy"; then
         echo -e "${GREEN}✅ API is available${NC}"
         echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
-        NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:8001/api/deployment/simple-notify" \
+        NOTIFICATION_RESULT=$(curl -k -s -X POST "https://localhost:8001/api/deployment/simple-notify" \
         -H "Content-Type: application/json" \
         -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
         
