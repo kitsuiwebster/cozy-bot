@@ -54,19 +54,15 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     # Get current version
     VERSION=$(./utils/deployment/get-version.sh 2>/dev/null || echo "latest")
     
-    # Save current audio state before shutdown
-    echo -e "${BLUE}💾 Saving current audio state...${NC}"
-    SAVE_RESULT=$(curl -s -X POST "http://localhost:8001/api/audio/save-state" 2>/dev/null)
-    if [ $? -eq 0 ]; then
-        SESSIONS_SAVED=$(echo "$SAVE_RESULT" | grep -o '"sessions_saved":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
-        echo -e "${GREEN}✅ Saved ${SESSIONS_SAVED} active audio sessions${NC}"
-    else
-        echo -e "${YELLOW}⚠️  Could not save audio state (API unavailable)${NC}"
-    fi
+    # TEMPORARY: Skip audio restoration until API imports are fixed
+    echo -e "${YELLOW}⚠️  Audio restoration temporarily disabled${NC}"
+    echo -e "${BLUE}ℹ️  Deploying without audio restoration features${NC}"
+    SKIP_API_FEATURES=true
     
-    # Send deployment notification to active voice channels
-    echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
-    NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:8001/api/deployment/simple-notify" \
+    # Skip notifications temporarily
+    if false; then
+        echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
+        NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:8001/api/deployment/simple-notify" \
         -H "Content-Type: application/json" \
         -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
     
