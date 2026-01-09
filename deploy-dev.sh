@@ -59,46 +59,8 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     echo -e "${BLUE}ℹ️  Deploying without audio restoration features${NC}"
     SKIP_API_FEATURES=true
     
-    # Skip notifications temporarily
-    if false; then
-        echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
-        NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:8001/api/deployment/simple-notify" \
-        -H "Content-Type: application/json" \
-        -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
-    
-    if [ $? -eq 0 ]; then
-        USERS_FOUND=$(echo "$NOTIFICATION_RESULT" | grep -o '"users_found":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
-        PROCEED_IMMEDIATELY=$(echo "$NOTIFICATION_RESULT" | grep -o '"proceed_immediately":[a-z]*' | cut -d':' -f2 2>/dev/null || echo "false")
-        
-        if [ "$PROCEED_IMMEDIATELY" = "true" ]; then
-            echo -e "${GREEN}✅ No active users found, proceeding immediately${NC}"
-        elif [ "$USERS_FOUND" -gt 0 ]; then
-            echo -e "${GREEN}📢 Notification file created for ${USERS_FOUND} users${NC}"
-            echo -e "${YELLOW}⏳ Bot will handle notifications and waiting automatically...${NC}"
-            
-            # Wait for notification to be sent and delay to complete
-            echo -e "${PURPLE}⏱👉 Waiting for notification system to complete (max 60s)...${NC}"
-            FIRST_SENT_LOG=true
-            for i in {1..60}; do
-                STATUS_CHECK=$(curl -s "http://localhost:8001/api/deployment/check-status" 2>/dev/null)
-                STATUS=$(echo "$STATUS_CHECK" | grep -o '"status":"[^"]*"' | cut -d':' -f2 | tr -d '"' 2>/dev/null || echo "pending")
-                
-                if [ "$STATUS" = "complete" ]; then
-                    echo -e "${GREEN}✅ Notification period complete after ${i}s${NC}"
-                    break
-                elif [ "$STATUS" = "sent" ] && [ "$FIRST_SENT_LOG" = "true" ]; then
-                    echo -e "${YELLOW}📢 Notifications sent, waiting for delay period...${NC}"
-                    FIRST_SENT_LOG=false
-                fi
-                
-                sleep 1
-            done
-        else
-            echo -e "${GREEN}✅ No active users found, proceeding immediately${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠️  Could not send notifications (API unavailable), proceeding with deployment${NC}"
-    fi
+    # NOTIFICATIONS TEMPORARILY DISABLED
+    echo -e "${BLUE}📢 Notifications skipped (temporarily disabled)${NC}"
 else
     echo -e "${GREEN}✅ No existing container found${NC}"
 fi
