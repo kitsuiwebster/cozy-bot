@@ -65,7 +65,7 @@ class DeploymentNotifier:
                         f"Hey {mentions_text}!\n\n"
                         f"📢 Bot update will deploy in a few minutes\n"
                         f"⏱️ Expected downtime: **<1 minute**\n"
-                        f"✨ Sound will be back very soon"
+                        f"✨ Sound will be back very soon\n\n"
                         f"*Sorry for the brief disruption*"
                     )
                     
