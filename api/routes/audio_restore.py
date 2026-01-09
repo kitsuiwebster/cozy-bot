@@ -7,8 +7,11 @@ import logging
 # Add parent directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
+# TEMPORARY FIX: Disable audio_state_manager import until path issues resolved
 try:
-    from utils.audio.audio_state_manager import audio_state_manager
+    # from utils.audio.audio_state_manager import audio_state_manager
+    audio_state_manager = None  # Temporarily disabled
+    logging.warning("Audio state manager temporarily disabled due to import issues")
 except ImportError as e:
     logging.error(f"Failed to import audio_state_manager: {e}")
     audio_state_manager = None

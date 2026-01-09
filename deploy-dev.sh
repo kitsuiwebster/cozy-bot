@@ -54,13 +54,34 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     # Get current version
     VERSION=$(./utils/deployment/get-version.sh 2>/dev/null || echo "latest")
     
-    # TEMPORARY: Skip audio restoration until API imports are fixed
-    echo -e "${YELLOW}⚠️  Audio restoration temporarily disabled${NC}"
-    echo -e "${BLUE}ℹ️  Deploying without audio restoration features${NC}"
-    SKIP_API_FEATURES=true
+    # Check API health before proceeding
+    echo -e "${BLUE}🔍 Checking API availability...${NC}"
+    set +e
+    API_HEALTH=$(curl -s "http://localhost:8001/health" 2>/dev/null)
+    API_EXIT_CODE=$?
+    set -e
     
-    # NOTIFICATIONS TEMPORARILY DISABLED
-    echo -e "${BLUE}📢 Notifications skipped (temporarily disabled)${NC}"
+    if [ $API_EXIT_CODE -eq 0 ] && echo "$API_HEALTH" | grep -q "healthy"; then
+        echo -e "${GREEN}✅ API is available${NC}"
+        echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
+        NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:8001/api/deployment/simple-notify" \
+        -H "Content-Type: application/json" \
+        -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
+        
+        if [ $? -eq 0 ]; then
+            USERS_FOUND=$(echo "$NOTIFICATION_RESULT" | grep -o '"users_found":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+            PROCEED_IMMEDIATELY=$(echo "$NOTIFICATION_RESULT" | grep -o '"proceed_immediately":[a-z]*' | cut -d':' -f2 2>/dev/null || echo "false")
+            
+            if [ "$PROCEED_IMMEDIATELY" = "true" ]; then
+                echo -e "${GREEN}✅ No active users found, proceeding immediately${NC}"
+            elif [ "$USERS_FOUND" -gt 0 ]; then
+                echo -e "${GREEN}📢 Notification sent to ${USERS_FOUND} users, waiting 30s...${NC}"
+                sleep 30
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️ API unavailable - proceeding without notifications${NC}"
+    fi
 else
     echo -e "${GREEN}✅ No existing container found${NC}"
 fi
