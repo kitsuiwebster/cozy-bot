@@ -387,7 +387,7 @@ async def periodic_backup():
                             for member in guild.voice_client.channel.members:
                                 if not member.bot and str(member.id) in users_missing_sessions:
                                     cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
-                                    logging.info(f"🔄 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
+                                    logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
                                     users_missing_sessions.remove(str(member.id))
             
             # Log voice time changes for servers since last save
@@ -576,10 +576,10 @@ async def on_voice_state_update(member, before, after):
                             logging.info(f"🔍 DEBUG: RECONNECT calling track_sound_start({user.id}, {current_guild_sound}) for {user.name}")
                             cozy_gamification.track_sound_start(str(user.id), current_guild_sound)
                             logging.info(f"🔍 DEBUG: RECONNECT track_sound_start completed for {user.name}")
-                            logging.info(f"🔄 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
+                            logging.info(f"👉 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
                         logging.info(f"🔍 DEBUG: RECONNECT all track_sound_start calls completed")
                     else:
-                        logging.info("🔄 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
+                        logging.info("👉 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
                         logging.info(f"🔍 DEBUG: RECONNECT no current_guild_sound found, global_current_sounds: {global_current_sounds}")
                 else:
                     logging.info("🔄 RECONNECT INFO: No active audio playing, users will start tracking when sound begins")

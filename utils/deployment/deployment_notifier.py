@@ -70,28 +70,65 @@ class DeploymentNotifier:
                         f"*Thank you for your patience* ✨"
                     )
                     
-                    # Find a suitable text channel
+                    # Find the text channel associated with the voice channel
                     target_channel = None
-                    voice_channel_name = guild_info['channel_name'].lower()
+                    voice_channel_id = int(guild_info['channel_id'])
+                    voice_channel = guild.get_channel(voice_channel_id)
                     
-                    # Look for text channels
-                    text_channels = [ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages]
+                    if voice_channel:
+                        
+                        # Method 0: Check if voice channel has a linked text channel (Discord native feature)  
+                        if hasattr(voice_channel, 'text_channel') and voice_channel.text_channel:
+                            if voice_channel.text_channel.permissions_for(guild.me).send_messages:
+                                target_channel = voice_channel.text_channel
+                                logging.info(f"🔗 Using native linked text channel: #{voice_channel.text_channel.name}")
+                        
+                        # Method 0.5: Try to send directly to voice channel (if it has integrated chat)
+                        elif not target_channel:
+                            try:
+                                if voice_channel.permissions_for(guild.me).send_messages:
+                                    target_channel = voice_channel
+                                    logging.info(f"🔗 Using voice channel with integrated text: #{voice_channel.name}")
+                            except:
+                                pass
+                        
+                        # Method 1: If voice channel is in a category, look for text channels in same category
+                        if not target_channel and voice_channel.category:
+                            category_text_channels = [ch for ch in voice_channel.category.text_channels 
+                                                    if ch.permissions_for(guild.me).send_messages]
+                            if category_text_channels:
+                                # Priority: channel with same name as voice channel
+                                voice_name = voice_channel.name.lower()
+                                for text_ch in category_text_channels:
+                                    if text_ch.name.lower() == voice_name:
+                                        target_channel = text_ch
+                                        break
+                                
+                                # Fallback: first available text channel in same category
+                                if not target_channel:
+                                    target_channel = category_text_channels[0]
+                        
+                        # Method 2: Look for text channel with same name as voice channel (server-wide)
+                        if not target_channel:
+                            voice_name = voice_channel.name.lower()
+                            for text_ch in guild.text_channels:
+                                if (text_ch.name.lower() == voice_name and 
+                                    text_ch.permissions_for(guild.me).send_messages):
+                                    target_channel = text_ch
+                                    break
                     
-                    # Priority: channel with similar name, then general, then first available
-                    for text_ch in text_channels:
-                        if any(keyword in text_ch.name.lower() for keyword in ['general', 'chat', 'main', voice_channel_name]):
-                            target_channel = text_ch
-                            break
-                    
-                    if not target_channel and text_channels:
-                        target_channel = text_channels[0]
+                    # Method 3: Fallback to any available text channel
+                    if not target_channel:
+                        available_channels = [ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages]
+                        if available_channels:
+                            target_channel = available_channels[0]
                     
                     if target_channel:
                         await target_channel.send(message)
                         notifications_sent += 1
-                        logging.info(f"📢 Notification sent to {guild.name} #{target_channel.name}")
+                        logging.info(f"📢 Notification sent to {guild.name} #{target_channel.name} (linked to voice: {voice_channel.name if voice_channel else 'unknown'})")
                     else:
-                        logging.warning(f"⚠️ No suitable text channel found in {guild.name}")
+                        logging.warning(f"⚠️ No suitable text channel found in {guild.name} for voice channel {voice_channel.name if voice_channel else 'unknown'}")
                         
                 except Exception as e:
                     logging.error(f"❌ Failed to notify guild {guild_info.get('guild_name', 'unknown')}: {e}")
