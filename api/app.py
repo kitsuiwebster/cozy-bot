@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes import top_users, top_servers, admin
 from .routes.stats import router as stats_router
 from .routes.simple_deployment import router as simple_deployment_router
-# Temporarily disable audio_restore router due to utils import issues
-# from .routes.audio_restore import router as audio_restore_router
+from .routes.audio_restore import router as audio_restore_router
 import logging
 
 # Initialize FastAPI application
@@ -33,7 +32,7 @@ app.include_router(top_servers.router, prefix="/api", tags=["servers"])
 app.include_router(stats_router, prefix="/api", tags=["stats"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(simple_deployment_router, prefix="/api", tags=["simple-deployment"])
-# app.include_router(audio_restore_router, prefix="/api", tags=["audio"])
+app.include_router(audio_restore_router, prefix="/api", tags=["audio"])
 
 @app.get("/")
 async def root():

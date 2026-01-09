@@ -9,8 +9,7 @@ import asyncio
 import fcntl
 import aiohttp
 from utils.deployment.deployment_notifier import DeploymentNotifier
-# TEMPORARY: Keep audio restoration disabled for now  
-# from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
+from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -795,9 +794,9 @@ async def on_ready():
     logging.info('📢 Started deployment notifier task')
     
     # Start audio restoration monitor  
-    # audio_monitor = AudioRestorationMonitor(bot)
-    # bot.loop.create_task(audio_monitor.start_monitoring())
-    # logging.info('🎵 Started audio restoration monitor task')
+    audio_monitor = AudioRestorationMonitor(bot)
+    bot.loop.create_task(audio_monitor.start_monitoring())
+    logging.info('🎵 Started audio restoration monitor task')
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)
