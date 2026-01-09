@@ -8,6 +8,8 @@ import json
 import asyncio
 import fcntl
 import aiohttp
+from utils.deployment.deployment_notifier import DeploymentNotifier
+from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -385,7 +387,7 @@ async def periodic_backup():
                             for member in guild.voice_client.channel.members:
                                 if not member.bot and str(member.id) in users_missing_sessions:
                                     cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
-                                    logging.info(f"🔄 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
+                                    logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
                                     users_missing_sessions.remove(str(member.id))
             
             # Log voice time changes for servers since last save
@@ -574,10 +576,10 @@ async def on_voice_state_update(member, before, after):
                             logging.info(f"🔍 DEBUG: RECONNECT calling track_sound_start({user.id}, {current_guild_sound}) for {user.name}")
                             cozy_gamification.track_sound_start(str(user.id), current_guild_sound)
                             logging.info(f"🔍 DEBUG: RECONNECT track_sound_start completed for {user.name}")
-                            logging.info(f"🔄 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
+                            logging.info(f"👉 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
                         logging.info(f"🔍 DEBUG: RECONNECT all track_sound_start calls completed")
                     else:
-                        logging.info("🔄 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
+                        logging.info("👉 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
                         logging.info(f"🔍 DEBUG: RECONNECT no current_guild_sound found, global_current_sounds: {global_current_sounds}")
                 else:
                     logging.info("🔄 RECONNECT INFO: No active audio playing, users will start tracking when sound begins")
@@ -752,6 +754,14 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with API: {e}')
     
+    # Share bot instance with audio restore API
+    try:
+        from api.routes.audio_restore import set_bot_instance as set_audio_bot_instance
+        set_audio_bot_instance(bot)
+        logging.info('🔗 Bot instance shared with audio restore API')
+    except Exception as e:
+        logging.warning(f'⚠️ Could not share bot instance with audio restore API: {e}')
+    
     logging.info(f'✨ {bot.user.name} is ready and connected!')
     
     # Synchronize application commands with Discord API
@@ -777,6 +787,16 @@ async def on_ready():
         logging.info('🕐 Started periodic backup task')
     else:
         logging.info('🕐 Periodic backup task already running')
+    
+    # Start deployment notifier
+    deployment_notifier = DeploymentNotifier(bot)
+    bot.loop.create_task(deployment_notifier.start_monitoring())
+    logging.info('📢 Started deployment notifier task')
+    
+    # Start audio restoration monitor  
+    audio_monitor = AudioRestorationMonitor(bot)
+    bot.loop.create_task(audio_monitor.start_monitoring())
+    logging.info('🎵 Started audio restoration monitor task')
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)

@@ -50,6 +50,50 @@ EXISTING_CONTAINER=$(docker ps -q --filter name=${CONTAINER_NAME} 2>/dev/null ||
 if [ ! -z "$EXISTING_CONTAINER" ]; then
     echo -e "${YELLOW}⚠️  Container ${CONTAINER_NAME} is currently running${NC}"
     echo -e "${PURPLE}👉 Container ID: ${EXISTING_CONTAINER}${NC}"
+    
+    # Get current version
+    VERSION=$(./utils/deployment/get-version.sh 2>/dev/null || echo "latest")
+    
+    # Check API health before proceeding
+    echo -e "${BLUE}🔍 Checking API availability...${NC}"
+    set +e
+    API_HEALTH=$(curl -k -s "https://localhost:8001/health" 2>/dev/null)
+    API_EXIT_CODE=$?
+    set -e
+    
+    if [ $API_EXIT_CODE -eq 0 ] && echo "$API_HEALTH" | grep -q "healthy"; then
+        echo -e "${GREEN}✅ API is available${NC}"
+        echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
+        NOTIFICATION_RESULT=$(curl -k -s -X POST "https://localhost:8001/api/deployment/simple-notify" \
+        -H "Content-Type: application/json" \
+        -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
+        
+        if [ $? -eq 0 ]; then
+            USERS_FOUND=$(echo "$NOTIFICATION_RESULT" | grep -o '"users_found":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+            PROCEED_IMMEDIATELY=$(echo "$NOTIFICATION_RESULT" | grep -o '"proceed_immediately":[a-z]*' | cut -d':' -f2 2>/dev/null || echo "false")
+            
+            if [ "$PROCEED_IMMEDIATELY" = "true" ]; then
+                echo -e "${GREEN}✅ No active users found, proceeding immediately${NC}"
+            elif [ "$USERS_FOUND" -gt 0 ]; then
+                echo -e "${GREEN}📢 Notification sent to ${USERS_FOUND} users, waiting 30s...${NC}"
+                sleep 30
+            fi
+            
+            # Save audio state before shutdown
+            echo -e "${BLUE}🎵 Saving current audio state...${NC}"
+            AUDIO_SAVE_RESULT=$(curl -k -s -X POST "https://localhost:8001/api/audio/save-state" 2>/dev/null)
+            if echo "$AUDIO_SAVE_RESULT" | grep -q '"success":true'; then
+                SESSIONS_SAVED=$(echo "$AUDIO_SAVE_RESULT" | grep -o '"sessions_saved":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+                echo -e "${GREEN}💾 Saved ${SESSIONS_SAVED} audio sessions${NC}"
+                echo -e "${BLUE}⏳ Waiting 3s for audio state to be written...${NC}"
+                sleep 3
+            else
+                echo -e "${YELLOW}⚠️ No audio sessions to save${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️ API unavailable - proceeding without notifications${NC}"
+    fi
 else
     echo -e "${GREEN}✅ No existing container found${NC}"
 fi
@@ -105,11 +149,15 @@ fi
 
 # Verify container is running
 echo -e "${BLUE}🔍 Verifying container status...${NC}"
-sleep 2
+echo -e "${BLUE}⏳ Waiting 8s for bot to fully start and process audio restoration...${NC}"
+sleep 8
 CONTAINER_STATUS=$(docker ps --filter name=${CONTAINER_NAME} --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | tail -n +2)
 if [ ! -z "$CONTAINER_STATUS" ]; then
     echo -e "${GREEN}✅ Container is running${NC}"
     echo -e "${PURPLE}👉 Status: $CONTAINER_STATUS${NC}"
+    
+    # Users have been notified to restart audio manually
+    echo -e "${GREEN}✅ Deployment complete! Users have been notified to restart audio.${NC}"
 else
     echo -e "${RED}❌ Container failed to start${NC}"
     echo -e "${YELLOW}🔍 Checking logs for errors...${NC}"
