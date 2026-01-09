@@ -8,6 +8,8 @@ import json
 import asyncio
 import fcntl
 import aiohttp
+from utils.deployment.deployment_notifier import DeploymentNotifier
+from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -752,6 +754,14 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with API: {e}')
     
+    # Share bot instance with audio restore API
+    try:
+        from api.routes.audio_restore import set_bot_instance as set_audio_bot_instance
+        set_audio_bot_instance(bot)
+        logging.info('🔗 Bot instance shared with audio restore API')
+    except Exception as e:
+        logging.warning(f'⚠️ Could not share bot instance with audio restore API: {e}')
+    
     logging.info(f'✨ {bot.user.name} is ready and connected!')
     
     # Synchronize application commands with Discord API
@@ -777,6 +787,16 @@ async def on_ready():
         logging.info('🕐 Started periodic backup task')
     else:
         logging.info('🕐 Periodic backup task already running')
+    
+    # Start deployment notifier
+    deployment_notifier = DeploymentNotifier(bot)
+    bot.loop.create_task(deployment_notifier.start_monitoring())
+    logging.info('📢 Started deployment notifier task')
+    
+    # Start audio restoration monitor
+    audio_monitor = AudioRestorationMonitor(bot)
+    bot.loop.create_task(audio_monitor.start_monitoring())
+    logging.info('🎵 Started audio restoration monitor task')
 
     # Log bot deployment statistics and connected guilds
     server_count = len(bot.guilds)

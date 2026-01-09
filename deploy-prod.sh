@@ -50,6 +50,36 @@ EXISTING_CONTAINER=$(docker ps -q --filter name=${CONTAINER_NAME} 2>/dev/null ||
 if [ ! -z "$EXISTING_CONTAINER" ]; then
     echo -e "${YELLOW}⚠️  Container ${CONTAINER_NAME} is currently running${NC}"
     echo -e "${PURPLE}👉 Container ID: ${EXISTING_CONTAINER}${NC}"
+    
+    # Get current version
+    VERSION=$(./get-version.sh 2>/dev/null || echo "latest")
+    
+    # Send deployment notification to active voice channels
+    echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
+    NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:8000/api/deployment/notify" \
+        -H "Content-Type: application/json" \
+        -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
+    
+    if [ $? -eq 0 ]; then
+        USERS_NOTIFIED=$(echo "$NOTIFICATION_RESULT" | grep -o '"users_notified":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+        CHANNELS_NOTIFIED=$(echo "$NOTIFICATION_RESULT" | grep -o '"channels_notified":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+        
+        if [ "$USERS_NOTIFIED" -gt 0 ]; then
+            echo -e "${GREEN}📢 Notified ${USERS_NOTIFIED} users in ${CHANNELS_NOTIFIED} channels${NC}"
+            echo -e "${YELLOW}⏳ Waiting 30 seconds for users to prepare...${NC}"
+            
+            # Countdown for user visibility
+            for i in {30..1}; do
+                echo -e "${PURPLE}⏱️  Deployment in ${i}s...${NC}"
+                sleep 1
+            done
+            echo -e "${GREEN}✅ Pre-deployment delay complete${NC}"
+        else
+            echo -e "${GREEN}✅ No active users found, proceeding immediately${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Could not send notifications (API unavailable), proceeding with deployment${NC}"
+    fi
 else
     echo -e "${GREEN}✅ No existing container found${NC}"
 fi

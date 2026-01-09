@@ -64,3 +64,4 @@ deploy-*.sh.backup
 
 # Autre
 repository.txt
+data/
