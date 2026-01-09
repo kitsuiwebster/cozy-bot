@@ -160,3 +160,4 @@ class DeploymentNotifier:
                 os.remove(self.notification_file)
             except:
                 pass
+
