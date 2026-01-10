@@ -79,6 +79,14 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
                 sleep 30
             fi
             
+            # Finalize user sessions before shutdown
+            echo -e "${BLUE}📊 Finalizing user sessions...${NC}"
+            SESSION_FINALIZE_RESULT=$(curl -k -s -X POST "https://localhost:8000/api/audio/finalize-sessions" 2>/dev/null)
+            if echo "$SESSION_FINALIZE_RESULT" | grep -q '"success":true'; then
+                SESSIONS_FINALIZED=$(echo "$SESSION_FINALIZE_RESULT" | grep -o '"sessions_finalized":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+                echo -e "${GREEN}📊 Finalized ${SESSIONS_FINALIZED} user sessions${NC}"
+            fi
+            
             # Save audio state before shutdown
             echo -e "${BLUE}🎵 Saving current audio state...${NC}"
             AUDIO_SAVE_RESULT=$(curl -k -s -X POST "https://localhost:8000/api/audio/save-state" 2>/dev/null)
@@ -156,8 +164,19 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     echo -e "${GREEN}✅ Container is running${NC}"
     echo -e "${PURPLE}👉 Status: $CONTAINER_STATUS${NC}"
     
-    # Users have been notified and audio should be restored automatically
-    echo -e "${GREEN}✅ Deployment complete! Users have been notified and audio restored.${NC}"
+    # Restore user sessions after deployment
+    echo -e "${BLUE}📊 Restoring user sessions...${NC}"
+    sleep 2  # Give the bot a moment to fully initialize
+    SESSION_RESTORE_RESULT=$(curl -k -s -X POST "https://localhost:8000/api/audio/restore-sessions" 2>/dev/null)
+    if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
+        SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+        echo -e "${GREEN}📊 Restored ${SESSIONS_RESTORED} user sessions${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Could not restore user sessions${NC}"
+    fi
+    
+    # Users have been notified and everything is restored
+    echo -e "${GREEN}✅ Deployment complete! Users notified, audio restored, sessions restarted.${NC}"
 else
     echo -e "${RED}❌ Container failed to start${NC}"
     echo -e "${YELLOW}🔍 Checking logs for errors...${NC}"
