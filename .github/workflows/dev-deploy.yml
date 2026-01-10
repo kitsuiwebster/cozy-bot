@@ -19,9 +19,9 @@ jobs:
           ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
       
       - name: 🚀 Deploy to Development
+        timeout-minutes: 6
         run: |
-          set +e
-          ${{ secrets.SSH_COMMAND }} <<'EOF'
+          ssh -T -o "ServerAliveInterval=5" -o "ServerAliveCountMax=1" -o "ExitOnForwardFailure=yes" -p 2248 kitsui@90.60.191.159 bash -s <<'EOF'
           set -euo pipefail
           export LC_ALL=C.UTF-8
           export LANG=C.UTF-8
@@ -42,13 +42,4 @@ jobs:
           ./deploy-dev.sh
 
           echo "✅ Development deployment completed!"
-          exit 0
           EOF
-              SSH_RC=$?
-              set -e
-              if [ "$SSH_RC" -eq 255 ]; then
-                echo "ℹ️ SSH closed after remote completion (Broken pipe). Treating as success."
-                exit 0
-              else
-                exit "$SSH_RC"
-              fi

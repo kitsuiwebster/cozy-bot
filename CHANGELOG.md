@@ -2,7 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.15] - 2026-01-10
+## [1.0.16] - 2026-01-10
+
+### Added
+
+- User session restoration system that automatically reconnects users and resumes their gamification tracking after hot deployments.
+- Session finalization endpoints to properly save voice time and award points before deployment updates.
+
+### Changed
+
+- Docker build logs now stream in real-time with intelligent filtering for improved deployment visibility.
+
+### Fixed
+
+- SSH connection hanging in CI/CD pipelines causing unnecessary 5-minute delays after successful deployments.
+- `make stop-dev` command incorrectly stopping production containers instead of only development containers.
+
+## [1.0.15] - 2026-01-09
 
 ### Added
 

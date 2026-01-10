@@ -79,6 +79,14 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
                 sleep 30
             fi
             
+            # Finalize user sessions before shutdown
+            echo -e "${BLUE}📊 Finalizing user sessions...${NC}"
+            SESSION_FINALIZE_RESULT=$(curl -k -s -X POST "https://localhost:8000/api/audio/finalize-sessions" 2>/dev/null)
+            if echo "$SESSION_FINALIZE_RESULT" | grep -q '"success":true'; then
+                SESSIONS_FINALIZED=$(echo "$SESSION_FINALIZE_RESULT" | grep -o '"sessions_finalized":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+                echo -e "${GREEN}📊 Finalized ${SESSIONS_FINALIZED} user sessions${NC}"
+            fi
+            
             # Save audio state before shutdown
             echo -e "${BLUE}🎵 Saving current audio state...${NC}"
             AUDIO_SAVE_RESULT=$(curl -k -s -X POST "https://localhost:8000/api/audio/save-state" 2>/dev/null)
@@ -133,17 +141,17 @@ echo -e "${BLUE}🏗️  Building and starting production container...${NC}"
 echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"
 echo -e "${PURPLE}👉 Source code will be mounted for live editing${NC}"
 
-BUILD_OUTPUT=$(docker compose --env-file .env.prod up -d --build 2>&1)
-if [ $? -eq 0 ]; then
+echo -e "${BLUE}🔍 Starting Docker build process...${NC}"
+docker compose --env-file .env.prod up -d --build 2>&1 | \
+  stdbuf -oL -eL grep -v "transferring context\|transferring dockerfile\|naming to docker.io" | \
+  stdbuf -oL -eL grep -E "^#|^\[|Built|Created|Started|Error|FAILED|COPY|RUN|exporting" | \
+  stdbuf -oL -eL grep -v "CACHED.*apt-get\|CACHED.*WORKDIR\|CACHED.*requirements\|CACHED.*pip install" || true
+BUILD_EXIT_CODE=${PIPESTATUS[0]}
+
+if [ $BUILD_EXIT_CODE -eq 0 ]; then
     echo -e "${GREEN}✅ Container built and started successfully${NC}"
-    
-    # Extract build information
-    if echo "$BUILD_OUTPUT" | grep -q "Built"; then
-        echo "$BUILD_OUTPUT" | grep "Built\|Created\|Started" | sed 's/^/👉 /'
-    fi
 else
-    echo -e "${RED}❌ Failed to build/start container${NC}"
-    echo "$BUILD_OUTPUT"
+    echo -e "${RED}❌ Failed to build/start container (exit code: $BUILD_EXIT_CODE)${NC}"
     exit 1
 fi
 
@@ -156,8 +164,19 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     echo -e "${GREEN}✅ Container is running${NC}"
     echo -e "${PURPLE}👉 Status: $CONTAINER_STATUS${NC}"
     
-    # Users have been notified and audio should be restored automatically
-    echo -e "${GREEN}✅ Deployment complete! Users have been notified and audio restored.${NC}"
+    # Restore user sessions after deployment
+    echo -e "${BLUE}👉 Restoring user sessions...${NC}"
+    sleep 2  # Give the bot a moment to fully initialize
+    SESSION_RESTORE_RESULT=$(curl -k -s -X POST "https://localhost:8000/api/audio/restore-sessions" 2>/dev/null)
+    if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
+        SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
+        echo -e "${GREEN}👉 Restored ${SESSIONS_RESTORED} user sessions${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Could not restore user sessions${NC}"
+    fi
+    
+    # Users have been notified and everything is restored
+    echo -e "${GREEN}✅ Deployment complete! Users notified, audio restored, sessions restarted.${NC}"
 else
     echo -e "${RED}❌ Container failed to start${NC}"
     echo -e "${YELLOW}🔍 Checking logs for errors...${NC}"
