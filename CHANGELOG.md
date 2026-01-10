@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.15] - 2026-01-10
+
+### Added
+
+- Zero-downtime hot deployment system with automatic user notifications and seamless audio restoration.
+- Pre-deployment Discord notifications sent 30 seconds before updates to all users in active voice channels.
+- Automatic audio session persistence and restoration across bot deployments using JSON state management.
+
+### Changed
+
+- Enhanced deployment scripts for both development and production environments.
+
 ## [1.0.14] - 2025-11-18
 
 ### Added

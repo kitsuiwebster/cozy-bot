@@ -64,8 +64,7 @@ class DeploymentNotifier:
                         f"🔄 **CozyBot Update {version}**\n"
                         f"Hey {mentions_text}!\n\n"
                         f"📢 Bot update will deploy in a few minutes\n"
-                        f"⏱️ Expected downtime: **<1 minute**\n"
-                        f"✨ Sound will be back very soon\n\n"
+                        f"⏱️ Sound will be paused for around **1 minute**\n\n"
                         f"*Sorry for the brief disruption*"
                     )
                     
