@@ -168,7 +168,7 @@ async def restore_user_sessions():
                         
                         # Start new session (like user joining)
                         cozy_gamification.join_session(str(member.id), member.name, force_bonus=True)
-                        cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.display_name)
+                        cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name)
                         
                         # If there's currently playing audio, start tracking it
                         # Check what sound is playing in this guild
