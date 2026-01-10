@@ -20,12 +20,7 @@ stop-prod:
 
 stop-dev:
 	@echo "🛑 Stopping development..."
-	@echo "🔍 Stopping all cozy containers (main, blue, green)..."
-	@docker stop $$(docker ps -q --filter "name=cozy-discord-bot" 2>/dev/null) 2>/dev/null || true
-	@docker rm $$(docker ps -aq --filter "name=cozy-discord-bot" 2>/dev/null) 2>/dev/null || true
-	@echo "🌐 Removing development network..."
-	@docker network rm cozy-bot-network-dev 2>/dev/null || echo "   Network already removed or not found"
-	@echo "✅ Development cleanup complete!"
+	@docker compose --env-file .env.dev down
 
 status:
 	@echo "📊 Container Status:"
