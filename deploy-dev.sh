@@ -142,12 +142,10 @@ echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"
 echo -e "${PURPLE}👉 Source code will be mounted for live editing${NC}"
 
 echo -e "${BLUE}🔍 Starting Docker build process...${NC}"
-{
-  docker compose --env-file .env.dev up -d --build 2>&1 | \
-    grep -v "transferring context\|transferring dockerfile\|naming to docker.io" | \
-    grep -E "^#|^\[|Built|Created|Started|Error|FAILED|COPY|RUN|exporting" | \
-    grep -v "CACHED.*apt-get\|CACHED.*WORKDIR\|CACHED.*requirements\|CACHED.*pip install" || true
-} | tail -40
+docker compose --env-file .env.dev up -d --build 2>&1 | \
+  stdbuf -oL -eL grep -v "transferring context\|transferring dockerfile\|naming to docker.io" | \
+  stdbuf -oL -eL grep -E "^#|^\[|Built|Created|Started|Error|FAILED|COPY|RUN|exporting" | \
+  stdbuf -oL -eL grep -v "CACHED.*apt-get\|CACHED.*WORKDIR\|CACHED.*requirements\|CACHED.*pip install" || true
 BUILD_EXIT_CODE=${PIPESTATUS[0]}
 
 if [ $BUILD_EXIT_CODE -eq 0 ]; then
