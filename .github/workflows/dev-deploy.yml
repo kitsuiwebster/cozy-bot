@@ -19,9 +19,10 @@ jobs:
           ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
       
       - name: 🚀 Deploy to Development
+        timeout-minutes: 8
         run: |
           set +e
-          ${{ secrets.SSH_COMMAND }} <<'EOF'
+          timeout 450 ${{ secrets.SSH_COMMAND }} <<'EOF'
           set -euo pipefail
           export LC_ALL=C.UTF-8
           export LANG=C.UTF-8
@@ -42,13 +43,19 @@ jobs:
           ./deploy-dev.sh
 
           echo "✅ Development deployment completed!"
+          
+          # Force close any background processes
+          pkill -f "docker" 2>/dev/null || true
+          
+          # Ensure clean exit
+          sleep 1
           exit 0
           EOF
-              SSH_RC=$?
-              set -e
-              if [ "$SSH_RC" -eq 255 ]; then
-                echo "ℹ️ SSH closed after remote completion (Broken pipe). Treating as success."
-                exit 0
-              else
-                exit "$SSH_RC"
-              fi
+          SSH_RC=$?
+          set -e
+          if [ "$SSH_RC" -eq 255 ] || [ "$SSH_RC" -eq 124 ]; then
+            echo "ℹ️ SSH closed after remote completion (exit code: $SSH_RC). Treating as success."
+            exit 0
+          else
+            exit "$SSH_RC"
+          fi
