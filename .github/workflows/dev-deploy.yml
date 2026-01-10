@@ -21,7 +21,7 @@ jobs:
       - name: 🚀 Deploy to Development
         timeout-minutes: 6
         run: |
-          ${{ secrets.SSH_COMMAND }} <<'EOF'
+          ssh -T -o "ServerAliveInterval=5" -o "ServerAliveCountMax=1" -o "ExitOnForwardFailure=yes" -p 2248 kitsui@90.60.191.159 bash -s <<'EOF'
           set -euo pipefail
           export LC_ALL=C.UTF-8
           export LANG=C.UTF-8
@@ -42,5 +42,4 @@ jobs:
           ./deploy-dev.sh
 
           echo "✅ Development deployment completed!"
-          exit 0
           EOF
