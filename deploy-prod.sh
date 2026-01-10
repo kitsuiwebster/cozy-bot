@@ -141,17 +141,14 @@ echo -e "${BLUE}🏗️  Building and starting production container...${NC}"
 echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"
 echo -e "${PURPLE}👉 Source code will be mounted for live editing${NC}"
 
-BUILD_OUTPUT=$(docker compose --env-file .env.prod up -d --build 2>&1)
-if [ $? -eq 0 ]; then
+echo -e "${BLUE}🔍 Starting Docker build process...${NC}"
+docker compose --env-file .env.prod up -d --build
+BUILD_EXIT_CODE=$?
+
+if [ $BUILD_EXIT_CODE -eq 0 ]; then
     echo -e "${GREEN}✅ Container built and started successfully${NC}"
-    
-    # Extract build information
-    if echo "$BUILD_OUTPUT" | grep -q "Built"; then
-        echo "$BUILD_OUTPUT" | grep "Built\|Created\|Started" | sed 's/^/👉 /'
-    fi
 else
-    echo -e "${RED}❌ Failed to build/start container${NC}"
-    echo "$BUILD_OUTPUT"
+    echo -e "${RED}❌ Failed to build/start container (exit code: $BUILD_EXIT_CODE)${NC}"
     exit 1
 fi
 
