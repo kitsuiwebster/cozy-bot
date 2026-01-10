@@ -81,22 +81,44 @@ async def finalize_all_sessions():
         if not bot_instance:
             raise HTTPException(status_code=503, detail="Bot instance not available")
         
+        # Import voice session tracking from main
+        import main
+        
         # Get all guilds where bot is connected to voice
         finalized_count = 0
         for guild in bot_instance.guilds:
             voice_client = guild.voice_client
             if voice_client and voice_client.channel:
+                guild_id = str(guild.id)
+                
                 # Get all users in the voice channel (except bot)
                 for member in voice_client.channel.members:
                     if not member.bot:
+                        user_id = str(member.id)
+                        
                         # Import here to avoid circular imports
                         from cogs.stats.gamification import cozy_gamification
                         
                         # Finalize their current sound session
-                        cozy_gamification.finalize_current_sound(str(member.id))
+                        cozy_gamification.finalize_current_sound(user_id)
+                        
+                        # Also finalize their voice session tracking (like user leaving)
+                        if guild_id in main.user_voice_sessions:
+                            session = main.user_voice_sessions[guild_id]
+                            if user_id in session['users']:
+                                # Calculate accumulated time like in normal leave
+                                from datetime import datetime
+                                user_session = session['users'][user_id]
+                                duration = (datetime.now() - user_session['join_time']).total_seconds()
+                                user_session['accumulated_time'] += duration
+                                
+                                # Award points for voice time
+                                result = cozy_gamification.add_listening_time(user_id, duration)
+                                logging.info(f"👉 USER FINALIZED: {member.name} session ended before deployment")
+                        
                         finalized_count += 1
                         
-        logging.info(f"🔄 Finalized {finalized_count} user sessions before deployment")
+        logging.info(f"👉 Finalized {finalized_count} user sessions before deployment")
         
         return {
             "success": True,
@@ -115,14 +137,32 @@ async def restore_user_sessions():
         if not bot_instance:
             raise HTTPException(status_code=503, detail="Bot instance not available")
         
+        # Import voice session tracking from main
+        import main
+        
         # Get all guilds where bot is connected to voice
         restored_count = 0
         for guild in bot_instance.guilds:
             voice_client = guild.voice_client
             if voice_client and voice_client.channel:
+                guild_id = str(guild.id)
+                
+                # Reinitialize voice session tracking for this guild
+                if guild_id not in main.user_voice_sessions:
+                    main.user_voice_sessions[guild_id] = {'users': {}}
+                
                 # Get all users in the voice channel (except bot)
                 for member in voice_client.channel.members:
                     if not member.bot:
+                        user_id = str(member.id)
+                        
+                        # Restore voice session tracking
+                        from datetime import datetime
+                        main.user_voice_sessions[guild_id]['users'][user_id] = {
+                            'join_time': datetime.now(),
+                            'accumulated_time': 0.0
+                        }
+                        
                         # Import here to avoid circular imports
                         from cogs.stats.gamification import cozy_gamification
                         
@@ -145,8 +185,9 @@ async def restore_user_sessions():
                             cozy_gamification.track_sound_start(str(member.id), current_sound)
                         
                         restored_count += 1
+                        logging.info(f"👉 USER RESTORED: {member.name} in {voice_client.channel.name} in {guild.name}")
                         
-        logging.info(f"🔄 Restored {restored_count} user sessions after deployment")
+        logging.info(f"👉 Restored {restored_count} user sessions after deployment")
         
         return {
             "success": True,

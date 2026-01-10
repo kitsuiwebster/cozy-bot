@@ -165,12 +165,12 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     echo -e "${PURPLE}👉 Status: $CONTAINER_STATUS${NC}"
     
     # Restore user sessions after deployment
-    echo -e "${BLUE}📊 Restoring user sessions...${NC}"
+    echo -e "${BLUE}👉 Restoring user sessions...${NC}"
     sleep 2  # Give the bot a moment to fully initialize
     SESSION_RESTORE_RESULT=$(curl -k -s -X POST "https://localhost:8001/api/audio/restore-sessions" 2>/dev/null)
     if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
         SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
-        echo -e "${GREEN}📊 Restored ${SESSIONS_RESTORED} user sessions${NC}"
+        echo -e "${GREEN}👉 Restored ${SESSIONS_RESTORED} user sessions${NC}"
     else
         echo -e "${YELLOW}⚠️ Could not restore user sessions${NC}"
     fi
