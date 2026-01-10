@@ -46,10 +46,11 @@ jobs:
           
           # Force close any background processes
           pkill -f "docker" 2>/dev/null || true
+          pkill -f "ssh" 2>/dev/null || true
           
           # Ensure clean exit
           sleep 1
-          exit 0
+          exec exit 0
           EOF
           SSH_RC=$?
           set -e

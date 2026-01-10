@@ -142,8 +142,8 @@ echo -e "${PURPLE}👉 Building with hot-reload enabled${NC}"
 echo -e "${PURPLE}👉 Source code will be mounted for live editing${NC}"
 
 echo -e "${BLUE}🔍 Starting Docker build process...${NC}"
-docker compose --env-file .env.dev up -d --build
-BUILD_EXIT_CODE=$?
+docker compose --env-file .env.dev up -d --build --quiet-pull 2>&1 | grep -E "(Built|Created|Started|✔|Error:|FAILED|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|=>)" | tail -20
+BUILD_EXIT_CODE=${PIPESTATUS[0]}
 
 if [ $BUILD_EXIT_CODE -eq 0 ]; then
     echo -e "${GREEN}✅ Container built and started successfully${NC}"
