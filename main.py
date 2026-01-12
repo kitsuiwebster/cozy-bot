@@ -553,7 +553,7 @@ async def on_voice_state_update(member, before, after):
                 # Award session join points - pass both username and display_name
                 # Force bonus for users already present when bot joins (new session start)
                 result = cozy_gamification.join_session(user_id, user.name, force_bonus=True)
-                cozy_gamification.update_username(user_id, user.name, user.global_name or user.display_name)
+                cozy_gamification.update_username(user_id, user.name, user.global_name or user.name)
                 logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
             
             # RECONNECTION FIX: Immediately restart sound tracking for users already present
@@ -672,7 +672,7 @@ async def on_voice_state_update(member, before, after):
             'accumulated_time': 0.0
         }
         result = cozy_gamification.join_session(user_id, member.name)  # real username
-        cozy_gamification.update_username(user_id, member.name, member.global_name or member.display_name)
+        cozy_gamification.update_username(user_id, member.name, member.global_name or member.name)
         
         # Check if there's a currently playing sound and assign it to the new user
         current_sound = None
@@ -740,7 +740,7 @@ async def on_ready():
     print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
     print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
     print("║                                                                 ║")
-    print("║                      Version 1.0.16                             ║")
+    print("║                      Version 1.0.17                             ║")
     print("║            by @kitsuiwebster & @BubbleXGum                      ║")
     print("║                                                                 ║")
     print("╚═════════════════════════════════════════════════════════════════╝")

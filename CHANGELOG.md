@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.17] - 2026-01-11
+
+### Fixed
+
+- Username display priority now correctly uses global_name or username fallback instead of server-specific display_name.
+
 ## [1.0.16] - 2026-01-10
 
 ### Added
