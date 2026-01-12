@@ -167,12 +167,14 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     # Restore user sessions after deployment
     echo -e "${BLUE}👉 Restoring user sessions...${NC}"
     sleep 2  # Give the bot a moment to fully initialize
-    SESSION_RESTORE_RESULT=$(curl -k -s -X POST "https://localhost:8001/api/audio/restore-sessions" 2>/dev/null)
+    set +e  # Don't exit on curl error
+    SESSION_RESTORE_RESULT=$(curl -k -s -X POST "https://localhost:8001/api/audio/restore-sessions" 2>/dev/null || echo '{}')
+    set -e  # Re-enable exit on error
     if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
         SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
         echo -e "${GREEN}👉 Restored ${SESSIONS_RESTORED} user sessions${NC}"
     else
-        echo -e "${YELLOW}⚠️ Could not restore user sessions${NC}"
+        echo -e "${YELLOW}⚠️ Could not restore user sessions (API might not be ready yet)${NC}"
     fi
     
     # Users have been notified and everything is restored
