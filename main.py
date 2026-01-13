@@ -819,11 +819,12 @@ async def run_bot():
         # Load bot command modules and register extensions
         extensions = [
             ('cogs.audio.rain.rain', '🌧️'),
-            ('cogs.audio.sea.sea', '🌊'), 
+            ('cogs.audio.sea.sea', '🌊'),
             ('cogs.audio.sparkles.sparkles', '✨'),
             ('cogs.audio.background_music.background-music', '🎵'),
             ('cogs.audio.noise.white-noise', '🤍'),
             ('cogs.audio.stop', '🛑'),
+            ('cogs.menu', '📋'),
             ('cogs.stats.profile', '🏅'),
             ('cogs.stats.tops', '🏆'),
             ('cogs.stats.total', '📊'),
