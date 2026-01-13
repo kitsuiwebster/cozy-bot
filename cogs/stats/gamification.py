@@ -614,7 +614,12 @@ class CozyGamification:
             'rain02.mp3': '🌧️⛈️💨',
             'rain03.mp3': '🌧️🏠🔥',
             'rain04.mp3': '🌧️🚗⚡',
-            # Sea sounds (from actual Discord buttons)  
+            'rain05.mp3': '🌧️🌧️🌧️',
+            'rain06.mp3': '🌧️🐦🌿',
+            'rain07.mp3': '🌧️🌧️🌧️',
+            'rain08.mp3': '🌧️🔥⛺',
+            'rain09.mp3': '🌧️🧚🏻‍♀️🌲',
+            # Sea sounds (from actual Discord buttons)
             'sea00.mp3': '🌊💧💦',
             'sea01.mp3': '🌊🕊️⛱️',
             'sea02.mp3': '🌊🏝️🌙',
@@ -631,7 +636,13 @@ class CozyGamification:
             'background-music01.mp3': '🎶🍃🌩️',
             'background-music02.mp3': '🎶🏺💦',
             'background-music03.mp3': '🎶🌸💦',
-            'background-music04.mp3': '🎶🌿💦'
+            'background-music04.mp3': '🎶🌿💦',
+            # White noise sounds (from actual Discord buttons)
+            'white-noise00.mp3': '🤍⏳🔜',
+            'white-noise01.mp3': '🤍🌌🌕',
+            'white-noise02.mp3': '🤍⏳🔜',
+            'white-noise03.mp3': '🤍⏳🔜',
+            'white-noise04.mp3': '🤍⏳🔜'
         }
         return sound_mapping.get(sound_filename, sound_filename)
     
