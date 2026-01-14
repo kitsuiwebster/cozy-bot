@@ -750,16 +750,22 @@ class CozyGamification:
         return 0
     
     def calculate_streak_bonus(self, user_id: str, listening_duration_minutes: float) -> int:
-        """Calculate streak bonus points based on current streak and listening time"""
+        """Calculate streak bonus points based on current streak and listening time
+
+        Note: Bonus is capped at 20 days for calculation, but actual streak count is unlimited
+        """
         current_streak = self.get_current_streak(user_id)
         if current_streak <= 0:
             return 0
-        
-        # +[streak days] points every 10 minutes of listening
+
+        # Cap streak at 20 for bonus calculation (actual streak in stats can be unlimited)
+        bonus_streak = min(current_streak, 20)
+
+        # +[bonus_streak] points every 10 minutes of listening
         ten_minute_periods = int(listening_duration_minutes / 10)
         if ten_minute_periods > 0:
-            return current_streak * ten_minute_periods
-        
+            return bonus_streak * ten_minute_periods
+
         return 0
     
     def check_level_achievements(self, level: int, user_stats: Dict) -> List[str]:
