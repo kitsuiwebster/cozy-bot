@@ -582,7 +582,54 @@ async def on_voice_state_update(member, before, after):
                         logging.info("👉 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
                         logging.info(f"🔍 DEBUG: RECONNECT no current_guild_sound found, global_current_sounds: {global_current_sounds}")
                 else:
-                    logging.info("🔄 RECONNECT INFO: No active audio playing, users will start tracking when sound begins")
+                    # Bot joined but no audio is playing - this is an error state
+                    # Wait 2 seconds to give audio time to start, then check again
+                    import asyncio
+                    await asyncio.sleep(2)
+
+                    # Double check if audio started in the meantime
+                    if voice_client and voice_client.is_playing():
+                        logging.info("🔄 RECONNECT INFO: Audio started after brief delay, continuing normally")
+                    else:
+                        # Still no audio - disconnect and notify user
+                        logging.warning("⚠️ RECONNECT ERROR: No audio playing after join, disconnecting bot")
+
+                        # Find a text channel to send the error message
+                        text_channel = None
+                        if member.guild.system_channel:
+                            text_channel = member.guild.system_channel
+                        else:
+                            # Try to find a general/chat channel
+                            for channel in member.guild.text_channels:
+                                if channel.permissions_for(member.guild.me).send_messages:
+                                    if 'general' in channel.name.lower() or 'chat' in channel.name.lower() or 'bot' in channel.name.lower():
+                                        text_channel = channel
+                                        break
+
+                            # Fallback to first available text channel
+                            if not text_channel:
+                                for channel in member.guild.text_channels:
+                                    if channel.permissions_for(member.guild.me).send_messages:
+                                        text_channel = channel
+                                        break
+
+                        # Send fun error message
+                        if text_channel:
+                            try:
+                                await text_channel.send(
+                                    "Oops! CozyBot encountered a hiccup and couldn't start the ambiance. "
+                                    "Please try your command again! 🌧️✨"
+                                )
+                            except Exception as e:
+                                logging.error(f"❌ Failed to send reconnect error message: {e}")
+
+                        # Disconnect the bot
+                        try:
+                            if voice_client:
+                                await voice_client.disconnect()
+                                logging.info("✅ Bot disconnected from voice channel due to no audio playing")
+                        except Exception as e:
+                            logging.error(f"❌ Failed to disconnect bot: {e}")
 
         # Bot left a voice channel
         elif before.channel is not None and after.channel is None:
