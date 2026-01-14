@@ -41,7 +41,7 @@ if ! git diff-index --quiet HEAD -- 2>/dev/null; then
 fi
 
 # Sync with remote main (force reset to avoid divergence issues)
-echo -e "${BLUE}🔄 Syncing with remote main...${NC}"
+echo -e "${BLUE}👉 Syncing with remote main...${NC}"
 git fetch origin main
 git reset --hard origin/main
 echo -e "${GREEN}✅ Synced with origin/main${NC}"
@@ -213,7 +213,7 @@ echo -e "${CYAN}🎉 Production Deployment Complete!${NC}"
 echo "================================================="
 echo -e "${GREEN}📋 Container: ${CONTAINER_NAME}${NC}"
 echo -e "${GREEN}🔗 Network: ${NETWORK_NAME}${NC}"
-echo -e "${GREEN}🔄 Hot-reload: Enabled (code changes will restart bot)${NC}"
+echo -e "${GREEN}👉 Hot-reload: Enabled (code changes will restart bot)${NC}"
 echo -e "${GREEN}💻 Environment: Production${NC}"
 echo ""
 echo -e "${BLUE}📝 Useful commands:${NC}"

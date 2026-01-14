@@ -596,7 +596,7 @@ async def on_voice_state_update(member, before, after):
 
                     # Double check if audio started in the meantime
                     if voice_client and voice_client.is_playing():
-                        logging.info("🔄 RECONNECT INFO: Audio started after brief delay, continuing normally")
+                        logging.info("👉 RECONNECT INFO: Audio started after brief delay, continuing normally")
                     else:
                         # Still no audio - disconnect and notify user
                         logging.warning("⚠️ RECONNECT ERROR: No audio playing after join, disconnecting bot")
@@ -820,7 +820,7 @@ async def on_ready():
     
     # Synchronize application commands with Discord API
     try:
-        logging.info('🔄 Syncing application commands...')
+        logging.info('👉 Syncing application commands...')
         synced = await bot.tree.sync()
         logging.info(f'✅ Synced {len(synced)} application commands!')
     except Exception as e:
