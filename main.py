@@ -440,30 +440,37 @@ async def periodic_backup():
         # Save current stats for API
         save_current_stats_for_api()
 def save_current_stats_for_api():
-    """Save current bot stats for API access"""
+    """Save current bot stats for API access (only counts users with active sounds)"""
     try:
-        total_people_with_bot = 0
+        active_listeners = 0
         servers_with_bot = 0
-        
+
+        # Count servers where bot is connected
         for guild in bot.guilds:
             voice_state = guild.voice_client
             if voice_state and voice_state.channel:
                 servers_with_bot += 1
-                for member in voice_state.channel.members:
-                    if member != bot.user:
-                        total_people_with_bot += 1
-        
+
+        # Count only users who have an active sound session
+        from cogs.stats.gamification import cozy_gamification
+        if hasattr(cozy_gamification, 'user_data'):
+            for user_id, user_stats in cozy_gamification.user_data.items():
+                current_sound = user_stats.get('current_sound')
+                # Check if user has an active sound session (with start_time)
+                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                    active_listeners += 1
+
         stats = {
-            'current_listeners': total_people_with_bot,
+            'current_listeners': active_listeners,
             'servers_with_bot': servers_with_bot,
             'total_servers': len(bot.guilds),
             'last_updated': datetime.now().isoformat()
         }
-        
+
         os.makedirs('data', exist_ok=True)
         with open('data/current_stats.json', 'w') as f:
             json.dump(stats, f, indent=2)
-            
+
     except Exception as e:
         logging.error(f'❌ Failed to save current stats: {e}')
 

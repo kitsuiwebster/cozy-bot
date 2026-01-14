@@ -34,28 +34,38 @@ def set_bot_instance(bot):
 
 @router.get("/total", response_model=TotalStats)
 async def get_total_stats():
-    """Get current statistics about active CozyBot listeners - LIVE DATA"""
+    """Get current statistics about active CozyBot listeners - LIVE DATA (only counts users with active sounds)"""
     try:
         if bot_instance is None:
             raise HTTPException(status_code=503, detail="Bot not available")
-        
-        total_people_with_bot = 0
+
+        # Count only users with active sound sessions (actually listening)
+        active_listeners = 0
         servers_with_bot = 0
-        
+
+        # Get gamification instance to check active sound sessions
+        from cogs.stats.gamification import cozy_gamification
+
+        # Count servers where bot is connected
         for guild in bot_instance.guilds:
             voice_state = guild.voice_client
             if voice_state and voice_state.channel:
                 servers_with_bot += 1
-                for member in voice_state.channel.members:
-                    if member != bot_instance.user:
-                        total_people_with_bot += 1
-        
+
+        # Count only users who have an active sound session
+        if hasattr(cozy_gamification, 'user_data'):
+            for user_id, user_stats in cozy_gamification.user_data.items():
+                current_sound = user_stats.get('current_sound')
+                # Check if user has an active sound session (with start_time)
+                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                    active_listeners += 1
+
         return TotalStats(
-            current_listeners=total_people_with_bot,
-            message=get_cozy_message(total_people_with_bot),
+            current_listeners=active_listeners,
+            message=get_cozy_message(active_listeners),
             servers_with_bot=servers_with_bot,
             total_servers=len(bot_instance.guilds)
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching total stats: {str(e)}")
