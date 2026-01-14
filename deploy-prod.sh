@@ -40,13 +40,11 @@ if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     echo -e "${YELLOW}💡 Consider committing or stashing them before deploying${NC}"
 fi
 
-# Pull latest changes from main
-echo -e "${BLUE}🔄 Pulling latest changes from main...${NC}"
-if git pull origin main 2>&1 | grep -q "Already up to date"; then
-    echo -e "${GREEN}✅ Already up to date${NC}"
-else
-    echo -e "${GREEN}✅ Pulled latest changes${NC}"
-fi
+# Sync with remote main (force reset to avoid divergence issues)
+echo -e "${BLUE}🔄 Syncing with remote main...${NC}"
+git fetch origin main
+git reset --hard origin/main
+echo -e "${GREEN}✅ Synced with origin/main${NC}"
 
 # Check Docker availability
 echo -e "${BLUE}🐳 Checking Docker availability...${NC}"
