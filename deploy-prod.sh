@@ -23,6 +23,31 @@ if [ ! -f ".env.prod" ]; then
 fi
 echo -e "${GREEN}✅ .env.prod found${NC}"
 
+# Git branch validation
+echo -e "${BLUE}🔍 Validating git branch...${NC}"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo -e "${RED}❌ Not on main branch! Currently on: ${CURRENT_BRANCH}${NC}"
+    echo -e "${YELLOW}⚠️  Production deployments must be from the main branch${NC}"
+    echo -e "${YELLOW}💡 Run: git checkout main${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ On main branch${NC}"
+
+# Check for uncommitted changes
+if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Warning: You have uncommitted changes${NC}"
+    echo -e "${YELLOW}💡 Consider committing or stashing them before deploying${NC}"
+fi
+
+# Pull latest changes from main
+echo -e "${BLUE}🔄 Pulling latest changes from main...${NC}"
+if git pull origin main 2>&1 | grep -q "Already up to date"; then
+    echo -e "${GREEN}✅ Already up to date${NC}"
+else
+    echo -e "${GREEN}✅ Pulled latest changes${NC}"
+fi
+
 # Check Docker availability
 echo -e "${BLUE}🐳 Checking Docker availability...${NC}"
 if ! command -v docker &> /dev/null; then
