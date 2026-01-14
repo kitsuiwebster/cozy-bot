@@ -442,21 +442,17 @@ class CozyGamification:
     
     def track_sound_start(self, user_id: str, sound_name: str):
         """Track when user starts listening to a sound"""
-        logging.info(f"🔍 DEBUG: track_sound_start called for user {user_id} with sound {sound_name}")
-        
         user_stats = self.get_user_stats(user_id)
-        logging.info(f"🔍 DEBUG: track_sound_start got user_stats for {user_id}")
-        
+
         # Note: finalize_current_sound is now handled at the calling site to control timing
-        
+
         # Start tracking new sound
         start_time = datetime.now().isoformat()
         user_stats['current_sound'] = {
             'name': sound_name,
             'start_time': start_time
         }
-        logging.info(f"🔍 DEBUG: track_sound_start set current_sound for {user_id}: {sound_name} at {start_time}")
-        
+
         # Initialize sound stats if not exists
         if 'listening_time_by_sound' not in user_stats:
             user_stats['listening_time_by_sound'] = {}
@@ -466,14 +462,12 @@ class CozyGamification:
                 'session_count': 0,
                 'consecutive_time': 0.0
             }
-        
+
         # Note: consecutive time reset is now handled at guild level via reset_consecutive_time_for_guild
-        
+
         user_stats['listening_time_by_sound'][sound_name]['session_count'] += 1
-        logging.info(f"🔍 DEBUG: track_sound_start incremented session_count for {user_id} {sound_name}")
-        
+
         self.save_user_data()
-        logging.info(f"🔍 DEBUG: track_sound_start completed and saved for user {user_id}")
     
     def reset_consecutive_time_for_guild(self, guild_id: str, users_in_vocal: List[str]):
         """Reset consecutive time for all users in the same vocal when sound changes"""
