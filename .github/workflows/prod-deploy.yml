@@ -32,7 +32,8 @@
             cd ~/cozy-bot
             git stash || true
             git checkout main
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
 
             echo "🚀 Running deployment script..."
             chmod +x deploy-prod.sh
