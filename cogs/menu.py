@@ -2,14 +2,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+# Cog for displaying menu of available commands and welcoming new servers
 class MenuCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Show interactive menu with all sound commands
     @app_commands.command(name="menu", description="Display all available sound commands")
     async def menu_command(self, interaction: discord.Interaction):
-        """Show interactive menu with all sound commands"""
-
         embed = discord.Embed(
             description=(
                 "**Available Commands**\n\n"
@@ -24,10 +24,9 @@ class MenuCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    # Send welcome message when bot joins a new server
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
-        """Send welcome message when bot joins a new server"""
-
         # Try to find a suitable channel to send the welcome message
         # Priority: system channel > general channel > first text channel
         target_channel = None

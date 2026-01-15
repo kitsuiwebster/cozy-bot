@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from ..base_sound import BaseSoundCog
 
+# Cog for playing sparkles sounds
 class SparklesCog(BaseSoundCog):
     def __init__(self, bot):
         sounds = ["sparkles00.mp3", "sparkles01.mp3", "sparkles02.mp3", "sparkles03.mp3", "sparkles04.mp3"]

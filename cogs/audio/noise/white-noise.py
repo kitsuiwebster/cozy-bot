@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from ..base_sound import BaseSoundCog
 
+# Cog for playing white noise sounds
 class WhiteNoiseCog(BaseSoundCog):
     def __init__(self, bot):
         sounds = ["white-noise00.mp3", "white-noise01.mp3", "white-noise02.mp3", "white-noise03.mp3", "white-noise04.mp3"]
@@ -15,8 +16,8 @@ class WhiteNoiseCog(BaseSoundCog):
         }
         super().__init__(bot, "white-noise", sounds, sound_labels, "Play differnet types of white noises.🤍")
 
+    # Override to add work in progress message for unavailable sounds
     async def on_button_click(self, interaction):
-        """Override to add work in progress message for unavailable sounds"""
         sound_filename = interaction.data.get('custom_id')
         
         # Check if this is a work in progress sound

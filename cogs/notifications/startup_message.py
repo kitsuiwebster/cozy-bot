@@ -4,14 +4,15 @@ import logging
 import os
 import json
 
+# Cog for sending startup messages to servers when bot comes online
 class StartupMessageCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.startup_message_sent = False
         
+    # Send startup message to all servers when bot is ready
     @commands.Cog.listener()
     async def on_ready(self):
-        """Send startup message to all servers when bot is ready"""
         try:
             # Only send once per bot session
             if self.startup_message_sent:
@@ -30,9 +31,9 @@ class StartupMessageCog(commands.Cog):
             logging.error(f"❌ Error in startup message on_ready: {e}")
             import traceback
             traceback.print_exc()
-    
+
+    # Check if startup messages are enabled via config file
     def is_startup_messages_enabled(self):
-        """Check if startup messages are enabled via config file"""
         try:
             config = self.load_message_config()
             # If current_message_type is null, disable startup messages
@@ -42,9 +43,9 @@ class StartupMessageCog(commands.Cog):
             return config.get("enabled", True)
         except:
             return False
-    
+
+    # Load startup message configuration from JSON file
     def load_message_config(self):
-        """Load startup message configuration from JSON file"""
         try:
             with open('cogs/notifications/config/startup_messages.json', 'r', encoding='utf-8') as file:
                 return json.load(file)
@@ -54,9 +55,9 @@ class StartupMessageCog(commands.Cog):
         except json.JSONDecodeError as e:
             logging.error(f"❌ Error parsing startup_messages.json: {e}")
             return self.get_default_config()
-    
+
+    # Get default configuration if JSON file is not available
     def get_default_config(self):
-        """Get default configuration if JSON file is not available"""
         return {
             "enabled": True,
             "messages": {
@@ -69,9 +70,9 @@ class StartupMessageCog(commands.Cog):
             },
             "current_message_type": "update"
         }
-    
+
+    # Send startup message to all servers
     async def send_startup_messages(self):
-        """Send startup message to all servers"""
         config = self.load_message_config()
         message_type = config.get("current_message_type", "update")
         
@@ -108,9 +109,9 @@ class StartupMessageCog(commands.Cog):
                 logging.error(f"❌ Failed to send startup message to {guild.name}: {e}")
         
         logging.info(f"📢 Startup messages sent: {success_count}/{total_servers} servers")
-    
+
+    # Find a suitable text channel to send the startup message
     async def find_suitable_channel(self, guild):
-        """Find a suitable text channel to send the startup message"""
         # Priority order for channel names
         preferred_channels = [
             'general',
@@ -167,9 +168,9 @@ class StartupMessageCog(commands.Cog):
             
         logging.debug(f"❌ No usable channel found in '{guild.name}'")
         return None
-    
+
+    # Format the startup message from JSON configuration
     def format_message(self, message_data):
-        """Format the startup message from JSON configuration"""
         parts = []
         
         # Add title

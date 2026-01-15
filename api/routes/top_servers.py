@@ -4,8 +4,10 @@ import json
 import os
 from pydantic import BaseModel
 
+# Initialize FastAPI router for server stats endpoints
 router = APIRouter()
 
+# Response model for individual server statistics
 class ServerStats(BaseModel):
     server_id: str
     server_name: Optional[str] = None
@@ -13,12 +15,13 @@ class ServerStats(BaseModel):
     formatted_time: str
     rank: int
 
+# Response model for top servers list
 class TopServersResponse(BaseModel):
     servers: List[ServerStats]
     total_count: int
 
+# Load voice channel usage statistics from persistent storage
 def load_voice_time_data():
-    """Load voice channel usage statistics from persistent storage"""
     data_file = 'data/voice_time_data.json'
     try:
         with open(data_file, 'r') as file:
@@ -28,8 +31,8 @@ def load_voice_time_data():
     except json.JSONDecodeError:
         return {}
 
+# Load server names cache from JSON file
 def load_servernames_data():
-    """Load server names cache from JSON file"""
     data_file = 'data/servernames.json'
     try:
         with open(data_file, 'r') as file:
@@ -39,16 +42,16 @@ def load_servernames_data():
     except json.JSONDecodeError:
         return {}
 
+# Convert seconds to human-readable duration format
 def format_time(total_seconds: int) -> str:
-    """Convert seconds to human-readable duration format"""
     days, remainder = divmod(total_seconds, 86400)
     hours, remainder = divmod(remainder, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{days}d {hours}h {minutes}m {seconds}s"
 
+# Get top servers by voice time
 @router.get("/top-servers", response_model=TopServersResponse)
 async def get_top_servers(limit: int = None):
-    """Get top servers by voice time"""
     try:
         # Load voice time and server names data
         guild_voice_time = load_voice_time_data()

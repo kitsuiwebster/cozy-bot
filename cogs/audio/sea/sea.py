@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from ..base_sound import BaseSoundCog
 
+# Cog for playing sea sounds
 class SeaCog(BaseSoundCog):
     def __init__(self, bot):
         sounds = ["sea00.mp3", "sea01.mp3", "sea02.mp3", "sea03.mp3", "sea04.mp3"]

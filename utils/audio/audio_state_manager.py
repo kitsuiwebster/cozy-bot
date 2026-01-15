@@ -4,12 +4,13 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
+# Manage saving and restoring audio state during deployments
 class AudioStateManager:
     def __init__(self):
         self.state_file = 'data/audio_restore_state.json'
-        
+
+    # Save current audio state to JSON file
     def save_current_state(self, bot_instance):
-        """Save current audio state to JSON file"""
         try:
             audio_states = []
             
@@ -53,9 +54,9 @@ class AudioStateManager:
         except Exception as e:
             logging.error(f"❌ Failed to save audio state: {e}")
             return 0
-    
+
+    # Restore audio state from JSON file
     def restore_audio_state(self, bot_instance):
-        """Restore audio state from JSON file"""
         try:
             if not os.path.exists(self.state_file):
                 logging.info("📦 No audio state file found")
@@ -113,9 +114,9 @@ class AudioStateManager:
         except Exception as e:
             logging.error(f"❌ Failed to restore audio state: {e}")
             return 0
-    
+
+    # Schedule audio restoration to happen after bot is fully ready
     def _schedule_audio_restore(self, guild_id: int, channel_id: int, sound_name: str):
-        """Schedule audio restoration to happen after bot is fully ready"""
         restore_data = {
             'guild_id': guild_id,
             'channel_id': channel_id,

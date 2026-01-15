@@ -17,26 +17,29 @@ except ImportError as e:
 # Global bot reference that will be set by the main module
 bot_instance = None
 
+# Set the bot instance for API access
 def set_bot_instance(bot):
-    """Set the bot instance for API access"""
     global bot_instance
     bot_instance = bot
 
+# Initialize FastAPI router for audio restore endpoints
 router = APIRouter()
 
+# Response model for audio state save operation
 class AudioStateResponse(BaseModel):
     success: bool
     sessions_saved: int
     message: str
 
+# Response model for audio state restore operation
 class RestoreStatusResponse(BaseModel):
     success: bool
     sessions_restored: int
     message: str
 
+# Save current audio state before deployment
 @router.post("/audio/save-state", response_model=AudioStateResponse)
 async def save_audio_state():
-    """Save current audio state before deployment"""
     try:
         if not audio_state_manager or not bot_instance:
             raise HTTPException(status_code=503, detail="Audio manager not available")
@@ -54,9 +57,9 @@ async def save_audio_state():
         logging.error(f"❌ Failed to save audio state: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save audio state: {str(e)}")
 
-@router.post("/audio/restore-state", response_model=RestoreStatusResponse) 
+# Restore audio state after deployment (manual trigger)
+@router.post("/audio/restore-state", response_model=RestoreStatusResponse)
 async def restore_audio_state():
-    """Restore audio state after deployment (manual trigger)"""
     try:
         if not audio_state_manager or not bot_instance:
             raise HTTPException(status_code=503, detail="Audio manager not available")
@@ -74,9 +77,9 @@ async def restore_audio_state():
         logging.error(f"❌ Failed to restore audio state: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to restore audio state: {str(e)}")
 
+# Finalize all active user sessions before deployment
 @router.post("/audio/finalize-sessions")
 async def finalize_all_sessions():
-    """Finalize all active user sessions before deployment"""
     try:
         if not bot_instance:
             raise HTTPException(status_code=503, detail="Bot instance not available")
@@ -130,9 +133,9 @@ async def finalize_all_sessions():
         logging.error(f"❌ Failed to finalize sessions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to finalize sessions: {str(e)}")
 
-@router.post("/audio/restore-sessions") 
+# Restore user sessions after deployment
+@router.post("/audio/restore-sessions")
 async def restore_user_sessions():
-    """Restore user sessions after deployment"""
     try:
         if not bot_instance:
             raise HTTPException(status_code=503, detail="Bot instance not available")
@@ -199,9 +202,9 @@ async def restore_user_sessions():
         logging.error(f"❌ Failed to restore sessions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to restore sessions: {str(e)}")
 
+# Get pending audio restore tasks
 @router.get("/audio/restore-tasks")
 async def get_restore_tasks():
-    """Get pending audio restore tasks"""
     try:
         import glob
         restore_files = glob.glob('data/restore_task_*.json')

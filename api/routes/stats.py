@@ -3,16 +3,18 @@ from pydantic import BaseModel
 import sys
 import os
 
+# Initialize FastAPI router for stats endpoints
 router = APIRouter()
 
+# Response model for total stats endpoint
 class TotalStats(BaseModel):
     current_listeners: int
     message: str
     servers_with_bot: int
     total_servers: int
 
+# Get cozy message based on current listener count
 def get_cozy_message(total_people: int) -> str:
-    """Get cozy message based on current listener count"""
     if total_people == 0:
         return "🌙 It's quiet right now... Join a voice channel and invite me for some cozy sounds!"
     elif total_people == 1:
@@ -27,14 +29,14 @@ def get_cozy_message(total_people: int) -> str:
 # Global bot reference that will be set by the main module
 bot_instance = None
 
+# Set the bot instance for live access
 def set_bot_instance(bot):
-    """Set the bot instance for live access"""
     global bot_instance
     bot_instance = bot
 
+# Get current statistics about active CozyBot listeners - LIVE DATA (only counts users with active sounds)
 @router.get("/total", response_model=TotalStats)
 async def get_total_stats():
-    """Get current statistics about active CozyBot listeners - LIVE DATA (only counts users with active sounds)"""
     try:
         if bot_instance is None:
             raise HTTPException(status_code=503, detail="Bot not available")

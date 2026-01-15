@@ -9,10 +9,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from cogs.stats.gamification import cozy_gamification
 
+# Initialize FastAPI router for admin endpoints
 router = APIRouter()
 
+# Find user_id by username from the usernames cache
 def get_user_id_by_username(username: str) -> Optional[str]:
-    """Find user_id by username from the usernames cache"""
     try:
         # Search through usernames data to find matching username
         for user_id, user_info in cozy_gamification.usernames.items():
@@ -26,9 +27,8 @@ def get_user_id_by_username(username: str) -> Optional[str]:
     except Exception:
         return None
 
-# API Key validation
+# Validate API key from header
 async def validate_api_key(x_api_key: Optional[str] = Header(None)):
-    """Validate API key from header"""
     expected_api_key = os.getenv("API_KEY")
     if not expected_api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
@@ -41,10 +41,12 @@ async def validate_api_key(x_api_key: Optional[str] = Header(None)):
     
     return True
 
+# Request model for points modification
 class PointsRequest(BaseModel):
     username: str
     points: int
 
+# Response model for points modification
 class PointsResponse(BaseModel):
     success: bool
     username: str
@@ -53,10 +55,12 @@ class PointsResponse(BaseModel):
     new_total: int
     message: str
 
+# Request model for listening time modification
 class TimeRequest(BaseModel):
     username: str
     seconds: int
 
+# Response model for listening time modification
 class TimeResponse(BaseModel):
     success: bool
     username: str
@@ -65,12 +69,14 @@ class TimeResponse(BaseModel):
     new_total: float
     message: str
 
+# Request model for adding sound data
 class AddSoundRequest(BaseModel):
     username: str
     sound_name: str
     total_time: float
     session_count: int = 1
 
+# Response model for adding sound data
 class AddSoundResponse(BaseModel):
     success: bool
     username: str
@@ -78,17 +84,19 @@ class AddSoundResponse(BaseModel):
     sound_name: str
     message: str
 
+# Request model for user deletion
 class DeleteUserRequest(BaseModel):
     user_id: str
 
+# Response model for user deletion
 class DeleteUserResponse(BaseModel):
     success: bool
     user_id: str
     message: str
 
+# Add or remove points from a user by username (protected by API key)
 @router.post("/points", response_model=PointsResponse, dependencies=[Depends(validate_api_key)])
 async def modify_user_points(request: PointsRequest):
-    """Add or remove points from a user by username (protected by API key)"""
     try:
         # Convert username to user_id
         user_id = get_user_id_by_username(request.username)
@@ -118,9 +126,9 @@ async def modify_user_points(request: PointsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error modifying points: {str(e)}")
 
+# Add or remove listening time (in seconds) from a user by username (protected by API key)
 @router.post("/time", response_model=TimeResponse, dependencies=[Depends(validate_api_key)])
 async def modify_user_time(request: TimeRequest):
-    """Add or remove listening time (in seconds) from a user by username (protected by API key)"""
     try:
         # Convert username to user_id
         user_id = get_user_id_by_username(request.username)
@@ -161,9 +169,9 @@ async def modify_user_time(request: TimeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error modifying time: {str(e)}")
 
+# Get raw decrypted user data for debugging (protected by API key)
 @router.get("/debug/user/{user_id}")
 async def get_raw_user_data(user_id: str, api_key: str = Depends(validate_api_key)):
-    """Get raw decrypted user data for debugging (protected by API key)"""
     try:
         # Get raw user data
         user_stats = cozy_gamification.get_user_stats(user_id)
@@ -179,9 +187,9 @@ async def get_raw_user_data(user_id: str, api_key: str = Depends(validate_api_ke
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting user data: {str(e)}")
 
+# Get all decrypted cozy_points.json data for debugging (protected by API key)
 @router.get("/debug/all-data")
 async def get_all_raw_data(api_key: str = Depends(validate_api_key)):
-    """Get all decrypted cozy_points.json data for debugging (protected by API key)"""
     try:
         # Get all raw data
         all_data = cozy_gamification.user_data
@@ -206,9 +214,9 @@ async def get_all_raw_data(api_key: str = Depends(validate_api_key)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting all data: {str(e)}")
 
+# Add listening_time_by_sound data to a user by username (protected by API key)
 @router.post("/add-sound", response_model=AddSoundResponse, dependencies=[Depends(validate_api_key)])
 async def add_user_sound(request: AddSoundRequest):
-    """Add listening_time_by_sound data to a user by username (protected by API key)"""
     try:
         # Convert username to user_id
         user_id = get_user_id_by_username(request.username)
@@ -245,9 +253,9 @@ async def add_user_sound(request: AddSoundRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding sound data: {str(e)}")
 
+# Delete a user completely from the database by user_id (protected by API key)
 @router.delete("/user", response_model=DeleteUserResponse, dependencies=[Depends(validate_api_key)])
 async def delete_user(request: DeleteUserRequest):
-    """Delete a user completely from the database by user_id (protected by API key)"""
     try:
         user_id = request.user_id
         

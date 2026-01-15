@@ -2,14 +2,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+# Cog for handling GDPR data deletion requests
 class PrivacyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Command to handle GDPR data deletion requests
     @app_commands.command(name="delete-request", description="Request deletion of your personal data")
     async def delete_request_command(self, interaction: discord.Interaction):
-        """Command to handle GDPR data deletion requests"""
-        
         # Create informative embed
         embed = discord.Embed(
             title="🗑️ Data Deletion Request",

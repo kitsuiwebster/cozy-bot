@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+# Cog for displaying link to statistics website
 class StatsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

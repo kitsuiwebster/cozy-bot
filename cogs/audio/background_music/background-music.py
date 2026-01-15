@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from ..base_sound import BaseSoundCog
 
+# Cog for playing background music
 class BackgroundMusicCog(BaseSoundCog):
     def __init__(self, bot):
         sounds = ["background-music00.mp3", "background-music01.mp3", "background-music02.mp3", "background-music03.mp3", "background-music04.mp3"]

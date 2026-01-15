@@ -4,14 +4,15 @@ import os
 import logging
 from datetime import datetime
 
+# Monitor and handle deployment notifications for active users
 class DeploymentNotifier:
     def __init__(self, bot):
         self.bot = bot
         self.notification_file = 'data/deployment_notification.json'
         self.check_interval = 2  # Check every 2 seconds
-        
+
+    # Start monitoring for deployment notifications
     async def start_monitoring(self):
-        """Start monitoring for deployment notifications"""
         await self.bot.wait_until_ready()
         
         while not self.bot.is_closed():
@@ -24,9 +25,9 @@ class DeploymentNotifier:
             except Exception as e:
                 logging.error(f"❌ Error in deployment notifier: {e}")
                 await asyncio.sleep(5)
-    
+
+    # Handle a pending deployment notification
     async def handle_deployment_notification(self):
-        """Handle a pending deployment notification"""
         try:
             with open(self.notification_file, 'r') as f:
                 data = json.load(f)

@@ -2,14 +2,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+# Cog for displaying credits for sound creators
 class CreditsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Display credits for all sound creators
     @app_commands.command(name="credits", description="View credits for all sound creators")
     async def credits_command(self, interaction: discord.Interaction):
-        """Display credits for all sound creators"""
-        
         # Create informative embed
         embed = discord.Embed(
             title="🎵 CozyBot Credits",

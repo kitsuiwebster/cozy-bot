@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from ..base_sound import BaseSoundCog
 
+# Cog for playing rain sounds
 class RainCog(BaseSoundCog):
     def __init__(self, bot):
         sounds = ["rain00.mp3", "rain01.mp3", "rain02.mp3", "rain03.mp3", "rain04.mp3", "rain05.mp3", "rain06.mp3", "rain07.mp3", "rain08.mp3", "rain09.mp3"]

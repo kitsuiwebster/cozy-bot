@@ -6,17 +6,17 @@ import json
 import os
 from datetime import datetime
 
+# Initialize FastAPI router for deployment endpoints
 router = APIRouter()
 
+# Request model for deployment notification
 class DeploymentRequest(BaseModel):
     version: str
     delay_seconds: Optional[int] = 30
 
+# Create a deployment notification file that the bot will check
 @router.post("/deployment/simple-notify")
 async def simple_deployment_notify(request: DeploymentRequest):
-    """
-    Create a deployment notification file that the bot will check
-    """
     try:
         from api.routes.stats import bot_instance
         
@@ -76,11 +76,9 @@ async def simple_deployment_notify(request: DeploymentRequest):
         logging.error(f"❌ Error creating deployment notification: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create notification: {str(e)}")
 
+# Check if deployment notification has been sent
 @router.get("/deployment/check-status")
 async def check_deployment_status():
-    """
-    Check if deployment notification has been sent
-    """
     notification_file = 'data/deployment_notification.json'
     
     if not os.path.exists(notification_file):
