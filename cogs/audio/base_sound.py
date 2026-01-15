@@ -133,10 +133,29 @@ class BaseSoundCog(commands.Cog):
         # Connect to voice channel with retry logic
         if voice_client is None:
             if user_channel:
+                # Check channel permissions before connecting
+                permissions = user_channel.permissions_for(interaction.guild.me)
+                logging.info(f"🔍 DEBUG: Channel '{user_channel.name}' (ID: {user_channel.id}) type: {user_channel.type}")
+                logging.info(f"🔍 DEBUG: Permissions - Connect: {permissions.connect}, Speak: {permissions.speak}, View: {permissions.view_channel}")
+
+                if not permissions.connect:
+                    await interaction.followup.send("❌ Bot doesn't have 'Connect' permission in this channel.", ephemeral=True)
+                    return
+
+                if not permissions.speak:
+                    await interaction.followup.send("❌ Bot doesn't have 'Speak' permission in this channel.", ephemeral=True)
+                    return
+
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
                         voice_client = await asyncio.wait_for(user_channel.connect(), timeout=20.0)
+                        logging.info(f"🔍 DEBUG: Connected to channel, voice_client.is_connected(): {voice_client.is_connected()}")
+
+                        # Wait briefly for voice state to stabilize
+                        await asyncio.sleep(0.5)
+                        logging.info(f"🔍 DEBUG: After delay, voice_client.is_connected(): {voice_client.is_connected()}")
+
                         await self.start_disconnect_timer(guild_id)
                         break
                     except asyncio.TimeoutError:
@@ -145,6 +164,7 @@ class BaseSoundCog(commands.Cog):
                             return
                         await asyncio.sleep(3)
                     except Exception as e:
+                        logging.error(f"❌ Connection attempt {attempt + 1} failed: {str(e)}")
                         if attempt == max_retries - 1:
                             await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
                             return
@@ -169,6 +189,17 @@ class BaseSoundCog(commands.Cog):
         if voice_client.is_playing():
             voice_client.stop()
 
+        # Verify voice client is properly connected before playing
+        if not voice_client:
+            await interaction.followup.send("❌ Voice client is None. This shouldn't happen - please report this bug.", ephemeral=True)
+            logging.error(f"❌ CRITICAL: voice_client is None after connection logic")
+            return
+
+        if not voice_client.is_connected():
+            await interaction.followup.send("❌ Bot appears connected but Discord reports not connected. Try disconnecting the bot and trying again.", ephemeral=True)
+            logging.error(f"❌ CRITICAL: voice_client.is_connected() is False. Channel: {voice_client.channel if hasattr(voice_client, 'channel') else 'unknown'}")
+            return
+
         # Determine sound path and start playback with FFmpeg infinite loop
         try:
             if sound_filename.startswith('rain'):
@@ -184,8 +215,10 @@ class BaseSoundCog(commands.Cog):
             else:
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
+                logging.info(f"🔍 DEBUG: About to play audio. voice_client.is_connected(): {voice_client.is_connected()}, sound_path: {sound_path}")
                 audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
                 voice_client.play(audio_source)
+                logging.info(f"🔍 DEBUG: Successfully started playing audio")
 
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
@@ -217,6 +250,10 @@ class BaseSoundCog(commands.Cog):
             else:
                 await interaction.followup.send(f"❌ Sound file not found: {sound_filename}", ephemeral=True)
         except Exception as e:
+            logging.error(f"❌ Exception during audio playback: {type(e).__name__}: {str(e)}")
+            logging.error(f"❌ voice_client state: is_connected={voice_client.is_connected() if voice_client else 'N/A'}, channel={voice_client.channel if voice_client else 'N/A'}")
+            import traceback
+            logging.error(f"❌ Traceback: {traceback.format_exc()}")
             await interaction.followup.send(f"❌ Error playing sound: {str(e)}", ephemeral=True)
 
     async def start_disconnect_timer(self, guild_id):
