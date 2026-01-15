@@ -130,6 +130,15 @@ class BaseSoundCog(commands.Cog):
 
         user_channel = guild_state.get('target_channel')
 
+        # Check if voice_client is actually connected, not just exists (fixes ghost connection bug)
+        if voice_client and not voice_client.is_connected():
+            logging.warning(f"⚠️ Ghost voice_client detected (exists but not connected). Cleaning up...")
+            try:
+                await voice_client.disconnect()
+            except:
+                pass
+            voice_client = None
+
         # Connect to voice channel with retry logic
         if voice_client is None:
             if user_channel:
@@ -254,7 +263,12 @@ class BaseSoundCog(commands.Cog):
             logging.error(f"❌ voice_client state: is_connected={voice_client.is_connected() if voice_client else 'N/A'}, channel={voice_client.channel if voice_client else 'N/A'}")
             import traceback
             logging.error(f"❌ Traceback: {traceback.format_exc()}")
-            await interaction.followup.send(f"❌ Error playing sound: {str(e)}", ephemeral=True)
+            await interaction.followup.send(
+                f"❌ **Error playing sound:** {str(e)}\n\n"
+                f"Sorry! We're aware of this issue and working on a fix. 🛠️\n"
+                f"**Try this:** Leave the voice channel, rejoin, and try again. Or try a different voice channel.",
+                ephemeral=True
+            )
 
     async def start_disconnect_timer(self, guild_id):
         guild_state = self.get_guild_state(guild_id)
