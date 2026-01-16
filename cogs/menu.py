@@ -17,7 +17,7 @@ class MenuCog(commands.Cog):
                 "🌊 `/sea` • 5 ocean sounds\n"
                 "✨ `/sparkles` • 5 magical sounds\n"
                 "🎶 `/music` • 5 background tracks\n"
-                "🤍 `/white-noise` • 5 white noise variations"
+                "🤍 `/noise` • 5 noise variations"
             ),
             color=0x2b2d31
         )

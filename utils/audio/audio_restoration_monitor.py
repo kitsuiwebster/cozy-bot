@@ -147,7 +147,7 @@ class AudioRestorationMonitor:
             'sea': 'cogs/audio/sea/', 
             'sparkles': 'cogs/audio/sparkles/',
             'background_music': 'cogs/audio/background_music/',
-            'white_noise': 'cogs/audio/noise/'
+            'noise': 'cogs/audio/noise/'
         }
         
         # Try to find the file in each category
