@@ -2,18 +2,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from ..base_sound import BaseSoundCog
+from ..sound_mappings import SOUND_LABELS
 
 # Cog for playing noise sounds
 class NoiseCog(BaseSoundCog):
     def __init__(self, bot):
         sounds = ["noise00.mp3", "noise01.mp3", "noise02.mp3", "noise03.mp3", "noise04.mp3"]
-        sound_labels = {
-            "noise00.mp3": "📡⏳🔜",
-            "noise01.mp3": "📡🤍🌌",
-            "noise02.mp3": "📡⏳🔜",
-            "noise03.mp3": "📡⏳🔜",
-            "noise04.mp3": "📡⏳🔜",
-        }
+        sound_labels = {sound: SOUND_LABELS[sound] for sound in sounds}
         super().__init__(bot, "noise", sounds, sound_labels, "Play differnet types of noises.📡")
 
     # Override to add work in progress message for unavailable sounds

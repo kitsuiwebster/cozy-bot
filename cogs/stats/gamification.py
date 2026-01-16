@@ -556,40 +556,8 @@ class CozyGamification:
         self.track_sound_start(user_id, sound_name)
     
     def get_sound_display_name(self, sound_filename: str) -> str:
-
-        sound_mapping = {
-            'rain00.mp3': '🌧️💧⚡',
-            'rain01.mp3': '🌧️🌿🌙',
-            'rain02.mp3': '🌧️⛈️💨',
-            'rain03.mp3': '🌧️🏠🔥',
-            'rain04.mp3': '🌧️🚗⚡',
-            'rain05.mp3': '🌧️🌧️🌧️',
-            'rain06.mp3': '🌧️🐦🌿',
-            'rain07.mp3': '🌧️🌧️🌧️',
-            'rain08.mp3': '🌧️🔥⛺',
-            'rain09.mp3': '🌧️🧚🏻‍♀️🌲',
-            'sea00.mp3': '🌊💧💦',
-            'sea01.mp3': '🌊🕊️⛱️',
-            'sea02.mp3': '🌊🏝️🌙',
-            'sea03.mp3': '🌊⛵🕊️',
-            'sea04.mp3': '🌊🤿🔱',
-            'sparkles00.mp3': '✨🪄⭐',
-            'sparkles01.mp3': '✨🌟💫',
-            'sparkles02.mp3': '✨🪄💎',
-            'sparkles03.mp3': '✨🌲🌙',
-            'sparkles04.mp3': '✨🪄💫',
-            'background-music00.mp3': '🎶🏛️🌙',
-            'background-music01.mp3': '🎶🍃🌩️',
-            'background-music02.mp3': '🎶🏺💦',
-            'background-music03.mp3': '🎶🌸💦',
-            'background-music04.mp3': '🎶🌿💦',
-            'noise00.mp3': '📡⏳🔜',
-            'noise01.mp3': '📡🤍🌌',
-            'noise02.mp3': '📡⏳🔜',
-            'noise03.mp3': '📡⏳🔜',
-            'noise04.mp3': '📡⏳🔜'
-        }
-        return sound_mapping.get(sound_filename, sound_filename)
+        from cogs.audio.sound_mappings import get_sound_display_name
+        return get_sound_display_name(sound_filename)
     
     def get_user_favorite_sound(self, user_id: str) -> str:
 

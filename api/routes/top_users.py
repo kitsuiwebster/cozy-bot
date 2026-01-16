@@ -103,36 +103,11 @@ class UserSoundStats(BaseModel):
     favorite_sound: Optional[str] = None
     sounds: List[SoundStats]
 
-# Convert sound filename to emoji display name
-def get_sound_display_name(sound_filename: str) -> str:
-    sound_mapping = {
-        'rain00.mp3': '🌧️💧⚡',
-        'rain01.mp3': '🌧️🌿🌙',
-        'rain02.mp3': '🌧️⛈️💨',
-        'rain03.mp3': '🌧️🏠🔥',
-        'rain04.mp3': '🌧️🚗⚡',
-        'sea00.mp3': '🌊💧💦',
-        'sea01.mp3': '🌊🕊️⛱️',
-        'sea02.mp3': '🌊🏝️🌙',
-        'sea03.mp3': '🌊⛵🕊️',
-        'sea04.mp3': '🌊🤿🔱',
-        'sparkles00.mp3': '✨🪄⭐',
-        'sparkles01.mp3': '✨🌟💫',
-        'sparkles02.mp3': '✨🪄💎',
-        'sparkles03.mp3': '✨🌲🌙',
-        'sparkles04.mp3': '✨🪄💫',
-        'background-music00.mp3': '🎶🏛️🌙',
-        'background-music01.mp3': '🎶🍃🌩️',
-        'background-music02.mp3': '🎶🏺💦',
-        'background-music03.mp3': '🎶🌸💦',
-        'background-music04.mp3': '🎶🌿💦',
-        'noise00.mp3': '📡⏳🔜',
-        'noise01.mp3': '📡🤍🌌',
-        'noise02.mp3': '📡⏳🔜',
-        'noise03.mp3': '📡⏳🔜',
-        'noise04.mp3': '📡⏳🔜',
-    }
-    return sound_mapping.get(sound_filename, sound_filename)
+# Import centralized sound mapping
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from cogs.audio.sound_mappings import get_sound_display_name
 
 # Response model for top sound statistics
 class TopSoundStats(BaseModel):
