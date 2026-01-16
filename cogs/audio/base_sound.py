@@ -407,6 +407,8 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/sparkles/{current_sound}"
             elif current_sound.startswith('background-music'):
                 sound_path = f"cogs/audio/background_music/{current_sound}"
+            elif current_sound.startswith('noise'):
+                sound_path = f"cogs/audio/noise/{current_sound}"
             else:
                 sound_path = f"cogs/audio/{current_sound}"
             
