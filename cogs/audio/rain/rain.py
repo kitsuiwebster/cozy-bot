@@ -13,9 +13,9 @@ class RainCog(BaseSoundCog):
             "rain02.mp3": "🌧️⛈️💨",
             "rain03.mp3": "🌧️🏠🔥",
             "rain04.mp3": "🌧️🚗⚡",
-            "rain05.mp3": "🌧️🌧️🌧️",
+            "rain05.mp3": "🌧️⚡🐦",
             "rain06.mp3": "🌧️🐦🌿",
-            "rain07.mp3": "🌧️🌧️🌧️",
+            "rain07.mp3": "🌧️⚡💦",
             "rain08.mp3": "🌧️🔥⛺",
             "rain09.mp3": "🌧️🧚🏻‍♀🌲",
         }
