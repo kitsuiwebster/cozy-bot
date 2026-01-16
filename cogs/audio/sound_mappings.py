@@ -45,3 +45,4 @@ SOUND_LABELS = {
 def get_sound_display_name(sound_filename: str) -> str:
     """Get emoji display name for a sound filename"""
     return SOUND_LABELS.get(sound_filename, sound_filename)
+
