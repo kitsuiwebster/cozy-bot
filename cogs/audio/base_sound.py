@@ -79,10 +79,18 @@ class BaseSoundCog(commands.Cog):
             if hasattr(cog, 'guild_states') and cog != self:
                 audio_cogs.append(cog)
 
+        # Clear states and cancel any pending restart tasks
         for cog in audio_cogs:
             if guild_id in cog.guild_states:
                 cog.guild_states[guild_id]['is_playing'] = False
                 cog.guild_states[guild_id]['current_sound'] = None
+                # Cancel loop task if exists
+                if cog.guild_states[guild_id].get('loop_task'):
+                    try:
+                        cog.guild_states[guild_id]['loop_task'].cancel()
+                    except:
+                        pass
+                    cog.guild_states[guild_id]['loop_task'] = None
         global_playing_states[guild_id] = self.__class__.__name__
 
     # Get or initialize guild state
@@ -113,9 +121,13 @@ class BaseSoundCog(commands.Cog):
 
     async def on_button_click(self, interaction):
         await interaction.response.defer()
-        
+
         guild_id = interaction.guild.id
         guild_state = self.get_guild_state(guild_id)
+
+        # Update target channel with user's current location (in case they moved)
+        if interaction.user.voice:
+            guild_state['target_channel'] = interaction.user.voice.channel
 
         sound_filename = interaction.data.get('custom_id')
 
@@ -182,16 +194,22 @@ class BaseSoundCog(commands.Cog):
                 await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
                 return
         else:
-            # Move to user's channel if different
+            # Already connected - check if we need to move
             if user_channel and voice_client.channel != user_channel:
+                logging.info(f"🔄 Bot needs to move from {voice_client.channel.name} to {user_channel.name}")
                 try:
                     await asyncio.wait_for(voice_client.move_to(user_channel), timeout=10.0)
+                    logging.info(f"✅ Successfully moved to {user_channel.name}")
                 except asyncio.TimeoutError:
+                    logging.error(f"❌ Timeout while moving to {user_channel.name}")
                     await interaction.followup.send("❌ Failed to move to voice channel: timeout. Please try again.", ephemeral=True)
                     return
                 except Exception as e:
+                    logging.error(f"❌ Error moving to {user_channel.name}: {str(e)}")
                     await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
                     return
+            elif user_channel:
+                logging.info(f"✅ Bot already in correct channel: {voice_client.channel.name}")
 
         self.clear_other_cog_states(interaction.guild.id)
 
@@ -363,15 +381,18 @@ class BaseSoundCog(commands.Cog):
             guild_state = self.get_guild_state(guild_id)
             voice_client = guild_state.get('voice_client')
             current_sound = guild_state['current_sound']
-            
+
+            logging.info(f"🔄 restart_audio_loop called by {self.__class__.__name__} for guild {guild_id}, current_sound: {current_sound}")
+
             # Get voice client from guild if not in state
             if not voice_client:
                 guild = self.bot.get_guild(guild_id)
                 if guild:
                     voice_client = guild.voice_client
-            
+
             # Only restart if we should still be playing
             if not current_sound or not guild_state['is_playing'] or not voice_client:
+                logging.info(f"🔄 restart_audio_loop skipped: current_sound={current_sound}, is_playing={guild_state['is_playing']}, voice_client={voice_client is not None}")
                 return
                 
             # Small delay to avoid rapid restart issues
@@ -391,8 +412,8 @@ class BaseSoundCog(commands.Cog):
             
             # Restart audio if file exists and voice client is ready
             if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(sound_path)
-                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
+                voice_client.play(audio_source)
             
         except Exception as e:
             logging.error(f"❌ Failed to restart audio loop: {e}")

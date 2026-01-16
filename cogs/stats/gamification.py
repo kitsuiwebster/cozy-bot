@@ -182,7 +182,8 @@ class CozyGamification:
 
         # Ensure data directory exists
         os.makedirs('data', exist_ok=True)
-        
+
+        temp_file = None  # Initialize to avoid UnboundLocalError in exception handler
         try:
             if ENCRYPTION_ENABLED:
                 encryption.save_encrypted_json(self.user_data, self.data_file)
@@ -247,7 +248,7 @@ class CozyGamification:
                 logging.debug(f"🚫 EVENT SAVE - No changes since last save")
 
         except Exception as e:
-            if os.path.exists(temp_file):
+            if temp_file and os.path.exists(temp_file):
                 os.remove(temp_file)
             logging.error(f'❌ Failed to save gamification data: {e}\n{traceback.format_exc()}')
     
