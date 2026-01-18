@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
 - Audio playback validation when bot connects to voice channel preventing silent connection states.
 - Active listener count in stats API route now correctly counts only users with active sessions.
 - Session error handling improved to prevent crashes during user tracking operations.
+- Audio files retain white-noise naming convention for backward compatibility with session restoration.
+- FFmpeg log spam suppressed by setting log level to error-only output.
 
 ## [1.0.17] - 2026-01-11
 
