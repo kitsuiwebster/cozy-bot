@@ -243,7 +243,7 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
                 logging.info(f"🔍 DEBUG: About to play audio. voice_client.is_connected(): {voice_client.is_connected()}, sound_path: {sound_path}")
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel error -stream_loop -1')
                 voice_client.play(audio_source)
                 logging.info(f"🔍 DEBUG: Successfully started playing audio")
 
@@ -414,7 +414,7 @@ class BaseSoundCog(commands.Cog):
             
             # Restart audio if file exists and voice client is ready
             if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel error -stream_loop -1')
                 voice_client.play(audio_source)
             
         except Exception as e:
