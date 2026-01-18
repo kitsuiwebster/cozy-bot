@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.18] - 2026-01-18
+
+### Added
+
+- `/menu` command displaying all available sound commands with categories and counts.
+- Extended `/rain` command with 5 additional rain ambiances (rain05-09) for a total of 10 rain sounds.
+
+### Changed
+
+- `/white-noise` command renamed to `/noise` for simplified command naming.
+- Production deployment script now performs hard reset from origin/main branch for consistent deployments.
+- Development deployment script now skips API notification calls in local environment for faster iteration.
+- Streak bonus points now capped at 20 points per 10-minute period to prevent exploitation.
+
+### Fixed
+
+- `/top-sounds` command now displays emoji labels instead of raw .mp3 filenames for better readability.
+- Audio playback validation when bot connects to voice channel preventing silent connection states.
+- Active listener count in stats API route now correctly counts only users with active sessions.
+- Session error handling improved to prevent crashes during user tracking operations.
+
 ## [1.0.17] - 2026-01-11
 
 ### Fixed
