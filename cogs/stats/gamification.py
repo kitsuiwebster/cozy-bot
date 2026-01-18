@@ -7,7 +7,6 @@ import fcntl
 import logging
 import traceback
 
-# Import encryption utilities
 try:
     from utils.encryption import encryption
     ENCRYPTION_ENABLED = True
@@ -16,14 +15,14 @@ except ImportError:
     ENCRYPTION_ENABLED = False
     logging.warning("⚡ Encryption disabled - install cryptography for data encryption")
 
+# Terminal color formatting helpers
 def colorize_points(text):
-    """Colorize point values in green"""
     return f'\033[32m{text}\033[0m'
 
 def colorize_duration(text):
-    """Colorize duration values in blue"""
     return f'\033[94m{text}\033[0m'
 
+# Main gamification system class
 class CozyGamification:
     def __init__(self):
         self.data_file = 'data/cozy_points.json'
@@ -35,28 +34,24 @@ class CozyGamification:
         
         # Track changes since last save for logging
         self.changes_since_save = {
-            'user_listening_time': {},  # user_id: added_seconds
-            'user_sound_time': {},      # user_id: {sound_name: added_seconds}
-            'user_points': {},          # user_id: added_points
-            'user_points_breakdown': {} # user_id: [{'reason': str, 'points': int}]
+            'user_listening_time': {},
+            'user_sound_time': {},
+            'user_points': {},
+            'user_points_breakdown': {}
         }
-        
-        # Clean corrupted data on startup
+
         self.clean_corrupted_data()
         
     def load_user_data(self) -> Dict:
-        """Load user gamification data from persistent storage with validation"""
         try:
             os.makedirs('data', exist_ok=True)
             
             if ENCRYPTION_ENABLED:
-                # Try to load encrypted data first
                 data = encryption.load_encrypted_json(self.data_file)
                 if data:
                     logging.info('🔒 Loaded encrypted gamification data')
                     return data
-                
-                # If no encrypted data, try to migrate from unencrypted
+
                 try:
                     with open(self.data_file, 'r') as file:
                         data = json.load(file)
@@ -68,7 +63,6 @@ class CozyGamification:
                     logging.info('❌ No existing unencrypted data found, starting fresh')
                     return {}
             else:
-                # Standard JSON loading
                 with open(self.data_file, 'r') as file:
                     data = json.load(file)
                     if isinstance(data, dict):
@@ -95,27 +89,21 @@ class CozyGamification:
             return {}
     
     def _migrate_to_encrypted(self, data: Dict):
-        """Migrate unencrypted data to encrypted format"""
         try:
-            # Save as encrypted
             encryption.save_encrypted_json(data, self.data_file)
-            # Remove old unencrypted file
             os.remove(self.data_file)
             logging.info('✅ Data migration to encrypted format completed')
         except Exception as e:
             logging.error(f'❌ Failed to migrate data to encrypted format: {e}')
     
     def load_usernames(self) -> Dict:
-        """Load username cache from persistent storage"""
         try:
             if ENCRYPTION_ENABLED:
-                # Try to load encrypted usernames first
                 data = encryption.load_encrypted_json(self.usernames_file)
                 if data:
                     logging.info('🔒 Loaded encrypted usernames cache')
                     return data
-                
-                # If no encrypted data, try to migrate from unencrypted
+
                 try:
                     with open(self.usernames_file, 'r') as file:
                         data = json.load(file)
@@ -126,7 +114,6 @@ class CozyGamification:
                 except FileNotFoundError:
                     pass
             else:
-                # Standard JSON loading
                 with open(self.usernames_file, 'r') as file:
                     return json.load(file)
         except FileNotFoundError:
@@ -138,32 +125,25 @@ class CozyGamification:
             return {}
     
     def _migrate_usernames_to_encrypted(self, data: Dict):
-        """Migrate unencrypted usernames to encrypted format"""
         try:
-            # Save as encrypted
             encryption.save_encrypted_json(data, self.usernames_file)
-            # Remove old unencrypted file
             os.remove(self.usernames_file)
             logging.info('✅ Usernames migration to encrypted format completed')
         except Exception as e:
             logging.error(f'❌ Failed to migrate usernames to encrypted format: {e}')
     
     def save_usernames(self):
-        """Save username cache to persistent storage"""
         try:
             os.makedirs('data', exist_ok=True)
             if ENCRYPTION_ENABLED:
-                # Save encrypted usernames
                 encryption.save_encrypted_json(self.usernames, self.usernames_file)
             else:
-                # Standard JSON saving
                 with open(self.usernames_file, 'w') as file:
                     json.dump(self.usernames, file, indent=2)
         except Exception as e:
             logging.error(f'❌ Failed to save usernames: {e}')
     
     def load_servernames(self) -> Dict:
-        """Load server names cache from persistent storage"""
         try:
             with open(self.servernames_file, 'r') as file:
                 return json.load(file)
@@ -173,7 +153,6 @@ class CozyGamification:
             return {}
     
     def save_servernames(self):
-        """Save server names cache to persistent storage"""
         try:
             os.makedirs('data', exist_ok=True)
             with open(self.servernames_file, 'w') as file:
@@ -182,7 +161,7 @@ class CozyGamification:
             logging.error(f'❌ Failed to save server names: {e}')
     
     def update_servername(self, guild_id: str, guild_name: str):
-        """Update server name in cache"""
+
         self.servernames[str(guild_id)] = {
             'name': guild_name,
             'last_updated': datetime.now().isoformat()
@@ -190,7 +169,7 @@ class CozyGamification:
         self.save_servernames()
     
     def update_username(self, user_id: str, username: str, display_name: str = None):
-        """Update username and display name in cache"""
+
         user_id = str(user_id)
         self.usernames[user_id] = {
             'username': username,
@@ -200,49 +179,43 @@ class CozyGamification:
         self.save_usernames()
     
     def save_user_data(self, force_detailed_log=False):
-        """Save user gamification data to persistent storage with atomic writes"""
+
         # Ensure data directory exists
         os.makedirs('data', exist_ok=True)
-        
+
+        temp_file = None  # Initialize to avoid UnboundLocalError in exception handler
         try:
             if ENCRYPTION_ENABLED:
-                # Save encrypted data
                 encryption.save_encrypted_json(self.user_data, self.data_file)
             else:
-                # Standard JSON saving with atomic writes
                 temp_file = self.data_file + '.tmp'
                 with open(temp_file, 'w') as file:
                     fcntl.flock(file.fileno(), fcntl.LOCK_EX)
                     json.dump(self.user_data, file, indent=2)
                     file.flush()
                     os.fsync(file.fileno())
-                
-                # Atomic rename to final file
+
                 os.rename(temp_file, self.data_file)
-            
-            # Log changes since last save (or force detailed log for hourly backup)
+
             from main import format_duration
-            
+
             has_changes = any(self.changes_since_save['user_listening_time']) or any(self.changes_since_save['user_sound_time']) or any(self.changes_since_save['user_points'])
-            
+
             if has_changes or force_detailed_log:
                 save_type = "PERIODIC SAVE" if force_detailed_log else "EVENT SAVE"
                 logging.info(f"✅️ {save_type} - Changes since last save:")
-                
-                # Log user changes
-                for user_id in set(list(self.changes_since_save['user_listening_time'].keys()) + 
-                                 list(self.changes_since_save['user_sound_time'].keys()) + 
+
+                for user_id in set(list(self.changes_since_save['user_listening_time'].keys()) +
+                                 list(self.changes_since_save['user_sound_time'].keys()) +
                                  list(self.changes_since_save['user_points'].keys())):
-                    
+
                     username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-                    
-                    # Total listening time for this user
+
                     if user_id in self.changes_since_save['user_listening_time']:
                         total_time = self.changes_since_save['user_listening_time'][user_id]
                         if total_time > 0:
                             logging.info(f"  👉 {colorize_duration(f'+{format_duration(total_time)}')} for {username}")
-                    
-                    # Points breakdown for this user
+
                     if user_id in self.changes_since_save['user_points_breakdown']:
                         breakdown = self.changes_since_save['user_points_breakdown'][user_id]
                         if isinstance(breakdown, list):
@@ -256,17 +229,15 @@ class CozyGamification:
                         points = self.changes_since_save['user_points'][user_id]
                         if points > 0:
                             logging.info(f"  👉 {colorize_points(f'+{points} points')} for {username}")
-                    
-                    # Sound-specific time for this user - SAFE ACCESS
-                    if (isinstance(self.changes_since_save['user_sound_time'], dict) and 
+
+                    if (isinstance(self.changes_since_save['user_sound_time'], dict) and
                         user_id in self.changes_since_save['user_sound_time']):
                         user_sound_data = self.changes_since_save['user_sound_time'][user_id]
                         if isinstance(user_sound_data, dict):
                             for sound_name, sound_time in user_sound_data.items():
                                 if isinstance(sound_time, (int, float)) and sound_time > 0:
                                     logging.info(f"  👉 {colorize_duration(f'+{format_duration(sound_time)}')} of {sound_name} for {username}")
-                
-                # Reset tracking for next period
+
                 self.changes_since_save = {
                     'user_listening_time': {},
                     'user_sound_time': {},
@@ -275,22 +246,21 @@ class CozyGamification:
                 }
             else:
                 logging.debug(f"🚫 EVENT SAVE - No changes since last save")
-            
+
         except Exception as e:
-            # Clean up temp file on error
-            if os.path.exists(temp_file):
+            if temp_file and os.path.exists(temp_file):
                 os.remove(temp_file)
             logging.error(f'❌ Failed to save gamification data: {e}\n{traceback.format_exc()}')
     
     def get_user_stats(self, user_id: str) -> Dict:
-        """Get or create user statistics"""
+
         user_id = str(user_id)
         if self.user_data is None:
             self.user_data = {}
         if user_id not in self.user_data:
             self.user_data[user_id] = {
                 'total_points': 0,
-                'listening_time': 0.0,  # seconds
+                'listening_time': 0.0,
                 'sessions_joined': 0,
                 'favorite_sounds': {},
                 'achievements': [],
@@ -300,57 +270,49 @@ class CozyGamification:
                 'level_progress': 0,
             }
         return self.user_data[user_id]
-    
+
+    # Add points and handle leveling up
     def add_points(self, user_id: str, points: int, reason: str = "Listening", save_data: bool = True) -> Dict:
-        """Add points to user and handle level progression"""
+
         user_stats = self.get_user_stats(user_id)
         user_stats['total_points'] += points
-        
-        # Calculate level and progress
+
         old_level = user_stats['level']
         new_level, progress = self.calculate_level(user_stats['total_points'])
         user_stats['level'] = new_level
         user_stats['level_progress'] = progress
-        
-        # Check for level up achievements
+
         level_up = new_level > old_level
         new_achievements = []
         level_bonus_points = 0
-        
-        # Handle level-ups with proper cascade handling
+
         current_level = old_level
         total_level_bonus_points = 0
-        
+
         while level_up:
             current_level += 1
             single_level_bonus = current_level * 10
             total_level_bonus_points += single_level_bonus
             user_stats['total_points'] += single_level_bonus
-            
+
             username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
             logging.info(f"⭐ Level bonus: {username} reached level {current_level} ({colorize_points(f'+{single_level_bonus} points')})")
-            
-            # Check for level achievements for THIS level
+
             level_achievements = self.check_level_achievements(current_level, user_stats)
             if level_achievements:
                 logging.info(f"🏆 Level achievement: {username} unlocked {', '.join(level_achievements)}")
             new_achievements.extend(level_achievements)
-            
-            # Check if bonus points caused ANOTHER level up
+
             new_level, progress = self.calculate_level(user_stats['total_points'])
             user_stats['level'] = new_level
             user_stats['level_progress'] = progress
-            
-            # Continue loop if we leveled up again
+
             level_up = new_level > current_level
-            
-        # Update final level bonus points for return value
+
         level_bonus_points = total_level_bonus_points
-        
-        # Check other achievements
         new_achievements.extend(self.check_general_achievements(user_stats))
-        
-        # Award bonus points for achievements (+100 points per achievement)
+
+        # Award 100 points per achievement
         achievement_bonus = len(new_achievements) * 100
         if achievement_bonus > 0:
             user_stats['total_points'] += achievement_bonus
@@ -400,7 +362,7 @@ class CozyGamification:
         }
     
     def calculate_level(self, total_points: int) -> tuple:
-        """Calculate user level and progress based on total points"""
+
         # Level progression: level * 10 points needed for next level
         # Level 1->2: 10 pts, Level 2->3: 20 pts, Level 3->4: 30 pts, etc.
         level = 1
@@ -421,7 +383,7 @@ class CozyGamification:
         return level, round(progress, 1)
     
     def add_listening_time(self, user_id: str, seconds: float):
-        """Add listening time and award points"""
+
         user_stats = self.get_user_stats(user_id)
         user_stats['listening_time'] += seconds
         
@@ -441,22 +403,18 @@ class CozyGamification:
             }
     
     def track_sound_start(self, user_id: str, sound_name: str):
-        """Track when user starts listening to a sound"""
-        logging.info(f"🔍 DEBUG: track_sound_start called for user {user_id} with sound {sound_name}")
-        
+
         user_stats = self.get_user_stats(user_id)
-        logging.info(f"🔍 DEBUG: track_sound_start got user_stats for {user_id}")
-        
+
         # Note: finalize_current_sound is now handled at the calling site to control timing
-        
+
         # Start tracking new sound
         start_time = datetime.now().isoformat()
         user_stats['current_sound'] = {
             'name': sound_name,
             'start_time': start_time
         }
-        logging.info(f"🔍 DEBUG: track_sound_start set current_sound for {user_id}: {sound_name} at {start_time}")
-        
+
         # Initialize sound stats if not exists
         if 'listening_time_by_sound' not in user_stats:
             user_stats['listening_time_by_sound'] = {}
@@ -466,17 +424,15 @@ class CozyGamification:
                 'session_count': 0,
                 'consecutive_time': 0.0
             }
-        
+
         # Note: consecutive time reset is now handled at guild level via reset_consecutive_time_for_guild
-        
+
         user_stats['listening_time_by_sound'][sound_name]['session_count'] += 1
-        logging.info(f"🔍 DEBUG: track_sound_start incremented session_count for {user_id} {sound_name}")
-        
+
         self.save_user_data()
-        logging.info(f"🔍 DEBUG: track_sound_start completed and saved for user {user_id}")
     
     def reset_consecutive_time_for_guild(self, guild_id: str, users_in_vocal: List[str]):
-        """Reset consecutive time for all users in the same vocal when sound changes"""
+
         reset_count = 0
         for user_id in users_in_vocal:
             user_id = str(user_id)
@@ -495,7 +451,7 @@ class CozyGamification:
             self.save_user_data()
     
     def finalize_current_sound(self, user_id: str):
-        """Finalize current sound listening session and add time"""
+
         user_stats = self.get_user_stats(user_id)
         current_sound = user_stats.get('current_sound')
         
@@ -553,38 +509,33 @@ class CozyGamification:
                         'user_points_breakdown': {}
                     }
                 
-                # Award points for listening time
                 points_added = int(duration / 60)
                 bonus_points = 0
-                
-                # Check for loyalty bonuses (30min=+50pts, 1h=+100pts, 12h=+500pts)
-                # Use TOTAL CONSECUTIVE session time (including current duration)
+
+                # Calculate loyalty bonuses: 30min=+50pts, 1h=+100pts, 12h=+500pts
                 consecutive_sound_time = user_stats['listening_time_by_sound'][sound_name]['consecutive_time']
                 consecutive_minutes = consecutive_sound_time / 60
-                
-                # Calculate loyalty bonuses based on consecutive time milestones
+
                 loyalty_bonus = 0
-                if consecutive_minutes >= 720:  # 12 hours
+                if consecutive_minutes >= 720:
                     loyalty_bonus = 500
                     reason = f"12h loyalty bonus on {sound_name}"
                     self.add_points(user_id, 500, reason, save_data=False)
-                elif consecutive_minutes >= 60:  # 1 hour
+                elif consecutive_minutes >= 60:
                     loyalty_bonus = 100
                     reason = f"1h loyalty bonus on {sound_name}"
                     self.add_points(user_id, 100, reason, save_data=False)
-                elif consecutive_minutes >= 30:  # 30 minutes
+                elif consecutive_minutes >= 30:
                     loyalty_bonus = 50
                     reason = f"30min loyalty bonus on {sound_name}"
                     self.add_points(user_id, 50, reason, save_data=False)
-                
+
                 if points_added > 0:
                     self.add_points(user_id, points_added, f"Listening to {sound_name}", save_data=False)
-                
-                # Check for category completion bonus
+
                 category_bonus = self.check_category_completion_bonus(user_id, sound_name, save_data=False)
                 bonus_points = loyalty_bonus + category_bonus
-                
-                # Log the sound tracking addition
+
                 from main import format_duration
                 duration_str = format_duration(duration)
                 username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
@@ -593,8 +544,7 @@ class CozyGamification:
                 points_str = f" ({colorize_points(f'+{total_points} {point_word}')})" if total_points > 0 else ""
                 bonus_str = f" [{colorize_points(f'+{bonus_points} bonus')}]" if bonus_points > 0 else ""
                 logging.info(f"👉 {colorize_duration(f'+{duration_str}')} of {sound_name} for {username}{points_str}{bonus_str}")
-                
-                # Single save at the end to avoid multiple EVENT SAVE logs
+
                 self.save_user_data()
                 
             except Exception as e:
@@ -602,41 +552,15 @@ class CozyGamification:
                 user_stats['current_sound'] = None
     
     def track_sound_preference(self, user_id: str, sound_name: str):
-        """Track user's favorite sounds (legacy method, redirects to new system)"""
+
         self.track_sound_start(user_id, sound_name)
     
     def get_sound_display_name(self, sound_filename: str) -> str:
-        """Convert sound filename to emoji display name"""
-        sound_mapping = {
-            # Rain sounds (from actual Discord buttons)
-            'rain00.mp3': '🌧️💧⚡',
-            'rain01.mp3': '🌧️🌿🌙',
-            'rain02.mp3': '🌧️⛈️💨',
-            'rain03.mp3': '🌧️🏠🔥',
-            'rain04.mp3': '🌧️🚗⚡',
-            # Sea sounds (from actual Discord buttons)  
-            'sea00.mp3': '🌊💧💦',
-            'sea01.mp3': '🌊🕊️⛱️',
-            'sea02.mp3': '🌊🏝️🌙',
-            'sea03.mp3': '🌊⛵🕊️',
-            'sea04.mp3': '🌊🤿🔱',
-            # Sparkles sounds (from actual Discord buttons)
-            'sparkles00.mp3': '✨🪄⭐',
-            'sparkles01.mp3': '✨🌟💫',
-            'sparkles02.mp3': '✨🪄💎',
-            'sparkles03.mp3': '✨🌲🌙',
-            'sparkles04.mp3': '✨🪄💫',
-            # Background music (from actual Discord buttons)
-            'background-music00.mp3': '🎶🏛️🌙',
-            'background-music01.mp3': '🎶🍃🌩️',
-            'background-music02.mp3': '🎶🏺💦',
-            'background-music03.mp3': '🎶🌸💦',
-            'background-music04.mp3': '🎶🌿💦'
-        }
-        return sound_mapping.get(sound_filename, sound_filename)
+        from cogs.audio.sound_mappings import get_sound_display_name
+        return get_sound_display_name(sound_filename)
     
     def get_user_favorite_sound(self, user_id: str) -> str:
-        """Get user's most listened sound by time with emoji display"""
+
         user_stats = self.get_user_stats(user_id)
         listening_times = user_stats.get('listening_time_by_sound', {})
         
@@ -650,57 +574,52 @@ class CozyGamification:
         return None
     
     def join_session(self, user_id: str, username: str = None, force_bonus: bool = False):
-        """Track when user joins a listening session"""
+
         user_stats = self.get_user_stats(user_id)
         
         # Check for recent join to prevent duplicate points from reconnections
         last_join_time = user_stats.get('last_join_time')
         current_time = datetime.now()
         
-        # Prevent duplicate join points within 2 minutes (120 seconds)
+        # Prevent duplicate join points within 2 minutes
         award_join_points = True
         if not force_bonus and last_join_time:
             try:
                 last_join = datetime.fromisoformat(last_join_time)
                 time_since_last_join = (current_time - last_join).total_seconds()
-                if time_since_last_join < 120:  # Less than 2 minutes
+                if time_since_last_join < 120:
                     award_join_points = False
             except Exception:
-                # Invalid timestamp, reset and award points
                 award_join_points = True
-        
-        # Reset consecutive time for all sounds when user joins a new session
+
+        # Reset consecutive listening time for all sounds
         if 'listening_time_by_sound' in user_stats:
             for sound_name in user_stats['listening_time_by_sound']:
                 if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
                     user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
                 user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
-        
+
         user_stats['sessions_joined'] += 1
         user_stats['last_join_time'] = current_time.isoformat()
-        
-        # Update username cache if provided
+
         if username:
-            # username is actually the display_name here, we need both
             self.update_username(user_id, username, username)
-        
+
         # Update daily streak
         today = datetime.now().strftime('%Y-%m-%d')
         last_active = user_stats.get('last_active_date')
-        
+
         if last_active != today:
             if last_active and self.is_consecutive_day(last_active, today):
                 user_stats['daily_streak'] += 1
             else:
                 user_stats['daily_streak'] = 1
             user_stats['last_active_date'] = today
-        
-        # Award session join points only if not a recent duplicate
+
         result = None
         if award_join_points:
             result = self.add_points(user_id, 5, "Joining session")
         else:
-            # Return a valid dict even with 0 points to maintain consistency
             result = {
                 'points_added': 0,
                 'total_points': user_stats['total_points'],
@@ -714,7 +633,7 @@ class CozyGamification:
         return result
     
     def is_consecutive_day(self, last_date: str, current_date: str) -> bool:
-        """Check if current date is consecutive to last active date"""
+
         try:
             last = datetime.strptime(last_date, '%Y-%m-%d')
             current = datetime.strptime(current_date, '%Y-%m-%d')
@@ -723,42 +642,42 @@ class CozyGamification:
             return False
     
     def get_current_streak(self, user_id: str) -> int:
-        """Get the current valid streak for a user"""
+
         user_stats = self.get_user_stats(user_id)
         today = datetime.now().strftime('%Y-%m-%d')
         last_active = user_stats.get('last_active_date')
         
-        # If last active was yesterday or today, return stored streak
         if last_active:
             try:
                 last = datetime.strptime(last_active, '%Y-%m-%d')
                 current = datetime.strptime(today, '%Y-%m-%d')
                 days_diff = (current - last).days
-                
-                # If active today or yesterday, streak is still valid
+
                 if days_diff <= 1:
                     return user_stats.get('daily_streak', 0)
             except:
                 pass
-        
-        # Only reset streak to 0 if more than 1 day inactive
+
         return 0
     
     def calculate_streak_bonus(self, user_id: str, listening_duration_minutes: float) -> int:
-        """Calculate streak bonus points based on current streak and listening time"""
+
         current_streak = self.get_current_streak(user_id)
         if current_streak <= 0:
             return 0
-        
-        # +[streak days] points every 10 minutes of listening
+
+        # Cap streak at 20 for bonus calculation (actual streak in stats can be unlimited)
+        bonus_streak = min(current_streak, 20)
+
+        # +[bonus_streak] points every 10 minutes of listening
         ten_minute_periods = int(listening_duration_minutes / 10)
         if ten_minute_periods > 0:
-            return current_streak * ten_minute_periods
-        
+            return bonus_streak * ten_minute_periods
+
         return 0
     
     def check_level_achievements(self, level: int, user_stats: Dict) -> List[str]:
-        """Check for level-based achievements"""
+
         achievements = []
         level_achievements = {
             5: "🥉 Bronze",
@@ -776,7 +695,7 @@ class CozyGamification:
         return achievements
     
     def clean_corrupted_data(self):
-        """Clean corrupted data structures on startup"""
+
         cleaned_count = 0
         
         # Clean user_data
@@ -820,7 +739,7 @@ class CozyGamification:
             self.save_user_data()
     
     def check_general_achievements(self, user_stats: Dict) -> List[str]:
-        """Check for general achievements based on stats"""
+
         achievements = []
         current_achievements = user_stats['achievements']
         
@@ -873,7 +792,7 @@ class CozyGamification:
         return achievements
     
     def check_category_completion_bonus(self, user_id: str, sound_name: str, save_data: bool = True) -> int:
-        """Check if user completed a sound category and award bonus"""
+
         user_stats = self.get_user_stats(user_id)
         listening_times = user_stats.get('listening_time_by_sound', {})
         
@@ -920,7 +839,7 @@ class CozyGamification:
         return 0
     
     def get_leaderboard(self, limit: int = 10) -> List[Dict]:
-        """Get top users leaderboard"""
+
         users = []
         for user_id, stats in self.user_data.items():
             users.append({
@@ -937,7 +856,7 @@ class CozyGamification:
         return users[:limit]
     
     def get_user_rank(self, user_id: str) -> Dict:
-        """Get user's rank and position in leaderboard"""
+
         leaderboard = self.get_leaderboard(1000)  # Get all users
         user_id = str(user_id)
         

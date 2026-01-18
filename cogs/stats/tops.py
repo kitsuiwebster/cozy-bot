@@ -4,6 +4,7 @@ from discord.ext import commands
 import json
 from .gamification import cozy_gamification
 
+# Cog for displaying leaderboards (top users, servers, sounds)
 class TopsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

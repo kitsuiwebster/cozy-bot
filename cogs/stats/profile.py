@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from .gamification import cozy_gamification
 
+# Cog for displaying user profiles with achievements and stats
 class ProfileCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

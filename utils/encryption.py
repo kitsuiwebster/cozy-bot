@@ -6,9 +6,10 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import logging
 
+# Encryption and decryption for sensitive data storage
 class DataEncryption:
+    # Initialize encryption with password from environment or provided
     def __init__(self, password: str = None):
-        """Initialize encryption with password from environment or provided"""
         if not password:
             password = os.getenv("ENCRYPTION_KEY", "DEFAULT_UNSAFE_KEY_CHANGE_THIS")
         
@@ -22,9 +23,9 @@ class DataEncryption:
         )
         key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
         self.cipher = Fernet(key)
-    
+
+    # Encrypt JSON data
     def encrypt_json(self, data: dict) -> bytes:
-        """Encrypt JSON data"""
         try:
             json_str = json.dumps(data)
             encrypted_data = self.cipher.encrypt(json_str.encode())
@@ -32,9 +33,9 @@ class DataEncryption:
         except Exception as e:
             logging.error(f"❌ Encryption failed: {e}")
             raise
-    
+
+    # Decrypt JSON data
     def decrypt_json(self, encrypted_data: bytes) -> dict:
-        """Decrypt JSON data"""
         try:
             decrypted_bytes = self.cipher.decrypt(encrypted_data)
             json_str = decrypted_bytes.decode()
@@ -42,9 +43,9 @@ class DataEncryption:
         except Exception as e:
             logging.error(f"❌ Decryption failed: {e}")
             raise
-    
+
+    # Save encrypted JSON to file
     def save_encrypted_json(self, data: dict, filepath: str):
-        """Save encrypted JSON to file"""
         try:
             encrypted_data = self.encrypt_json(data)
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -53,9 +54,9 @@ class DataEncryption:
         except Exception as e:
             logging.error(f"❌ Failed to save encrypted data: {e}")
             raise
-    
+
+    # Load encrypted JSON from file
     def load_encrypted_json(self, filepath: str) -> dict:
-        """Load encrypted JSON from file"""
         try:
             with open(filepath + '.enc', 'rb') as f:
                 encrypted_data = f.read()

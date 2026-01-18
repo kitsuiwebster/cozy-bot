@@ -5,19 +5,19 @@ import glob
 import logging
 from datetime import datetime
 
+# Monitor and process audio restoration tasks after deployment or reconnection
 class AudioRestorationMonitor:
     def __init__(self, bot):
         self.bot = bot
         self.check_interval = 5  # Check every 5 seconds
-        
+
+    # Start monitoring for audio restoration tasks
     async def start_monitoring(self):
-        """Start monitoring for audio restoration tasks"""
         await self.bot.wait_until_ready()
         
         # Wait a bit for bot to be fully ready before checking for restore tasks
         await asyncio.sleep(3)
         
-        # Check for pending restore tasks on startup
         # First check if there's a main audio state file to convert to individual tasks
         from .audio_state_manager import audio_state_manager
         if audio_state_manager:
@@ -36,9 +36,9 @@ class AudioRestorationMonitor:
             except Exception as e:
                 logging.error(f"❌ Error in audio restoration monitor: {e}")
                 await asyncio.sleep(10)
-    
+
+    # Process any pending audio restoration tasks
     async def process_pending_tasks(self):
-        """Process any pending audio restoration tasks"""
         try:
             restore_files = glob.glob('data/restore_task_*.json')
             
@@ -60,9 +60,9 @@ class AudioRestorationMonitor:
                         
         except Exception as e:
             logging.error(f"❌ Error processing pending tasks: {e}")
-    
+
+    # Process a single audio restoration task
     async def process_restore_task(self, file_path):
-        """Process a single audio restoration task"""
         try:
             with open(file_path, 'r') as f:
                 task_data = json.load(f)
@@ -100,9 +100,9 @@ class AudioRestorationMonitor:
         except Exception as e:
             logging.error(f"❌ Error processing restore task {file_path}: {e}")
             raise
-    
+
+    # Restore audio playback in a specific channel
     async def restore_audio_in_channel(self, guild, channel, sound_name):
-        """Restore audio playback in a specific channel"""
         try:
             # Check if bot is already connected to voice in this guild
             voice_client = guild.voice_client
@@ -138,16 +138,16 @@ class AudioRestorationMonitor:
         except Exception as e:
             logging.error(f"❌ Failed to restore audio in {guild.name}: {e}")
             raise
-    
+
+    # Get the full path to a sound file based on its name
     def get_sound_file_path(self, sound_name):
-        """Get the full path to a sound file based on its name"""
         # Map of sound categories to their directories
         sound_categories = {
             'rain': 'cogs/audio/rain/',
             'sea': 'cogs/audio/sea/', 
             'sparkles': 'cogs/audio/sparkles/',
             'background_music': 'cogs/audio/background_music/',
-            'white_noise': 'cogs/audio/noise/'
+            'noise': 'cogs/audio/noise/'
         }
         
         # Try to find the file in each category

@@ -10,8 +10,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from cogs.stats.gamification import cozy_gamification
 
+# Initialize FastAPI router for user stats endpoints
 router = APIRouter()
 
+# Response model for individual user stats
 class UserStats(BaseModel):
     user_id: str
     username: Optional[str] = None
@@ -27,12 +29,13 @@ class UserStats(BaseModel):
     achievements_count: int
     favorite_sound: Optional[str] = None
 
+# Response model for top users list
 class TopUsersResponse(BaseModel):
     users: List[UserStats]
     total_count: int
 
+# Load cozy points data with encryption support
 def load_cozy_points_data():
-    """Load cozy points data with encryption support"""
     # Try to import encryption utilities
     try:
         from utils.encryption import encryption
@@ -52,8 +55,8 @@ def load_cozy_points_data():
     except json.JSONDecodeError:
         return {}
 
+# Load usernames cache with encryption support
 def load_usernames_data():
-    """Load usernames cache with encryption support"""
     # Try to import encryption utilities
     try:
         from utils.encryption import encryption
@@ -73,8 +76,8 @@ def load_usernames_data():
     except json.JSONDecodeError:
         return {}
 
+# Convert seconds to human-readable listening time format
 def format_listening_time(total_seconds: float) -> str:
-    """Convert seconds to human-readable listening time format"""
     if total_seconds < 60:
         return f"{int(total_seconds)}s"
     elif total_seconds < 3600:
@@ -86,54 +89,27 @@ def format_listening_time(total_seconds: float) -> str:
         minutes = int((total_seconds % 3600) / 60)
         return f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
 
+# Response model for individual sound statistics
 class SoundStats(BaseModel):
     sound_name: str
     total_time: float
     formatted_time: str
     session_count: int
 
+# Response model for user's sound statistics
 class UserSoundStats(BaseModel):
     user_id: str
     username: Optional[str] = None
     favorite_sound: Optional[str] = None
     sounds: List[SoundStats]
 
-def get_sound_display_name(sound_filename: str) -> str:
-    """Convert sound filename to emoji display name"""
-    sound_mapping = {
-        # Rain sounds (from actual Discord buttons)
-        'rain00.mp3': '🌧️💧⚡',
-        'rain01.mp3': '🌧️🌿🌙',
-        'rain02.mp3': '🌧️⛈️💨',
-        'rain03.mp3': '🌧️🏠🔥',
-        'rain04.mp3': '🌧️🚗⚡',
-        # Sea sounds (from actual Discord buttons)  
-        'sea00.mp3': '🌊💧💦',
-        'sea01.mp3': '🌊🕊️⛱️',
-        'sea02.mp3': '🌊🏝️🌙',
-        'sea03.mp3': '🌊⛵🕊️',
-        'sea04.mp3': '🌊🤿🔱',
-        # Sparkles sounds (from actual Discord buttons)
-        'sparkles00.mp3': '✨🪄⭐',
-        'sparkles01.mp3': '✨🌟💫',
-        'sparkles02.mp3': '✨🪄💎',
-        'sparkles03.mp3': '✨🌲🌙',
-        'sparkles04.mp3': '✨🪄💫',
-        # Background music (from actual Discord buttons)
-        'background-music00.mp3': '🎶🏛️🌙',
-        'background-music01.mp3': '🎶🍃🌩️',
-        'background-music02.mp3': '🎶🏺💦',
-        'background-music03.mp3': '🎶🌸💦',
-        'background-music04.mp3': '🎶🌿💦',
-        # White noise sounds (from actual Discord buttons)
-        'white-noise00.mp3': '🤍⏳🔜',
-        'white-noise01.mp3': '🤍🌌🌕',
-        'white-noise02.mp3': '🤍⏳🔜',
-        'white-noise03.mp3': '🤍⏳🔜',
-        'white-noise04.mp3': '🤍⏳🔜',
-    }
-    return sound_mapping.get(sound_filename, sound_filename)
+# Import centralized sound mapping
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from cogs.audio.sound_mappings import get_sound_display_name
 
+# Response model for top sound statistics
 class TopSoundStats(BaseModel):
     sound_name: str
     display_name: str
@@ -142,13 +118,14 @@ class TopSoundStats(BaseModel):
     total_sessions: int
     unique_listeners: int
 
+# Response model for top sounds list
 class TopSoundsResponse(BaseModel):
     sounds: List[TopSoundStats]
     total_sounds: int
 
+# Get most listened sounds globally
 @router.get("/top-sounds", response_model=TopSoundsResponse)
 async def get_top_sounds(limit: int = None):
-    """Get most listened sounds globally"""
     try:
         user_data = load_cozy_points_data()
         
@@ -199,9 +176,9 @@ async def get_top_sounds(limit: int = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
 
+# Get top users by cozy points
 @router.get("/top-users", response_model=TopUsersResponse)
 async def get_top_users(limit: int = None):
-    """Get top users by cozy points"""
     try:
         # Load data directly from the same JSON files the bot uses
         user_data_raw = load_cozy_points_data()

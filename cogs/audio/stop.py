@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+# Cog for stopping audio playback and disconnecting bot
 class StopCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
