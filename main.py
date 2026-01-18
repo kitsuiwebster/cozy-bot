@@ -743,7 +743,7 @@ async def run_bot():
             ('cogs.audio.sea.sea', '🌊'),
             ('cogs.audio.sparkles.sparkles', '✨'),
             ('cogs.audio.background_music.background-music', '🎵'),
-            ('cogs.audio.white-noise.white-noise', '🤍'),
+            ('cogs.audio.noise.noise', '🤍'),
             ('cogs.audio.stop', '🛑'),
             ('cogs.menu', '📋'),
             ('cogs.stats.profile', '🏅'),

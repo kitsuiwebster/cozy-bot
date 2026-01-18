@@ -34,12 +34,12 @@ SOUND_LABELS = {
     "background-music03.mp3": "🎶🌸💦",
     "background-music04.mp3": "🎶🌿💦",
 
-    # White noise sounds
-    "white-noise00.mp3": "📡⏳🔜",
-    "white-noise01.mp3": "📡🤍🌌",
-    "white-noise02.mp3": "📡⏳🔜",
-    "white-noise03.mp3": "📡⏳🔜",
-    "white-noise04.mp3": "📡⏳🔜",
+    # Noise sounds
+    "noise00.mp3": "📡⏳🔜",
+    "noise01.mp3": "📡🤍🌌",
+    "noise02.mp3": "📡⏳🔜",
+    "noise03.mp3": "📡⏳🔜",
+    "noise04.mp3": "📡⏳🔜",
 }
 
 def get_sound_display_name(sound_filename: str) -> str:
