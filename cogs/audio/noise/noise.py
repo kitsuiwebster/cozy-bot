@@ -27,7 +27,7 @@ class NoiseCog(BaseSoundCog):
         # For available sounds, use parent method
         await super().on_button_click(interaction)
 
-    @app_commands.command(name="noise", description="Play differnet types of noises")
+    @app_commands.command(name="noise", description="Play different types of noises")
     async def noise_command(self, interaction: discord.Interaction):
         await self.play_sound_command(interaction, "Please select a noise sound:")
 
