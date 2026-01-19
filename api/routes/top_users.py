@@ -28,6 +28,7 @@ class UserStats(BaseModel):
     sessions_joined: int
     achievements_count: int
     favorite_sound: Optional[str] = None
+    days_since_last_activity: Optional[int] = None
 
 # Response model for top users list
 class TopUsersResponse(BaseModel):
@@ -92,6 +93,7 @@ def format_listening_time(total_seconds: float) -> str:
 # Response model for individual sound statistics
 class SoundStats(BaseModel):
     sound_name: str
+    display_name: str
     total_time: float
     formatted_time: str
     session_count: int
@@ -102,6 +104,35 @@ class UserSoundStats(BaseModel):
     username: Optional[str] = None
     favorite_sound: Optional[str] = None
     sounds: List[SoundStats]
+
+# Response model for current sound being played
+class CurrentSound(BaseModel):
+    name: str
+    display_name: str
+    started_at: str
+    duration_seconds: int
+
+# Response model for detailed user profile
+class UserDetailedProfile(BaseModel):
+    user_id: str
+    username: Optional[str] = None
+    display_name: Optional[str] = None
+    total_points: int
+    rank: Optional[int] = None
+    level: int
+    level_progress: float
+    listening_time_seconds: float
+    listening_time_formatted: str
+    daily_streak: int
+    sessions_joined: int
+    days_since_last_activity: Optional[int] = None
+    last_join_time: Optional[str] = None
+    last_active_date: Optional[str] = None
+    achievements: List[str]
+    category_completions: List[str]
+    favorite_sound: Optional[str] = None
+    listening_by_sound: List[SoundStats]
+    current_sound: Optional[CurrentSound] = None
 
 # Import centralized sound mapping
 import sys
@@ -242,7 +273,19 @@ async def get_top_users(limit: int = None):
                 
                 if favorite_sound:
                     favorite_sound_emoji = get_sound_display_name(favorite_sound)
-            
+
+            # Calculate days since last activity
+            days_since_last_activity = None
+            last_active_date = original_stats.get('last_active_date')
+            if last_active_date:
+                try:
+                    from datetime import datetime
+                    last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
+                    today = datetime.now()
+                    days_since_last_activity = (today - last_active).days
+                except Exception:
+                    days_since_last_activity = None
+
             user_stats = UserStats(
                 user_id=user_data['user_id'],
                 username=username,
@@ -256,7 +299,8 @@ async def get_top_users(limit: int = None):
                 level_progress=original_stats.get('level_progress', 0.0),
                 sessions_joined=original_stats.get('sessions_joined', 0),
                 achievements_count=len(original_stats.get('achievements', [])),
-                favorite_sound=favorite_sound_emoji
+                favorite_sound=favorite_sound_emoji,
+                days_since_last_activity=days_since_last_activity
             )
             users.append(user_stats)
         
@@ -267,3 +311,135 @@ async def get_top_users(limit: int = None):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top users: {str(e)}")
+
+# Get detailed profile for a specific user by username
+@router.get("/user/{username}", response_model=UserDetailedProfile)
+async def get_user_profile(username: str):
+    try:
+        from datetime import datetime
+
+        # Load data
+        user_data_raw = load_cozy_points_data()
+        usernames_data = load_usernames_data()
+
+        # Find user by username
+        user_id = None
+        for uid, user_info in usernames_data.items():
+            if isinstance(user_info, dict):
+                if user_info.get('username', '').lower() == username.lower():
+                    user_id = uid
+                    break
+            elif isinstance(user_info, str):
+                if user_info.lower() == username.lower():
+                    user_id = uid
+                    break
+
+        if not user_id:
+            raise HTTPException(status_code=404, detail=f"User '{username}' not found")
+
+        if user_id not in user_data_raw:
+            raise HTTPException(status_code=404, detail=f"User data not found for '{username}'")
+
+        user_stats = user_data_raw[user_id]
+
+        # Get username and display_name
+        user_info = usernames_data.get(user_id)
+        if isinstance(user_info, dict):
+            username_str = user_info.get('username', f"User {user_id[:8]}")
+            display_name = user_info.get('display_name', username_str)
+        else:
+            username_str = user_info if user_info else f"User {user_id[:8]}"
+            display_name = username_str
+
+        # Calculate rank (position in leaderboard)
+        all_users = [(uid, stats.get('total_points', 0)) for uid, stats in user_data_raw.items()]
+        all_users.sort(key=lambda x: x[1], reverse=True)
+        rank = None
+        for i, (uid, _) in enumerate(all_users, start=1):
+            if uid == user_id:
+                rank = i
+                break
+
+        # Get current valid streak
+        current_streak = cozy_gamification.get_current_streak(user_id)
+
+        # Calculate days since last activity
+        days_since_last_activity = None
+        last_active_date = user_stats.get('last_active_date')
+        if last_active_date:
+            try:
+                last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
+                today = datetime.now()
+                days_since_last_activity = (today - last_active).days
+            except Exception:
+                days_since_last_activity = None
+
+        # Get achievements (full list)
+        achievements = user_stats.get('achievements', [])
+
+        # Get category completions
+        category_completions = user_stats.get('category_completions', [])
+
+        # Get listening_by_sound details
+        listening_by_sound = []
+        listening_times = user_stats.get('listening_time_by_sound', {})
+        for sound_name, sound_data in listening_times.items():
+            if isinstance(sound_data, dict):
+                listening_by_sound.append(SoundStats(
+                    sound_name=sound_name,
+                    display_name=get_sound_display_name(sound_name),
+                    total_time=sound_data.get('total_time', 0.0),
+                    formatted_time=format_listening_time(sound_data.get('total_time', 0.0)),
+                    session_count=sound_data.get('session_count', 0)
+                ))
+
+        # Sort by total time descending
+        listening_by_sound.sort(key=lambda x: x.total_time, reverse=True)
+
+        # Get favorite sound (top 1)
+        favorite_sound_emoji = None
+        if listening_by_sound:
+            favorite_sound_emoji = get_sound_display_name(listening_by_sound[0].sound_name)
+
+        # Get current sound if actively listening
+        current_sound_obj = None
+        current_sound = user_stats.get('current_sound')
+        if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+            try:
+                start_time = datetime.fromisoformat(current_sound['start_time'])
+                duration = int((datetime.now() - start_time).total_seconds())
+                current_sound_obj = CurrentSound(
+                    name=current_sound['name'],
+                    display_name=get_sound_display_name(current_sound['name']),
+                    started_at=current_sound['start_time'],
+                    duration_seconds=duration
+                )
+            except Exception:
+                current_sound_obj = None
+
+        return UserDetailedProfile(
+            user_id=user_id,
+            username=username_str,
+            display_name=display_name,
+            total_points=user_stats.get('total_points', 0),
+            rank=rank,
+            level=user_stats.get('level', 1),
+            level_progress=user_stats.get('level_progress', 0.0),
+            listening_time_seconds=user_stats.get('listening_time', 0.0),
+            listening_time_formatted=format_listening_time(user_stats.get('listening_time', 0.0)),
+            daily_streak=current_streak,
+            sessions_joined=user_stats.get('sessions_joined', 0),
+            days_since_last_activity=days_since_last_activity,
+            last_join_time=user_stats.get('last_join_time'),
+            last_active_date=last_active_date,
+            achievements=achievements,
+            category_completions=category_completions,
+            favorite_sound=favorite_sound_emoji,
+            listening_by_sound=listening_by_sound,
+            current_sound=current_sound_obj
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching user profile: {str(e)}")

@@ -144,6 +144,18 @@ class AudioRestorationMonitor:
                     guild_state['target_channel'] = channel
                     logging.info(f"✅ Updated {cog_name} guild_state for {guild.name}")
 
+            # Update gamification current_sound for each user in the channel
+            from cogs.stats.gamification import cozy_gamification
+            current_users = [member for member in channel.members if not member.bot]
+            for member in current_users:
+                try:
+                    cozy_gamification.start_new_sound(str(member.id), sound_name)
+                except Exception as e:
+                    logging.error(f"❌ Failed to start sound tracking for {member.name}: {e}")
+
+            if current_users:
+                logging.info(f"✅ Started sound tracking for {len(current_users)} users in {guild.name}")
+
             logging.info(f"🎵 Successfully restored {sound_name} in {guild.name}")
                 
         except Exception as e:
