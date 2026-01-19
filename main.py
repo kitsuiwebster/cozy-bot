@@ -524,7 +524,8 @@ async def on_voice_state_update(member, before, after):
 
                         try:
                             if voice_client:
-                                await voice_client.disconnect()
+                                await voice_client.disconnect(force=True)
+                                await asyncio.sleep(0.5)  # Give Discord time to process disconnect
                                 logging.info("✅ Bot disconnected from voice channel due to no audio playing")
                         except Exception as e:
                             logging.error(f"❌ Failed to disconnect bot: {e}")

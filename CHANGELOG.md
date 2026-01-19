@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Audio files retain white-noise naming convention for backward compatibility with session restoration.
 - FFmpeg log spam suppressed by setting log level to error-only output.
 - Server voice time now preserved even when data format is invalid, preventing accidental resets to zero.
+- "Already connected to voice channel" errors resolved with forced disconnect cleanup and retry logic.
 
 ## [1.0.17] - 2026-01-11
 
