@@ -142,6 +142,11 @@ class BaseSoundCog(commands.Cog):
 
         user_channel = guild_state.get('target_channel')
 
+        # Debug: Log current voice state
+        logging.info(f"🔍 DEBUG: Current voice_client state: exists={voice_client is not None}, connected={voice_client.is_connected() if voice_client else 'N/A'}, channel={voice_client.channel.name if voice_client and voice_client.channel else 'None'}")
+        logging.info(f"🔍 DEBUG: User wants to connect to: {user_channel.name if user_channel else 'None'}")
+        logging.info(f"🔍 DEBUG: Guild: {interaction.guild.name}, Guild ID: {interaction.guild.id}")
+
         # Check if voice_client is actually connected, not just exists (fixes ghost connection bug)
         if voice_client and not voice_client.is_connected():
             logging.warning(f"⚠️ Ghost voice_client detected (exists but not connected). Cleaning up...")
@@ -150,9 +155,11 @@ class BaseSoundCog(commands.Cog):
             except:
                 pass
             voice_client = None
+            logging.info(f"🔍 DEBUG: After cleanup, voice_client is now None")
 
         # Connect to voice channel with retry logic
         if voice_client is None:
+            logging.info(f"🔍 DEBUG: voice_client is None, will attempt to connect")
             if user_channel:
                 # Check channel permissions before connecting
                 permissions = user_channel.permissions_for(interaction.guild.me)
@@ -170,6 +177,7 @@ class BaseSoundCog(commands.Cog):
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
+                        logging.info(f"🔍 DEBUG: Attempting to connect (attempt {attempt + 1}/{max_retries})")
                         voice_client = await asyncio.wait_for(user_channel.connect(), timeout=20.0)
                         logging.info(f"🔍 DEBUG: Connected to channel, voice_client.is_connected(): {voice_client.is_connected()}")
 
@@ -177,14 +185,32 @@ class BaseSoundCog(commands.Cog):
                         await asyncio.sleep(0.5)
                         logging.info(f"🔍 DEBUG: After delay, voice_client.is_connected(): {voice_client.is_connected()}")
 
+                        logging.info(f"🔍 DEBUG: About to start disconnect timer")
                         await self.start_disconnect_timer(guild_id)
+                        logging.info(f"🔍 DEBUG: Disconnect timer started successfully")
                         break
                     except asyncio.TimeoutError:
+                        logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
+
+                        # Check if bot connected anyway despite timeout (stuck session bug workaround)
+                        voice_client = interaction.guild.voice_client
+                        if voice_client and voice_client.is_connected():
+                            logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
+                            await asyncio.sleep(0.5)
+                            logging.info(f"🔍 DEBUG: After timeout workaround, voice_client.is_connected(): {voice_client.is_connected()}")
+
+                            logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
+                            await self.start_disconnect_timer(guild_id)
+                            logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                            break
+
+                        # Really not connected, retry or fail
                         if attempt == max_retries - 1:
                             await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
                             return
                         await asyncio.sleep(3)
                     except Exception as e:
+                        logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} failed with exception: {type(e).__name__}: {str(e)}")
                         # Handle "Already connected" error by forcing cleanup
                         if "already connected" in str(e).lower():
                             logging.warning(f"⚠️ Already connected error detected, forcing cleanup...")
@@ -202,10 +228,15 @@ class BaseSoundCog(commands.Cog):
                             return
                         await asyncio.sleep(2)
             else:
+                logging.error(f"❌ DEBUG: No target voice channel found")
                 await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
                 return
+
+            logging.info(f"🔍 DEBUG: Finished connection attempts, voice_client state: exists={voice_client is not None}, connected={voice_client.is_connected() if voice_client else 'N/A'}")
         else:
             # Already connected - check if we need to move
+            logging.info(f"🔍 DEBUG: Bot already connected to {voice_client.channel.name}")
+            logging.info(f"🔍 DEBUG: Current channel: {voice_client.channel.name}, Target channel: {user_channel.name if user_channel else 'None'}")
             if user_channel and voice_client.channel != user_channel:
                 logging.info(f"🔄 Bot needs to move from {voice_client.channel.name} to {user_channel.name}")
                 try:
@@ -222,10 +253,14 @@ class BaseSoundCog(commands.Cog):
             elif user_channel:
                 logging.info(f"✅ Bot already in correct channel: {voice_client.channel.name}")
 
+        logging.info(f"🔍 DEBUG: About to clear other cog states")
         self.clear_other_cog_states(interaction.guild.id)
+        logging.info(f"🔍 DEBUG: Cleared other cog states")
 
+        logging.info(f"🔍 DEBUG: Checking if audio is playing: {voice_client.is_playing()}")
         if voice_client.is_playing():
             voice_client.stop()
+            logging.info(f"🔍 DEBUG: Stopped playing audio")
 
         # Verify voice client is properly connected before playing
         logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
