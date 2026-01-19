@@ -191,6 +191,20 @@ class BaseSoundCog(commands.Cog):
                         break
                     except asyncio.TimeoutError:
                         logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
+
+                        # Check if bot connected anyway despite timeout (stuck session bug workaround)
+                        voice_client = interaction.guild.voice_client
+                        if voice_client and voice_client.is_connected():
+                            logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
+                            await asyncio.sleep(0.5)
+                            logging.info(f"🔍 DEBUG: After timeout workaround, voice_client.is_connected(): {voice_client.is_connected()}")
+
+                            logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
+                            await self.start_disconnect_timer(guild_id)
+                            logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                            break
+
+                        # Really not connected, retry or fail
                         if attempt == max_retries - 1:
                             await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
                             return
