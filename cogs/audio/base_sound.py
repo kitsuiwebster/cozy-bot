@@ -177,7 +177,9 @@ class BaseSoundCog(commands.Cog):
                         await asyncio.sleep(0.5)
                         logging.info(f"🔍 DEBUG: After delay, voice_client.is_connected(): {voice_client.is_connected()}")
 
+                        logging.info(f"🔍 DEBUG: About to start disconnect timer")
                         await self.start_disconnect_timer(guild_id)
+                        logging.info(f"🔍 DEBUG: Disconnect timer started successfully")
                         break
                     except asyncio.TimeoutError:
                         if attempt == max_retries - 1:
@@ -206,6 +208,7 @@ class BaseSoundCog(commands.Cog):
                 return
         else:
             # Already connected - check if we need to move
+            logging.info(f"🔍 DEBUG: Bot already connected, checking if need to move")
             if user_channel and voice_client.channel != user_channel:
                 logging.info(f"🔄 Bot needs to move from {voice_client.channel.name} to {user_channel.name}")
                 try:
@@ -222,10 +225,14 @@ class BaseSoundCog(commands.Cog):
             elif user_channel:
                 logging.info(f"✅ Bot already in correct channel: {voice_client.channel.name}")
 
+        logging.info(f"🔍 DEBUG: About to clear other cog states")
         self.clear_other_cog_states(interaction.guild.id)
+        logging.info(f"🔍 DEBUG: Cleared other cog states")
 
+        logging.info(f"🔍 DEBUG: Checking if audio is playing: {voice_client.is_playing()}")
         if voice_client.is_playing():
             voice_client.stop()
+            logging.info(f"🔍 DEBUG: Stopped playing audio")
 
         # Verify voice client is properly connected before playing
         logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
