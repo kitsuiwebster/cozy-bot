@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.19] - 2026-01-19
+
+### Added
+
+- Admin API endpoint `/api/admin/server-time` to add or remove voice time from servers by guild ID.
+
+### Fixed
+
+- Voice channel connexion wrong status resolved with forced disconnect cleanup and retry logic.
+- Audio restoration now properly updates cog guild states to enable sound tracking for users joining after bot restart.
+- Server voice time data corruption prevention with improved format validation and preservation logic.
+
 ## [1.0.18] - 2026-01-18
 
 ### Added

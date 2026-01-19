@@ -8,38 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: 🚀 Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      
-      - name: 🔑 Add SSH host key
+      - name: ⚠️ Auto-deploy disabled
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
-      
-      - name: 🚀 Deploy to Development
-        timeout-minutes: 6
-        run: |
-          ssh -T -o "ServerAliveInterval=5" -o "ServerAliveCountMax=1" -o "ExitOnForwardFailure=yes" -p 2248 kitsui@90.60.191.159 bash -s <<'EOF'
-          set -euo pipefail
-          export LC_ALL=C.UTF-8
-          export LANG=C.UTF-8
-          export TERM=xterm
-
-          echo "🎯 Starting development deployment..."
-          cd ~/cozy-bot
-
-          echo "📝 Updating code..."
-          git fetch origin dev
-          git reset --hard origin/dev
-
-          echo "🔍 Checking environment files..."
-          test -f .env.dev
-
-          echo "🚀 Running deployment script..."
-          chmod +x deploy-dev.sh
-          ./deploy-dev.sh
-
-          echo "✅ Development deployment completed!"
-          EOF
+          echo "⚠️ Automatic development deployment is currently disabled"
+          echo "✅ Code pushed to dev branch successfully"
+          echo "👉 Deploy manually on VPS using: make dev"

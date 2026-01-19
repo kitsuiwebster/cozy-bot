@@ -185,6 +185,17 @@ class BaseSoundCog(commands.Cog):
                             return
                         await asyncio.sleep(3)
                     except Exception as e:
+                        # Handle "Already connected" error by forcing cleanup
+                        if "already connected" in str(e).lower():
+                            logging.warning(f"⚠️ Already connected error detected, forcing cleanup...")
+                            try:
+                                existing_vc = interaction.guild.voice_client
+                                if existing_vc:
+                                    await existing_vc.disconnect(force=True)
+                                    await asyncio.sleep(1)
+                            except:
+                                pass
+
                         logging.error(f"❌ Connection attempt {attempt + 1} failed: {str(e)}")
                         if attempt == max_retries - 1:
                             await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)

@@ -126,18 +126,43 @@ class AudioRestorationMonitor:
                 return
             
             # Play the audio with infinite loop
-            audio_source = FFmpegPCMAudio(sound_path, before_options='-stream_loop -1')
+            audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel error -stream_loop -1')
             voice_client.play(audio_source)
-            
+
             # Update global state to track what's playing
             from cogs.audio.base_sound import global_current_sounds
             global_current_sounds[guild.id] = sound_name
-            
+
+            # Update the corresponding cog's guild_state
+            cog_name = self.get_cog_name_for_sound(sound_name)
+            if cog_name:
+                cog = self.bot.get_cog(cog_name)
+                if cog and hasattr(cog, 'guild_states'):
+                    guild_state = cog.get_guild_state(guild.id)
+                    guild_state['is_playing'] = True
+                    guild_state['current_sound'] = sound_name
+                    guild_state['target_channel'] = channel
+                    logging.info(f"✅ Updated {cog_name} guild_state for {guild.name}")
+
             logging.info(f"🎵 Successfully restored {sound_name} in {guild.name}")
                 
         except Exception as e:
             logging.error(f"❌ Failed to restore audio in {guild.name}: {e}")
             raise
+
+    # Get the cog name for a given sound
+    def get_cog_name_for_sound(self, sound_name):
+        if sound_name.startswith('rain'):
+            return 'RainCog'
+        elif sound_name.startswith('sea'):
+            return 'SeaCog'
+        elif sound_name.startswith('sparkles'):
+            return 'SparklesCog'
+        elif sound_name.startswith('background-music'):
+            return 'BackgroundMusicCog'
+        elif sound_name.startswith('white-noise'):
+            return 'NoiseCog'
+        return None
 
     # Get the full path to a sound file based on its name
     def get_sound_file_path(self, sound_name):
