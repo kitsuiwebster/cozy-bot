@@ -139,6 +139,20 @@ class AudioRestorationMonitor:
             logging.error(f"❌ Failed to restore audio in {guild.name}: {e}")
             raise
 
+    # Get the cog name for a given sound
+    def get_cog_name_for_sound(self, sound_name):
+        if sound_name.startswith('rain'):
+            return 'RainCog'
+        elif sound_name.startswith('sea'):
+            return 'SeaCog'
+        elif sound_name.startswith('sparkles'):
+            return 'SparklesCog'
+        elif sound_name.startswith('background-music'):
+            return 'BackgroundMusicCog'
+        elif sound_name.startswith('white-noise'):
+            return 'NoiseCog'
+        return None
+
     # Get the full path to a sound file based on its name
     def get_sound_file_path(self, sound_name):
         # Map of sound categories to their directories

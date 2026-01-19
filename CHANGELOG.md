@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Session error handling improved to prevent crashes during user tracking operations.
 - Audio files retain white-noise naming convention for backward compatibility with session restoration.
 - FFmpeg log spam suppressed by setting log level to error-only output.
+- Server voice time now preserved even when data format is invalid, preventing accidental resets to zero.
 
 ## [1.0.17] - 2026-01-11
 

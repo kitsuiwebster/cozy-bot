@@ -545,9 +545,12 @@ async def on_voice_state_update(member, before, after):
                         guild_voice_time_changes[guild_id] = 0
                     guild_voice_time_changes[guild_id] += session_duration
                 else:
-                    guild_voice_time[guild_id] = [None, 0]
+                    # Preserve accumulated time even if format is invalid
+                    accumulated_time = guild_data[1] if isinstance(guild_data, list) and len(guild_data) >= 2 else 0
+                    guild_voice_time[guild_id] = [None, accumulated_time]
                     session_duration = 0
-                    total_time = 0
+                    total_time = accumulated_time
+                    logging.warning(f"⚠️ Invalid guild_data format for {guild_id}, preserved accumulated time: {format_duration(accumulated_time)}")
                 logging.info("")
                 logging.info("")
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
