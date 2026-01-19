@@ -497,17 +497,24 @@ async def on_voice_state_update(member, before, after):
                     else:
                         logging.warning("⚠️ RECONNECT ERROR: No audio playing after join, disconnecting bot")
 
+                        # Try to send message in voice channel chat instead of general
                         text_channel = None
-                        if member.guild.system_channel:
-                            text_channel = member.guild.system_channel
-                        else:
+                        voice_client = member.guild.voice_client
+                        if voice_client and voice_client.channel:
+                            # Look for a text channel associated with the voice channel
+                            voice_channel_name = voice_client.channel.name.lower()
                             for channel in member.guild.text_channels:
                                 if channel.permissions_for(member.guild.me).send_messages:
-                                    if 'general' in channel.name.lower() or 'chat' in channel.name.lower() or 'bot' in channel.name.lower():
+                                    # Check if text channel name matches voice channel name
+                                    if voice_channel_name in channel.name.lower() or channel.name.lower() in voice_channel_name:
                                         text_channel = channel
                                         break
 
-                            if not text_channel:
+                        # Fallback to system channel or any available channel if no match found
+                        if not text_channel:
+                            if member.guild.system_channel and member.guild.system_channel.permissions_for(member.guild.me).send_messages:
+                                text_channel = member.guild.system_channel
+                            else:
                                 for channel in member.guild.text_channels:
                                     if channel.permissions_for(member.guild.me).send_messages:
                                         text_channel = channel
