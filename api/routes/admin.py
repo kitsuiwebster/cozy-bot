@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from typing import Optional
 import sys
 import os
+import json
 from pydantic import BaseModel
 
 # Add project root to path to import cogs
@@ -11,6 +12,38 @@ from cogs.stats.gamification import cozy_gamification
 
 # Initialize FastAPI router for admin endpoints
 router = APIRouter()
+
+# Load server voice time data from disk
+def load_voice_time_data():
+    try:
+        with open('data/voice_time_data.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+
+# Save server voice time data to disk
+def save_voice_time_data(data):
+    try:
+        os.makedirs('data', exist_ok=True)
+        with open('data/voice_time_data.json', 'w') as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+# Find server name by guild_id from the servernames cache
+def get_server_name_by_id(guild_id: str) -> Optional[str]:
+    try:
+        server_info = cozy_gamification.servernames.get(guild_id)
+        if isinstance(server_info, dict):
+            return server_info.get('name', f'Server {guild_id[:8]}')
+        elif isinstance(server_info, str):
+            return server_info
+        return f'Server {guild_id[:8]}'
+    except Exception:
+        return f'Server {guild_id[:8]}'
 
 # Find user_id by username from the usernames cache
 def get_user_id_by_username(username: str) -> Optional[str]:
@@ -92,6 +125,20 @@ class DeleteUserRequest(BaseModel):
 class DeleteUserResponse(BaseModel):
     success: bool
     user_id: str
+    message: str
+
+# Request model for server time modification
+class ServerTimeRequest(BaseModel):
+    guild_id: str
+    seconds: int
+
+# Response model for server time modification
+class ServerTimeResponse(BaseModel):
+    success: bool
+    guild_id: str
+    server_name: str
+    seconds_added: int
+    new_total: float
     message: str
 
 # Add or remove points from a user by username (protected by API key)
@@ -279,6 +326,62 @@ async def delete_user(request: DeleteUserRequest):
             user_id=user_id,
             message=f"Successfully deleted user '{user_id}' and all associated data"
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
+
+# Add or remove listening time (in seconds) from a server by guild_id (protected by API key)
+@router.post("/server-time", response_model=ServerTimeResponse, dependencies=[Depends(validate_api_key)])
+async def modify_server_time(request: ServerTimeRequest):
+    try:
+        guild_id = request.guild_id
+
+        # Load server voice time data
+        voice_time_data = load_voice_time_data()
+
+        # Check if server exists in data
+        if guild_id not in voice_time_data:
+            # Initialize new server with 0 time
+            voice_time_data[guild_id] = [None, 0]
+
+        # Get current server data
+        guild_data = voice_time_data[guild_id]
+
+        # Extract accumulated time (format: [start_time or None, accumulated_seconds])
+        if isinstance(guild_data, list) and len(guild_data) >= 2:
+            current_time = guild_data[1]
+        else:
+            current_time = 0
+
+        # Add time (can be negative to remove)
+        new_time = current_time + request.seconds
+
+        # Prevent negative time
+        if new_time < 0:
+            new_time = 0
+            seconds_actually_added = -current_time
+        else:
+            seconds_actually_added = request.seconds
+
+        # Update server data (preserve start_time if exists)
+        start_time = guild_data[0] if isinstance(guild_data, list) and len(guild_data) >= 1 else None
+        voice_time_data[guild_id] = [start_time, new_time]
+
+        # Save the changes
+        if not save_voice_time_data(voice_time_data):
+            raise HTTPException(status_code=500, detail="Failed to save voice time data")
+
+        # Get server name
+        server_name = get_server_name_by_id(guild_id)
+
+        return ServerTimeResponse(
+            success=True,
+            guild_id=guild_id,
+            server_name=server_name,
+            seconds_added=seconds_actually_added,
+            new_total=new_time,
+            message=f"Successfully {'added' if request.seconds >= 0 else 'removed'} {abs(seconds_actually_added)} seconds to {server_name}"
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error modifying server time: {str(e)}")
