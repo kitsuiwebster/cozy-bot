@@ -28,6 +28,7 @@ class UserStats(BaseModel):
     sessions_joined: int
     achievements_count: int
     favorite_sound: Optional[str] = None
+    days_since_last_activity: Optional[int] = None
 
 # Response model for top users list
 class TopUsersResponse(BaseModel):
@@ -242,7 +243,19 @@ async def get_top_users(limit: int = None):
                 
                 if favorite_sound:
                     favorite_sound_emoji = get_sound_display_name(favorite_sound)
-            
+
+            # Calculate days since last activity
+            days_since_last_activity = None
+            last_active_date = original_stats.get('last_active_date')
+            if last_active_date:
+                try:
+                    from datetime import datetime
+                    last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
+                    today = datetime.now()
+                    days_since_last_activity = (today - last_active).days
+                except Exception:
+                    days_since_last_activity = None
+
             user_stats = UserStats(
                 user_id=user_data['user_id'],
                 username=username,
@@ -256,7 +269,8 @@ async def get_top_users(limit: int = None):
                 level_progress=original_stats.get('level_progress', 0.0),
                 sessions_joined=original_stats.get('sessions_joined', 0),
                 achievements_count=len(original_stats.get('achievements', [])),
-                favorite_sound=favorite_sound_emoji
+                favorite_sound=favorite_sound_emoji,
+                days_since_last_activity=days_since_last_activity
             )
             users.append(user_stats)
         
