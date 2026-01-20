@@ -105,9 +105,22 @@ def save_voice_time_data(silent=False):
     os.makedirs('data', exist_ok=True)
 
     try:
+        # Reload from disk first to merge with any external changes (like API modifications)
+        file_data = load_voice_time_data()
+
+        # Merge: keep active sessions from memory, preserve file data for inactive sessions
+        merged_data = file_data.copy()
+        for guild_id, guild_data in guild_voice_time.items():
+            # If there's an active session (start_time is not None), use memory data
+            if isinstance(guild_data, list) and len(guild_data) >= 1 and guild_data[0] is not None:
+                merged_data[guild_id] = guild_data
+            # Otherwise, only update if guild not in file or memory has more recent data
+            elif guild_id not in file_data:
+                merged_data[guild_id] = guild_data
+
         with open(temp_file, 'w') as file:
             fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-            json.dump(guild_voice_time, file, indent=2)
+            json.dump(merged_data, file, indent=2)
             file.flush()
             os.fsync(file.fileno())
 
