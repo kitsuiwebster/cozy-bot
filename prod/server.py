@@ -47,4 +47,3 @@ if __name__ == "__main__":
         asyncio.run(start_bot())
     except KeyboardInterrupt:
         logging.info("🛑 Bot and API stopped by user.")
-
