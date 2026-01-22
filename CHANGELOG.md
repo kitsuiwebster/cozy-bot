@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.20] - 2026-01-22
+
+### Changed
+
+- Complete architecture refactoring with separate `dev/` and `prod/` directories for independent deployments on same VPS.
+- Docker volume configuration now uses environment-specific volumes (`cozy-bot-voice-data-dev` and `cozy-bot-voice-data-prod`).
+- FFmpeg log level changed from error to panic to suppress bitrate estimation warnings.
+
+### Fixed
+
+- Gamification username tracking bug causing AttributeError when usernames data was None or missing from initialization.
+- Server time data merge logic now preserves API modifications during periodic saves by reloading from disk.
+- Obsolete reconnect check removed that caused premature disconnections with "hiccup" error messages.
+
 ## [1.0.19] - 2026-01-19
 
 ### Added

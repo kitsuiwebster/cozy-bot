@@ -1,0 +1,19 @@
+{
+  "_comment": "Set 'current_message_type' to 'null' to disable startup messages",
+  "enabled": true,
+  "messages": {
+    "update": {
+      "title": "🚀 **Cozy Bot v1.0.6 - Major Update!** 🚀",
+      "description": "We've upgraded CozyBot with amazing new features and improvements that will make your cozy experience even better!",
+      "features": [
+        "🆕 **New Commands:** `/profile`, `/top-users`, `/achievements`, `/stop` - Discover your cozy stats and control your experience!",
+        "🏆 **Gamification System** - Earn points for listening time (1 point/minute), unlock achievements, level up, and build daily streaks! Track your favorite sounds and compete on the leaderboard.",
+        "🔧 **Fixed Audio Interruptions** - Resolved the bug where sounds would stop unexpectedly - now plays continuously!"
+      ],
+      "call_to_action": "Experience the enhanced cozy vibes with `/rain`, `/sea`, `/sparkles`, or `/music`!",
+      "footer": "We wish you a great day! ✨\n— Imène and Raphaël, CozyBot developers"
+    }
+  },
+  "current_message_type": "null"
+}
+
