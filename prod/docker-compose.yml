@@ -10,6 +10,7 @@ services:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - API_KEY=${API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     ports:
       - "${API_PORT:-8000}:8000"  # API port exposed from bot container
     volumes:
