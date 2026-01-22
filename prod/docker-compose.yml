@@ -17,7 +17,7 @@ services:
       - voice-data:/app/data
       - bot-logs:/app/logs
       # Specific environment file
-      - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
+      - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env:ro
       # SSL certificates from Let's Encrypt
       - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
