@@ -16,7 +16,7 @@ services:
       # Base volumes always mounted
       - voice-data:/app/data
       - bot-logs:/app/logs
-      # Specific environment file
+      # Specific environment file - mount to /app/.env like in dev
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env:ro
       # SSL certificates from Let's Encrypt
       - /etc/letsencrypt:/etc/letsencrypt:ro
