@@ -1,11 +1,11 @@
-# Environment files (contiennent les secrets)
+# Environment files (contain secrets)
 .env
 .env.local
 .env.prod
 .env.dev
 .env.test
 
-# Garder le fichier d'exemple
+# Keep example file
 !.env.example
 
 # Docker override files
@@ -56,13 +56,23 @@ logs/
 # Useless
 useful
 
-# Bot data (si sensible)
+# Bot data (if sensitive)
 voice_time_data.json
 
-# Scripts temporaires
+# Temporary scripts
 deploy-*.sh.backup
 
-# Autre
+# Other
 repository.txt
+
+# Dev and prod environment data
+dev/.env
+dev/data/
+dev/logs/
+prod/.env
+prod/data/
+prod/logs/
 data/
 
+# md
+TODO.md

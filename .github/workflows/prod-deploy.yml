@@ -36,8 +36,8 @@
             git reset --hard origin/main
 
             echo "🚀 Running deployment script..."
-            chmod +x deploy-prod.sh
-            ./deploy-prod.sh
+            chmod +x scripts/deploy-prod.sh
+            ./scripts/deploy-prod.sh
 
             echo "✅ Production deployment completed!"
             EOF
