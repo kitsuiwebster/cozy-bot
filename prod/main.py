@@ -332,7 +332,7 @@ async def periodic_backup():
                                 if not member.bot and str(member.id) in users_missing_sessions:
                                     cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name)
                                     cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
-                                    logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking {current_guild_sound}")
+                                    logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking \033[36m{current_guild_sound}\033[0m")
                                     users_missing_sessions.remove(str(member.id))
             
             # Log voice time changes since last save
@@ -363,7 +363,7 @@ async def periodic_backup():
                     username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
                     time_str = f'\033[94m+{format_duration(update_info["time"])}\033[0m'
                     points_str = f' (\033[32m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
-                    logging.info(f"  👉 {time_str} for {username} ({update_info['sound']} active session){points_str}")
+                    logging.info(f"  👉 {time_str} for {username} (\033[36m{update_info['sound']}\033[0m active session){points_str}")
 
             if guild_voice_time:
                 save_voice_time_data(silent=True)
@@ -499,7 +499,7 @@ async def on_voice_state_update(member, before, after):
                     if current_guild_sound:
                         for user in current_users:
                             cozy_gamification.track_sound_start(str(user.id), current_guild_sound)
-                            logging.info(f"👉 RECONNECT FIX: Restarted tracking {current_guild_sound} for \\033[35m{user.name}\\033[0m")
+                            logging.info(f"👉 RECONNECT FIX: Restarted tracking \033[36m{current_guild_sound}\033[0m for \\033[35m{user.name}\\033[0m")
                     else:
                         logging.info("👉 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
 
@@ -589,7 +589,7 @@ async def on_voice_state_update(member, before, after):
         # Find currently playing sound to track for new user
         current_sound = None
         guild_id_int = int(guild_id)
-        for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog']:
+        for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
             cog = bot.get_cog(cog_name)
             if cog and hasattr(cog, 'guild_states'):
                 guild_state = cog.guild_states.get(guild_id_int, {})
@@ -597,13 +597,13 @@ async def on_voice_state_update(member, before, after):
                     current_sound = guild_state['current_sound']
                     logging.info("")
                     logging.info("")
-                    logging.info(f"🔍 Found current sound {current_sound} in {cog_name} for guild {guild_id}")
+                    logging.info(f"🔍 Found current sound \033[36m{current_sound}\033[0m in {cog_name} for guild {guild_id}")
                     break
 
         if current_sound:
             cozy_gamification.finalize_current_sound(user_id)
             cozy_gamification.track_sound_start(user_id, current_sound)
-            logging.info(f"🎵 Tracking {current_sound} for \033[35m{member.name}\033[0m")
+            logging.info(f"🎵 Tracking \033[36m{current_sound}\033[0m for \033[35m{member.name}\033[0m")
         else:
             logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
 

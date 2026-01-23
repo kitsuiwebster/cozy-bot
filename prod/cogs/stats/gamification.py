@@ -267,7 +267,7 @@ class CozyGamification:
                         if isinstance(user_sound_data, dict):
                             for sound_name, sound_time in user_sound_data.items():
                                 if isinstance(sound_time, (int, float)) and sound_time > 0:
-                                    logging.info(f"  👉 {colorize_duration(f'+{format_duration(sound_time)}')} of {sound_name} for {username}")
+                                    logging.info(f"  👉 {colorize_duration(f'+{format_duration(sound_time)}')} of \033[36m{sound_name}\033[0m for {username}")
 
                 self.changes_since_save = {
                     'user_listening_time': {},
@@ -574,7 +574,7 @@ class CozyGamification:
                 point_word = "points" if total_points != 1 else "point"
                 points_str = f" ({colorize_points(f'+{total_points} {point_word}')})" if total_points > 0 else ""
                 bonus_str = f" [{colorize_points(f'+{bonus_points} bonus')}]" if bonus_points > 0 else ""
-                logging.info(f"👉 {colorize_duration(f'+{duration_str}')} of {sound_name} for {username}{points_str}{bonus_str}")
+                logging.info(f"👉 {colorize_duration(f'+{duration_str}')} of \033[36m{sound_name}\033[0m for {username}{points_str}{bonus_str}")
 
                 self.save_user_data()
                 
