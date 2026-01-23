@@ -149,7 +149,7 @@ class AudioRestorationMonitor:
             current_users = [member for member in channel.members if not member.bot]
             for member in current_users:
                 try:
-                    cozy_gamification.start_new_sound(str(member.id), sound_name)
+                    cozy_gamification.track_sound_start(str(member.id), sound_name)
                 except Exception as e:
                     logging.error(f"❌ Failed to start sound tracking for {member.name}: {e}")
 
