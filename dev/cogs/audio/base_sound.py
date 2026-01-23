@@ -117,8 +117,6 @@ class BaseSoundCog(commands.Cog):
         else:
             if guild_state['current_sound'] and guild_state['is_playing']:
                 self.bot.loop.create_task(self.restart_audio_loop(guild_id))
-            else:
-                logging.warning(f"❌ Not restarting - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
 
     async def on_button_click(self, interaction):
         await interaction.response.defer()
@@ -144,6 +142,8 @@ class BaseSoundCog(commands.Cog):
         user_channel = guild_state.get('target_channel')
 
         # Debug: Log current voice state
+        logging.info("")
+        logging.info("")
         logging.info(f"🔍 DEBUG: Current voice_client state: exists={voice_client is not None}, connected={voice_client.is_connected() if voice_client else 'N/A'}, channel={voice_client.channel.name if voice_client and voice_client.channel else 'None'}")
         logging.info(f"🔍 DEBUG: User wants to connect to: {user_channel.name if user_channel else 'None'}")
         logging.info(f"🔍 DEBUG: Guild: {interaction.guild.name}, Guild ID: {interaction.guild.id}")
@@ -325,7 +325,7 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
                 logging.info(f"🔍 DEBUG: About to play audio. voice_client.is_connected(): {voice_client.is_connected()}, sound_path: {sound_path}")
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic')
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=open(os.devnull, 'w'))
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
                 logging.info(f"🔍 DEBUG: Successfully started playing audio")
 
@@ -342,7 +342,7 @@ class BaseSoundCog(commands.Cog):
                     current_users = [member for member in voice_client.channel.members if not member.bot]
                     logging.info("")
                     logging.info("")
-                    logging.info(f"🎵 SOUND START: {sound_filename} in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
+                    logging.info(f"🎵 SOUND START: \033[36m{sound_filename}\033[0m in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
 
                     for member in current_users:
                         cozy_gamification.finalize_current_sound(str(member.id))
@@ -353,7 +353,7 @@ class BaseSoundCog(commands.Cog):
                     for member in current_users:
                         cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name)
                         cozy_gamification.track_sound_start(member.id, sound_filename)
-                        logging.info(f"🎵 Tracking {sound_filename} for \033[35m{member.name}\033[0m")
+                        logging.info(f"🎵 Tracking \033[36m{sound_filename}\033[0m for \033[35m{member.name}\033[0m")
 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -465,7 +465,11 @@ class BaseSoundCog(commands.Cog):
             voice_client = guild_state.get('voice_client')
             current_sound = guild_state['current_sound']
 
-            logging.info(f"🔄 restart_audio_loop called by {self.__class__.__name__} for guild {guild_id}, current_sound: {current_sound}")
+            guild = self.bot.get_guild(guild_id)
+            guild_name = guild.name if guild else f"guild {guild_id}"
+            logging.info("")
+            logging.info("")
+            logging.info(f"👉 Restarting \033[36m{current_sound}\033[0m in {guild_name}")
 
             # Get voice client from guild if not in state
             if not voice_client:
@@ -475,7 +479,7 @@ class BaseSoundCog(commands.Cog):
 
             # Only restart if we should still be playing
             if not current_sound or not guild_state['is_playing'] or not voice_client:
-                logging.info(f"🔄 restart_audio_loop skipped: current_sound={current_sound}, is_playing={guild_state['is_playing']}, voice_client={voice_client is not None}")
+                logging.info(f"🔄 restart_audio_loop skipped: current_sound=\033[36m{current_sound}\033[0m, is_playing={guild_state['is_playing']}, voice_client={voice_client is not None}")
                 return
                 
             # Small delay to avoid rapid restart issues
@@ -497,7 +501,7 @@ class BaseSoundCog(commands.Cog):
             
             # Restart audio if file exists and voice client is ready
             if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic')
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=open(os.devnull, 'w'))
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             
         except Exception as e:
