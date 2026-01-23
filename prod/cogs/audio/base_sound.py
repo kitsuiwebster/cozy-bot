@@ -512,4 +512,3 @@ class BaseSoundCog(commands.Cog):
             if guild_state['is_playing'] and guild_state['current_sound']:
                 self.bot.loop.create_task(self.restart_audio_loop(guild_id))
 
-
