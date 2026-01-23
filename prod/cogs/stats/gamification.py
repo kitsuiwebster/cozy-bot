@@ -45,8 +45,23 @@ class CozyGamification:
     def load_user_data(self) -> Dict:
         try:
             os.makedirs('data', exist_ok=True)
-            
+
             if ENCRYPTION_ENABLED:
+                # Check if unencrypted .json is newer than encrypted .enc
+                json_exists = os.path.exists(self.data_file)
+                enc_exists = os.path.exists(self.data_file + '.enc')
+
+                if json_exists and enc_exists:
+                    json_mtime = os.path.getmtime(self.data_file)
+                    enc_mtime = os.path.getmtime(self.data_file + '.enc')
+                    if json_mtime > enc_mtime:
+                        logging.info('👉 Unencrypted file is newer, migrating...')
+                        with open(self.data_file, 'r') as file:
+                            data = json.load(file)
+                            if isinstance(data, dict):
+                                self._migrate_to_encrypted(data)
+                                return data
+
                 data = encryption.load_encrypted_json(self.data_file)
                 if data:
                     logging.info('🔒 Loaded encrypted gamification data')
@@ -99,6 +114,21 @@ class CozyGamification:
     def load_usernames(self) -> Dict:
         try:
             if ENCRYPTION_ENABLED:
+                # Check if unencrypted .json is newer than encrypted .enc
+                json_exists = os.path.exists(self.usernames_file)
+                enc_exists = os.path.exists(self.usernames_file + '.enc')
+
+                if json_exists and enc_exists:
+                    json_mtime = os.path.getmtime(self.usernames_file)
+                    enc_mtime = os.path.getmtime(self.usernames_file + '.enc')
+                    if json_mtime > enc_mtime:
+                        logging.info('👉 Usernames .json is newer, migrating...')
+                        with open(self.usernames_file, 'r') as file:
+                            data = json.load(file)
+                            if isinstance(data, dict):
+                                self._migrate_usernames_to_encrypted(data)
+                                return data
+
                 data = encryption.load_encrypted_json(self.usernames_file)
                 if data is not None:
                     logging.info('🔒 Loaded encrypted usernames cache')
