@@ -109,14 +109,14 @@ class BaseSoundCog(commands.Cog):
     # Audio playback completion callback
     def after_playing(self, error, guild_id):
         guild_state = self.get_guild_state(guild_id)
-        
+
         if error:
             logging.error(f"❌ Player error: {error}")
             if guild_state['current_sound'] and guild_state['is_playing']:
-                asyncio.create_task(self.restart_audio_loop(guild_id))
+                self.bot.loop.create_task(self.restart_audio_loop(guild_id))
         else:
             if guild_state['current_sound'] and guild_state['is_playing']:
-                asyncio.create_task(self.restart_audio_loop(guild_id))
+                self.bot.loop.create_task(self.restart_audio_loop(guild_id))
             else:
                 logging.warning(f"❌ Not restarting - current_sound: {guild_state['current_sound']}, is_playing: {guild_state['is_playing']}")
 
@@ -506,6 +506,6 @@ class BaseSoundCog(commands.Cog):
             await asyncio.sleep(1)
             guild_state = self.get_guild_state(guild_id)
             if guild_state['is_playing'] and guild_state['current_sound']:
-                asyncio.create_task(self.restart_audio_loop(guild_id))
+                self.bot.loop.create_task(self.restart_audio_loop(guild_id))
 
 
