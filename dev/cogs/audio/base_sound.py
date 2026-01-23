@@ -481,7 +481,7 @@ class BaseSoundCog(commands.Cog):
             if not current_sound or not guild_state['is_playing'] or not voice_client:
                 logging.info(f"🔄 restart_audio_loop skipped: current_sound=\033[36m{current_sound}\033[0m, is_playing={guild_state['is_playing']}, voice_client={voice_client is not None}")
                 return
-                
+
             # Small delay to avoid rapid restart issues
             await asyncio.sleep(0.1)
             
