@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.21] - 2026-01-23
+
+### Fixed
+
+- Voice connection stability issues: audio now starts in <2s (removed FFmpeg stream loop), race conditions prevented with async locks, ghost connections eliminated, timeout increased to 30s with exponential backoff, and "Already connected" errors resolved.
+
 ## [1.0.20] - 2026-01-22
 
 ### Changed

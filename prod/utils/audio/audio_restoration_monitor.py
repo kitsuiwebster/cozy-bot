@@ -125,16 +125,9 @@ class AudioRestorationMonitor:
                 logging.error(f"❌ Sound file not found: {sound_name}")
                 return
             
-            # Play the audio with infinite loop
-            audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel error -stream_loop -1')
-            voice_client.play(audio_source)
-
-            # Update global state to track what's playing
-            from cogs.audio.base_sound import global_current_sounds
-            global_current_sounds[guild.id] = sound_name
-
-            # Update the corresponding cog's guild_state
+            # Update the corresponding cog's guild_state first
             cog_name = self.get_cog_name_for_sound(sound_name)
+            cog = None
             if cog_name:
                 cog = self.bot.get_cog(cog_name)
                 if cog and hasattr(cog, 'guild_states'):
@@ -143,6 +136,18 @@ class AudioRestorationMonitor:
                     guild_state['current_sound'] = sound_name
                     guild_state['target_channel'] = channel
                     logging.info(f"✅ Updated {cog_name} guild_state for {guild.name}")
+
+            # Play the audio with callback for looping (removed -stream_loop for instant start)
+            audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel error')
+            # Use the cog's after_playing callback if available
+            if cog and hasattr(cog, 'after_playing'):
+                voice_client.play(audio_source, after=lambda e: cog.after_playing(e, guild.id))
+            else:
+                voice_client.play(audio_source)
+
+            # Update global state to track what's playing
+            from cogs.audio.base_sound import global_current_sounds
+            global_current_sounds[guild.id] = sound_name
 
             # Update gamification current_sound for each user in the channel
             from cogs.stats.gamification import cozy_gamification

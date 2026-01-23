@@ -54,6 +54,7 @@ class BaseSoundCog(commands.Cog):
         self.sound_labels = sound_labels
         self.description = description
         self.guild_states = {}
+        self.connection_locks = {}  # Prevent simultaneous connection attempts per guild
 
     async def play_sound_command(self, interaction, prompt_message):
         await interaction.response.defer()
@@ -174,59 +175,90 @@ class BaseSoundCog(commands.Cog):
                     await interaction.followup.send("❌ Bot doesn't have 'Speak' permission in this channel.", ephemeral=True)
                     return
 
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        logging.info(f"🔍 DEBUG: Attempting to connect (attempt {attempt + 1}/{max_retries})")
-                        voice_client = await asyncio.wait_for(user_channel.connect(), timeout=20.0)
-                        logging.info(f"🔍 DEBUG: Connected to channel, voice_client.is_connected(): {voice_client.is_connected()}")
+                # Use guild-level lock to prevent simultaneous connection attempts
+                if guild_id not in self.connection_locks:
+                    self.connection_locks[guild_id] = asyncio.Lock()
 
-                        # Wait briefly for voice state to stabilize
-                        await asyncio.sleep(0.5)
-                        logging.info(f"🔍 DEBUG: After delay, voice_client.is_connected(): {voice_client.is_connected()}")
+                async with self.connection_locks[guild_id]:
+                    # Double-check if already connected (another request might have connected while waiting for lock)
+                    voice_client = interaction.guild.voice_client
+                    if voice_client and voice_client.is_connected():
+                        logging.info(f"✅ Another request already connected to {voice_client.channel.name} while waiting for lock")
+                    else:
+                        max_retries = 3
+                        retry_delay = 2.0  # Start with 2 seconds
 
-                        logging.info(f"🔍 DEBUG: About to start disconnect timer")
-                        await self.start_disconnect_timer(guild_id)
-                        logging.info(f"🔍 DEBUG: Disconnect timer started successfully")
-                        break
-                    except asyncio.TimeoutError:
-                        logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
-
-                        # Check if bot connected anyway despite timeout (stuck session bug workaround)
-                        voice_client = interaction.guild.voice_client
-                        if voice_client and voice_client.is_connected():
-                            logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
-                            await asyncio.sleep(0.5)
-                            logging.info(f"🔍 DEBUG: After timeout workaround, voice_client.is_connected(): {voice_client.is_connected()}")
-
-                            logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
-                            await self.start_disconnect_timer(guild_id)
-                            logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
-                            break
-
-                        # Really not connected, retry or fail
-                        if attempt == max_retries - 1:
-                            await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
-                            return
-                        await asyncio.sleep(3)
-                    except Exception as e:
-                        logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} failed with exception: {type(e).__name__}: {str(e)}")
-                        # Handle "Already connected" error by forcing cleanup
-                        if "already connected" in str(e).lower():
-                            logging.warning(f"⚠️ Already connected error detected, forcing cleanup...")
+                        for attempt in range(max_retries):
                             try:
-                                existing_vc = interaction.guild.voice_client
-                                if existing_vc:
-                                    await existing_vc.disconnect(force=True)
-                                    await asyncio.sleep(1)
-                            except:
-                                pass
+                                logging.info(f"🔍 DEBUG: Attempting to connect (attempt {attempt + 1}/{max_retries})")
+                                # Increased timeout to 30 seconds for better reliability with slow Discord servers
+                                voice_client = await asyncio.wait_for(user_channel.connect(), timeout=30.0)
+                                logging.info(f"🔍 DEBUG: Connected to channel, voice_client.is_connected(): {voice_client.is_connected()}")
 
-                        logging.error(f"❌ Connection attempt {attempt + 1} failed: {str(e)}")
-                        if attempt == max_retries - 1:
-                            await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
-                            return
-                        await asyncio.sleep(2)
+                                # Wait briefly for voice state to stabilize
+                                await asyncio.sleep(1.0)
+                                logging.info(f"🔍 DEBUG: After delay, voice_client.is_connected(): {voice_client.is_connected()}")
+
+                                logging.info(f"🔍 DEBUG: About to start disconnect timer")
+                                await self.start_disconnect_timer(guild_id)
+                                logging.info(f"🔍 DEBUG: Disconnect timer started successfully")
+                                break
+                            except asyncio.TimeoutError:
+                                logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
+
+                                # Check if bot connected anyway despite timeout (stuck session bug workaround)
+                                await asyncio.sleep(1.0)
+                                voice_client = interaction.guild.voice_client
+                                if voice_client and voice_client.is_connected():
+                                    logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
+                                    logging.info(f"🔍 DEBUG: After timeout workaround, voice_client.is_connected(): {voice_client.is_connected()}")
+
+                                    logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
+                                    await self.start_disconnect_timer(guild_id)
+                                    logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                                    break
+
+                                # Really not connected, retry or fail
+                                if attempt == max_retries - 1:
+                                    await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
+                                    return
+
+                                # Exponential backoff
+                                logging.info(f"⏳ Waiting {retry_delay}s before retry...")
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 1.5  # Increase delay for next retry
+                            except Exception as e:
+                                logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} failed with exception: {type(e).__name__}: {str(e)}")
+                                # Handle "Already connected" error by graceful cleanup
+                                if "already connected" in str(e).lower():
+                                    logging.warning(f"⚠️ Already connected error detected, checking existing connection...")
+                                    try:
+                                        existing_vc = interaction.guild.voice_client
+                                        if existing_vc:
+                                            # If it's actually connected, use it
+                                            if existing_vc.is_connected():
+                                                logging.info(f"✅ Using existing valid connection to {existing_vc.channel.name}")
+                                                voice_client = existing_vc
+                                                await self.start_disconnect_timer(guild_id)
+                                                break
+                                            else:
+                                                # Disconnect ghost connection gracefully
+                                                logging.warning(f"🧹 Cleaning up ghost connection...")
+                                                await existing_vc.disconnect()
+                                                await asyncio.sleep(2)
+                                    except Exception as cleanup_error:
+                                        logging.error(f"❌ Cleanup error: {cleanup_error}")
+                                        await asyncio.sleep(2)
+
+                                logging.error(f"❌ Connection attempt {attempt + 1} failed: {str(e)}")
+                                if attempt == max_retries - 1:
+                                    await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
+                                    return
+
+                                # Exponential backoff
+                                logging.info(f"⏳ Waiting {retry_delay}s before retry...")
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 1.5
             else:
                 logging.error(f"❌ DEBUG: No target voice channel found")
                 await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
@@ -293,8 +325,8 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
                 logging.info(f"🔍 DEBUG: About to play audio. voice_client.is_connected(): {voice_client.is_connected()}, sound_path: {sound_path}")
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic -stream_loop -1')
-                voice_client.play(audio_source)
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic')
+                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
                 logging.info(f"🔍 DEBUG: Successfully started playing audio")
 
                 guild_state['is_playing'] = True
@@ -465,8 +497,8 @@ class BaseSoundCog(commands.Cog):
             
             # Restart audio if file exists and voice client is ready
             if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic -stream_loop -1')
-                voice_client.play(audio_source)
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic')
+                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             
         except Exception as e:
             logging.error(f"❌ Failed to restart audio loop: {e}")
