@@ -298,16 +298,18 @@ class BaseSoundCog(commands.Cog):
             logging.info(f"🔍 DEBUG: Stopped playing audio")
 
         # Verify voice client is properly connected before playing
-        logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
+        # For large bots, is_connected() may be False even when physically connected
+        # Check voice_client.channel instead
+        logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, channel={voice_client.channel.name if voice_client and voice_client.channel else 'None'}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
 
         if not voice_client:
             await interaction.followup.send("❌ Voice client is None. This shouldn't happen - please report this bug.", ephemeral=True)
             logging.error(f"❌ CRITICAL: voice_client is None after connection logic. Guild: {interaction.guild.name}, User: {interaction.user.name}")
             return
 
-        if not voice_client.is_connected():
+        if not voice_client.channel:
             await interaction.followup.send("❌ Bot appears connected but Discord reports not connected. Try disconnecting the bot and trying again.", ephemeral=True)
-            logging.error(f"❌ CRITICAL: voice_client.is_connected() is False. Guild: {interaction.guild.name}, Channel: {voice_client.channel if hasattr(voice_client, 'channel') else 'unknown'}")
+            logging.error(f"❌ CRITICAL: voice_client.channel is None. Guild: {interaction.guild.name}, is_connected: {voice_client.is_connected()}")
             return
 
         logging.info(f"✅ DEBUG: All verification checks passed, proceeding to play audio")
