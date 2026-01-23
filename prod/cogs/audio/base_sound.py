@@ -207,7 +207,8 @@ class BaseSoundCog(commands.Cog):
                                 logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
 
                                 # Check if bot connected anyway despite timeout (stuck session bug workaround)
-                                await asyncio.sleep(1.0)
+                                logging.info(f"⏳ Waiting 60s to check if bot connected despite timeout...")
+                                await asyncio.sleep(60.0)
                                 voice_client = interaction.guild.voice_client
                                 if voice_client and voice_client.is_connected():
                                     logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
