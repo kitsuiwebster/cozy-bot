@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.22] - 2026-01-24
+
+### Added
+
+- User count validation before voice connection with helpful error message for Discord token limitation workaround.
+- Bidirectional merge scripts (merge_to_prod.sh and merge_to_dev.sh) for dev/prod synchronization.
+
+### Fixed
+
+- Voice connection attempts now blocked when 2+ users in channel, preventing timeout issues on production token.
+
 ## [1.0.21] - 2026-01-23
 
 ### Fixed
