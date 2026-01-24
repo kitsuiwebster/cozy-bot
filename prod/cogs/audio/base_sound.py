@@ -207,18 +207,23 @@ class BaseSoundCog(commands.Cog):
                                 logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
 
                                 # Check if bot connected anyway despite timeout (stuck session bug workaround)
-                                # For large verified bots, is_connected() can stay False even when physically connected
-                                # Check if voice_client.channel exists instead
-                                logging.info(f"⏳ Waiting 5s to check if bot connected despite timeout...")
-                                await asyncio.sleep(5.0)
-                                voice_client = interaction.guild.voice_client
-                                if voice_client and voice_client.channel:
-                                    logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
-                                    logging.info(f"🔍 DEBUG: After timeout workaround, voice_client.channel: {voice_client.channel.name}, is_connected(): {voice_client.is_connected()}")
+                                # For large verified bots, is_connected() takes time to become True
+                                # Wait up to 30s checking every 2s
+                                logging.info(f"⏳ Checking if bot connected despite timeout (will wait up to 30s)...")
+                                for check_num in range(15):  # 15 checks x 2s = 30s max
+                                    await asyncio.sleep(2.0)
+                                    voice_client = interaction.guild.voice_client
+                                    if voice_client and voice_client.is_connected():
+                                        logging.warning(f"⚠️ Connection timed out but bot is now connected to {voice_client.channel.name} (took {(check_num+1)*2}s)")
+                                        logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
+                                        await self.start_disconnect_timer(guild_id)
+                                        logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                                        break
+                                    elif voice_client and voice_client.channel:
+                                        logging.info(f"🔍 DEBUG: Check {check_num+1}/15: voice_client.channel exists but is_connected() still False...")
 
-                                    logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
-                                    await self.start_disconnect_timer(guild_id)
-                                    logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                                # If we found valid connection, break from retry loop
+                                if voice_client and voice_client.is_connected():
                                     break
 
                                 # Really not connected, retry or fail
@@ -298,18 +303,16 @@ class BaseSoundCog(commands.Cog):
             logging.info(f"🔍 DEBUG: Stopped playing audio")
 
         # Verify voice client is properly connected before playing
-        # For large bots, is_connected() may be False even when physically connected
-        # Check voice_client.channel instead
-        logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, channel={voice_client.channel.name if voice_client and voice_client.channel else 'None'}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
+        logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
 
         if not voice_client:
             await interaction.followup.send("❌ Voice client is None. This shouldn't happen - please report this bug.", ephemeral=True)
             logging.error(f"❌ CRITICAL: voice_client is None after connection logic. Guild: {interaction.guild.name}, User: {interaction.user.name}")
             return
 
-        if not voice_client.channel:
+        if not voice_client.is_connected():
             await interaction.followup.send("❌ Bot appears connected but Discord reports not connected. Try disconnecting the bot and trying again.", ephemeral=True)
-            logging.error(f"❌ CRITICAL: voice_client.channel is None. Guild: {interaction.guild.name}, is_connected: {voice_client.is_connected()}")
+            logging.error(f"❌ CRITICAL: voice_client.is_connected() is False. Guild: {interaction.guild.name}, Channel: {voice_client.channel if hasattr(voice_client, 'channel') else 'unknown'}")
             return
 
         logging.info(f"✅ DEBUG: All verification checks passed, proceeding to play audio")
