@@ -64,7 +64,7 @@ handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 discord_logger.propagate = False
 discord_logger.addHandler(handler)
-discord_logger.setLevel(logging.DEBUG)  # Changed from ERROR to DEBUG for detailed Discord logs
+discord_logger.setLevel(logging.ERROR)
 
 # Configure Discord bot intents
 intents = discord.Intents.default()
