@@ -175,6 +175,24 @@ class BaseSoundCog(commands.Cog):
                     await interaction.followup.send("❌ Bot doesn't have 'Speak' permission in this channel.", ephemeral=True)
                     return
 
+                # Check number of users in voice channel (workaround for Discord token issue)
+                members_in_channel = [m for m in user_channel.members if not m.bot]
+                user_count = len(members_in_channel)
+
+                if user_count >= 2:
+                    await interaction.followup.send(
+                        "⚠️ **Temporary Discord Issue**\n\n"
+                        "Due to a Discord-side limitation affecting our bot, you need to be **alone in the voice channel** when starting a sound.\n\n"
+                        "**Workaround:**\n"
+                        "1. Be the only person in the voice channel\n"
+                        "2. Start your sound with `/rain` (or other commands)\n"
+                        "3. Your friends can then join and listen together!\n\n"
+                        "Our team is actively working with Discord Support to resolve this issue. Thank you for your patience! 💙",
+                        ephemeral=True
+                    )
+                    logging.warning(f"⚠️ Blocked connection attempt - {user_count} users in channel (Discord token limitation)")
+                    return
+
                 # Use guild-level lock to prevent simultaneous connection attempts
                 if guild_id not in self.connection_locks:
                     self.connection_locks[guild_id] = asyncio.Lock()
