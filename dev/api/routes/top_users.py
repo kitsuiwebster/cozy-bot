@@ -35,18 +35,8 @@ class TopUsersResponse(BaseModel):
     users: List[UserStats]
     total_count: int
 
-# Load cozy points data with encryption support
+# Load cozy points data (plain JSON)
 def load_cozy_points_data():
-    # Try to import encryption utilities
-    try:
-        from utils.encryption import encryption
-        data = encryption.load_encrypted_json('data/cozy_points.json')
-        if data:
-            return data
-    except ImportError:
-        pass
-    
-    # Fallback to standard JSON loading
     data_file = 'data/cozy_points.json'
     try:
         with open(data_file, 'r') as file:
@@ -56,18 +46,8 @@ def load_cozy_points_data():
     except json.JSONDecodeError:
         return {}
 
-# Load usernames cache with encryption support
+# Load usernames cache (plain JSON)
 def load_usernames_data():
-    # Try to import encryption utilities
-    try:
-        from utils.encryption import encryption
-        data = encryption.load_encrypted_json('data/usernames.json')
-        if data:
-            return data
-    except ImportError:
-        pass
-    
-    # Fallback to standard JSON loading
     data_file = 'data/usernames.json'
     try:
         with open(data_file, 'r') as file:

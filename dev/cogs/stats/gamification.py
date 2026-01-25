@@ -7,13 +7,9 @@ import fcntl
 import logging
 import traceback
 
-try:
-    from utils.encryption import encryption
-    ENCRYPTION_ENABLED = True
-    logging.info("🔒 Encryption enabled for data storage")
-except ImportError:
-    ENCRYPTION_ENABLED = False
-    logging.warning("⚡ Encryption disabled - install cryptography for data encryption")
+# Encryption disabled - using plain JSON until CouchDB setup
+ENCRYPTION_ENABLED = False
+logging.info("📝 Using plain JSON storage (encryption disabled)")
 
 # Terminal color formatting helpers
 def colorize_points(text):
