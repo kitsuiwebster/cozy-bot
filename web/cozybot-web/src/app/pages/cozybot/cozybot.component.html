@@ -1,0 +1,366 @@
+<div class="container">
+  <div class="header">
+    <div class="header-content">
+      <div class="bot-info">
+        <div class="bot-avatar">
+          <img src="assets/images/cozybot/cozybot-logo3.png" alt="CozyBot Logo" />
+        </div>
+        <div class="bot-details">
+          <h1 [class.animating]="animatingTitle">CozyBot</h1>
+          <p class="bot-description">Discord Bot • Leaderboard</p>
+          <div class="view-selector">
+            <select [(ngModel)]="selectedView" (change)="onViewChange()" class="view-select">
+              <option value="users">Top Users</option>
+              <option value="servers">Top Servers</option>
+              <option value="sounds">Top Sounds</option>
+            </select>
+            <a href="https://discord.com/oauth2/authorize?client_id=1156917047284994178&permissions=8&scope=bot" 
+               target="_blank" 
+               class="add-to-server-btn">
+              Add to your Discord server
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingUsers">{{ getTotalUsers() }}</span>
+          <span class="stat-label">Total Users</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingTotalServers">{{ liveStats.total_servers }}</span>
+          <span class="stat-label">Total Servers</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingTime">{{ getTotalTimeDays() }}</span>
+          <span class="stat-label">Total Time</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Stats en haut au centre en gros -->
+  <div class="live-stats-section">
+    <div class="live-stats">
+      <div class="live-stat-combined" [class.loading]="statsLoading">
+        <span class="live-stat-text">
+          <span class="live-stat-number" 
+                [class.animating]="animatingListeners"
+                [class.pulse-glow]="liveStats.current_listeners > 0">{{ liveStats.current_listeners }}</span>
+          <span class="live-stat-word">{{ liveStats.current_listeners === 1 ? 'person' : 'people' }} in</span>
+          <span class="live-stat-number" 
+                [class.animating]="animatingServers"
+                [class.pulse-glow]="liveStats.servers_with_bot > 0">{{ liveStats.servers_with_bot }}</span>
+          <span class="live-stat-word">{{ liveStats.servers_with_bot === 1 ? 'server' : 'servers' }}</span>
+        </span>
+        <span class="live-stat-label">🎧 listening now</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- How to earn points link -->
+  <div class="points-info-section">
+    <div class="points-info">
+      <a href="/cozypoints" class="points-link">How to earn points? →</a>
+    </div>
+  </div>
+
+  <div class="leaderboard-section">
+    <div class="section-header">
+      <h2 *ngIf="selectedView === 'users'">🏆 Top CozyBot users by CozyPoints</h2>
+      <h2 *ngIf="selectedView === 'servers'">🏆 Top CozyBot servers by listening time</h2>
+      <h2 *ngIf="selectedView === 'sounds'">🏆 Top CozyBot sounds by listening time</h2>
+      <p *ngIf="selectedView === 'users'">Ranking based on Discord activity</p>
+      <p *ngIf="selectedView === 'servers'">Ranking based on total listening time</p>
+      <p *ngIf="selectedView === 'sounds'">Ranking based on total listening time</p>
+      <div *ngIf="selectedView === 'users'" class="total-points-display">
+        <span class="points-number" [class.animating]="animatingPoints">{{ getTotalPoints() | number }}</span>
+        <span class="points-label">Total CozyPoints earned by all users</span>
+      </div>
+      <div *ngIf="selectedView === 'sounds'" class="total-sessions-display">
+        <span class="sessions-number" [class.animating]="animatingSessions">{{ getTotalSessions() | number }}</span>
+        <span class="sessions-label">Total Sessions played by all users</span>
+      </div>
+      
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading leaderboard...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="error" class="error">
+      <span class="error-icon">⚠️</span>
+      <p>{{ error }}</p>
+    </div>
+
+    <!-- Users Leaderboard -->
+    <div *ngIf="!loading && !error && selectedView === 'users'" class="leaderboard">
+      <!-- Leaderboard list -->
+      <div class="leaderboard-list users-list">
+        <div *ngFor="let user of getRemainingUsers(); trackBy: trackByUserId"
+             class="leaderboard-item"
+             (click)="openUserModal(user.username)"
+             style="cursor: pointer;">
+          <div class="rank-number" [ngClass]="getRankColorClass(user)">{{ user.rank }}</div>
+          <div class="user-info">
+            <div class="user-avatar-small"><span class="emoji-only">{{ getFavoriteSoundEmoji(user) }}</span></div>
+            <div class="user-details">
+              <span class="username">{{ getDisplayName(user) }}</span>
+              <div class="user-meta">
+                <span class="level-badge">Lvl {{ user.level }}</span>
+                <span class="time-spent">
+                  <span class="desktop-text">{{ getListeningTimeDays(user.listening_time_seconds) }} <small class="favorite-sound">{{ getFavoriteSound(user) }}</small></span>
+                  <span class="mobile-text">{{ getListeningTimeDays(user.listening_time_seconds) }} <small class="favorite-sound">{{ getFavoriteSound(user) }}</small></span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="points-section">
+            <div class="points">{{ formatPoints(user.total_points) }}</div>
+            <div class="points-label">CozyPoints</div>
+          </div>
+          <div class="streak-section">
+            <span class="streak" *ngIf="user.daily_streak && user.daily_streak > 0"><span class="emoji-only">🔥</span><small>{{ user.daily_streak }}</small></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination for Users -->
+      <div *ngIf="totalPages > 1" class="pagination">
+        <button class="pagination-btn" [disabled]="!hasPreviousPage" (click)="goToPreviousPage()">
+          ← Previous
+        </button>
+        <div class="page-numbers">
+          <button *ngFor="let page of getPageNumbers()" 
+                  class="page-number" 
+                  [class.active]="page === currentPage"
+                  (click)="goToPage(page)">
+            {{ page }}
+          </button>
+        </div>
+        <button class="pagination-btn" [disabled]="!hasNextPage" (click)="goToNextPage()">
+          Next →
+        </button>
+      </div>
+    </div>
+
+    <!-- Servers Leaderboard -->
+    <div *ngIf="!loading && !error && selectedView === 'servers'" class="leaderboard">
+      <div class="leaderboard-list">
+        <div *ngFor="let server of servers; trackBy: trackByServerId" 
+             class="leaderboard-item">
+          <div class="user-info">
+            <div class="user-avatar-small">{{ server.rank }}</div>
+            <div class="user-details">
+              <span class="username server-name">{{ server.server_name }}</span>
+            </div>
+          </div>
+          <div class="points-section">
+            <div class="points">{{ formatTime(server.total_time_seconds) }}</div>
+            <div class="points-label">Total Time</div>
+          </div>
+          <div class="streak-section">
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination for Servers -->
+      <div *ngIf="totalPages > 1" class="pagination">
+        <button class="pagination-btn" [disabled]="!hasPreviousPage" (click)="goToPreviousPage()">
+          ← Previous
+        </button>
+        <div class="page-numbers">
+          <button *ngFor="let page of getPageNumbers()" 
+                  class="page-number" 
+                  [class.active]="page === currentPage"
+                  (click)="goToPage(page)">
+            {{ page }}
+          </button>
+        </div>
+        <button class="pagination-btn" [disabled]="!hasNextPage" (click)="goToNextPage()">
+          Next →
+        </button>
+      </div>
+    </div>
+
+    <!-- Sounds Leaderboard -->
+    <div *ngIf="!loading && !error && selectedView === 'sounds'" class="leaderboard">
+      <div class="leaderboard-list">
+        <div *ngFor="let sound of sounds; let i = index; trackBy: trackBySoundName" 
+             class="leaderboard-item">
+          <div class="user-info">
+            <div class="user-avatar-small">{{ i + 1 }}</div>
+            <div class="user-details">
+              <span class="username sound-name">{{ sound.display_name }}</span>
+              <div class="user-meta">
+                <span class="level-badge">{{ sound.total_sessions }} sessions</span>
+                <span class="time-spent">{{ sound.unique_listeners }} unique listeners</span>
+              </div>
+            </div>
+          </div>
+          <div class="points-section">
+            <div class="points">{{ formatTime(sound.total_time) }}</div>
+            <div class="points-label">Total Time</div>
+          </div>
+          <div class="streak-section">
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination for Sounds -->
+      <div *ngIf="totalPages > 1" class="pagination">
+        <button class="pagination-btn" [disabled]="!hasPreviousPage" (click)="goToPreviousPage()">
+          ← Previous
+        </button>
+        <div class="page-numbers">
+          <button *ngFor="let page of getPageNumbers()"
+                  class="page-number"
+                  [class.active]="page === currentPage"
+                  (click)="goToPage(page)">
+            {{ page }}
+          </button>
+        </div>
+        <button class="pagination-btn" [disabled]="!hasNextPage" (click)="goToNextPage()">
+          Next →
+        </button>
+      </div>
+
+      <!-- Camemberts des sons -->
+      <div class="sounds-charts-wrapper" *ngIf="soundsChartData.length > 0">
+        <!-- Camembert par catégorie -->
+        <div class="sounds-chart-section">
+          <div class="sounds-chart-container">
+            <ngx-charts-pie-chart
+              [results]="soundsByCategoryChartData"
+              [legend]="false"
+              [labels]="true"
+              [doughnut]="false"
+              [explodeSlices]="false"
+              [animations]="true"
+              [view]="chartView"
+              [scheme]="colorScheme"
+              [trimLabels]="false"
+              [labelFormatting]="formatChartLabel">
+            </ngx-charts-pie-chart>
+          </div>
+        </div>
+
+        <!-- Camembert par son -->
+        <div class="sounds-chart-section">
+          <div class="sounds-chart-container">
+            <ngx-charts-pie-chart
+              [results]="soundsChartData"
+              [legend]="false"
+              [labels]="true"
+              [doughnut]="false"
+              [explodeSlices]="false"
+              [animations]="true"
+              [view]="chartView"
+              [scheme]="colorScheme"
+              [trimLabels]="false"
+              [labelFormatting]="formatChartLabel">
+            </ngx-charts-pie-chart>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal des détails de l'utilisateur -->
+<div *ngIf="showUserModal" class="user-modal-overlay" (click)="closeUserModal()">
+  <div class="user-modal-content" (click)="$event.stopPropagation()">
+    <button class="modal-close-btn" (click)="closeUserModal()">✕</button>
+
+    <div *ngIf="loadingUserDetails" class="modal-loading">
+      <div class="spinner"></div>
+      <p>Loading user details...</p>
+    </div>
+
+    <div *ngIf="!loadingUserDetails && selectedUserDetails" class="user-details-container">
+      <!-- Header avec avatar et nom -->
+      <div class="user-header">
+        <div class="user-avatar-large">
+          <span class="emoji-only">{{ getFavoriteSoundEmoji(selectedUserDetails) }}</span>
+        </div>
+        <div class="user-header-info">
+          <h2 class="user-display-name">
+            {{ selectedUserDetails.display_name }}
+            <span *ngIf="selectedUserDetails.current_sound" class="live-indicator" title="Currently listening"></span>
+          </h2>
+        </div>
+      </div>
+
+      <!-- Stats principales -->
+      <div class="user-main-stats">
+        <div class="stat-box">
+          <div class="stat-value">{{ selectedUserDetails.total_points }}</div>
+          <div class="stat-label">Points</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">#{{ selectedUserDetails.rank }}</div>
+          <div class="stat-label">Rank</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">{{ selectedUserDetails.level }}</div>
+          <div class="stat-label">Level</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">{{ selectedUserDetails.daily_streak }}</div>
+          <div class="stat-label">Streak 🔥</div>
+        </div>
+      </div>
+
+      <!-- Progress bar du level -->
+      <div class="level-progress">
+        <div class="progress-label">Level Progress: {{ selectedUserDetails.level_progress }}%</div>
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="selectedUserDetails.level_progress"></div>
+        </div>
+      </div>
+
+      <!-- Listening stats -->
+      <div class="listening-stats">
+        <div class="stat-item">
+          <span class="stat-icon">⏱️</span>
+          <span class="stat-text">{{ formatListeningTimeDays(selectedUserDetails.listening_time_seconds) }}</span>
+          <span class="stat-desc">Total listening time</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">🎧</span>
+          <span class="stat-text">{{ selectedUserDetails.sessions_joined }}</span>
+          <span class="stat-desc">Sessions joined</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">📅</span>
+          <span class="stat-text">{{ selectedUserDetails.days_since_last_activity }} day(s) ago</span>
+          <span class="stat-desc">Last activity</span>
+        </div>
+      </div>
+
+      <!-- Achievements -->
+      <div *ngIf="selectedUserDetails.achievements && selectedUserDetails.achievements.length > 0" class="achievements-section">
+        <h3>🏆 Achievements</h3>
+        <div class="achievements-grid">
+          <div *ngFor="let achievement of selectedUserDetails.achievements" class="achievement-badge">
+            {{ achievement }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Sounds -->
+      <div *ngIf="selectedUserDetails.listening_by_sound && selectedUserDetails.listening_by_sound.length > 0" class="top-sounds-section">
+        <h3>🎵 Top Listened Sounds</h3>
+        <div class="sounds-list">
+          <div *ngFor="let sound of selectedUserDetails.listening_by_sound.slice(0, 5); let i = index" class="sound-item">
+            <span class="sound-rank">{{ i + 1 }}</span>
+            <span class="sound-name emoji-only">{{ sound.display_name }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

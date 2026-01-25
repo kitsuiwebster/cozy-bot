@@ -1,0 +1,112 @@
+<div class="container">
+  <div class="header">
+    <div class="header-content">
+      <div class="bot-info">
+        <div class="bot-avatar">
+          <img src="assets/images/cozybot/cozybot-logo3.png" alt="Credits Logo" />
+        </div>
+        <div class="bot-details">
+          <h1 [class.animating]="animatingTitle">CozyBot</h1>
+          <p class="bot-description">Discord Bot • Credits</p>
+          <div class="add-to-server-section">
+            <a href="https://discord.com/oauth2/authorize?client_id=1156917047284994178&permissions=8&scope=bot" 
+               target="_blank" 
+               class="add-to-server-btn">
+              Add to your Discord server
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingUsers">{{ getTotalUsers() }}</span>
+          <span class="stat-label">Total Users</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingTotalServers">{{ liveStats.total_servers }}</span>
+          <span class="stat-label">Total Servers</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingPoints">{{ getTotalPoints() | number }}</span>
+          <span class="stat-label">Total CozyPoints</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" [class.animating]="animatingTime">{{ getTotalTimeDays() }}</span>
+          <span class="stat-label">Total Time</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Stats en haut au centre en gros -->
+  <div class="live-stats-section">
+    <div class="live-stats">
+      <div class="live-stat-combined" [class.loading]="statsLoading">
+        <span class="live-stat-text">
+          <span class="live-stat-number" 
+                [class.animating]="animatingListeners"
+                [class.pulse-glow]="liveStats.current_listeners > 0">{{ liveStats.current_listeners }}</span>
+          <span class="live-stat-word">{{ liveStats.current_listeners === 1 ? 'person' : 'people' }} in</span>
+          <span class="live-stat-number" 
+                [class.animating]="animatingServers"
+                [class.pulse-glow]="liveStats.servers_with_bot > 0">{{ liveStats.servers_with_bot }}</span>
+          <span class="live-stat-word">{{ liveStats.servers_with_bot === 1 ? 'server' : 'servers' }}</span>
+        </span>
+        <span class="live-stat-label">🎧 listening now</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back to leaderboard button -->
+  <div class="back-section">
+    <div class="back-info">
+      <a href="/cozybot" class="back-link">← Back to CozyBot Leaderboard</a>
+    </div>
+  </div>
+
+  <div class="content-section">
+    <div class="section-header">
+      <h2>🙏 Credits</h2>
+    </div>
+
+    <div class="cozypoints-content">
+      <div class="content-card">
+        <h3>Audio Content Credits</h3>
+        <div class="subsection">
+          <h4>/rain Commands</h4>
+          <ul>
+            <li>🌧️ <strong><a href="https://www.youtube.com/@rainsleep6868" target="_blank" class="link">Rain Sleep</a></strong></li>
+            <li>🌧️ <strong><a href="https://www.youtube.com/@therelaxedguy" target="_blank" class="link">The Relaxed Guy</a></strong></li>
+            <li>🌧️ <strong><a href="https://www.youtube.com/@CozyRain" target="_blank" class="link">Pluie Douillette</a></strong></li>
+            <li>🌧️ <strong><a href="https://www.youtube.com/@DannyLouis" target="_blank" class="link">Danny Louis</a></strong></li>
+            <li>🌧️ <strong><a href="https://www.youtube.com/@Doctorsleep2406" target="_blank" class="link">Doctor Sleep</a></strong></li>
+          </ul>
+          
+          <h4>/sea Commands</h4>
+          <ul>
+            <li>🌊 <strong><a href="https://www.youtube.com/@SweetDreamsme" target="_blank" class="link">Sweet Dreams</a></strong></li>
+            <li>🌊 <strong><a href="https://www.youtube.com/watch?v=la_AEFO8m7U" target="_blank" class="link">Asleep in Perfection</a></strong></li>
+            <li>🌊 <strong><a href="https://www.youtube.com/channel/UCRNFrOQyN0Z3MyOB8kpqCEA" target="_blank" class="link">Tmsoft's White Noise Sleep Sounds</a></strong></li>
+            <li>🌊 <strong><a href="https://www.youtube.com/channel/UCGRr7rvhTilTilM9QpDT0Cg" target="_blank" class="link">Ultimate Journey</a></strong></li>
+          </ul>
+          
+          <h4>/sparkles Commands</h4>
+          <ul>
+            <li>✨ <strong><a href="https://www.youtube.com/@BerlinAtmospheres" target="_blank" class="link">Berlin Atmospheres</a></strong></li>
+            <li>✨ <strong><a href="https://www.youtube.com/@FreeAudioZone" target="_blank" class="link">Free Audio Zone</a></strong></li>
+            <li>✨ Sounds of KSHMR Sample Pack</li>
+          </ul>
+          
+          <h4>/music Commands</h4>
+          <ul>
+            <li>🎵 <strong><a href="https://www.youtube.com/@roselightmoon" target="_blank" class="link">Roselight Moon</a></strong></li>
+            <li>🎵 <strong><a href="https://www.youtube.com/channel/UCjd8O0ApEpAqjI9k02RzLXA" target="_blank" class="link">Natural Study</a></strong></li>
+            <li>🎵 <strong><a href="https://www.youtube.com/channel/UC-gjtyoUTzGEwWM5Y1J4J7Q" target="_blank" class="link">New Bliss</a></strong></li>
+            <li>🎵 <strong><a href="https://mynoise.net/noiseMachines.php" target="_blank" class="link">myNoise</a></strong></li>
+            <li>🎵 &#64;kitsuiwebster</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

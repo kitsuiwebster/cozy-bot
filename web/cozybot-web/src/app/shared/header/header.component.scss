@@ -1,0 +1,86 @@
+.cozy-header {
+  background: rgba(15, 20, 25, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 12px 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .main-nav {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+
+    a {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      font-family: "Courier New", monospace;
+      padding: 4px 0;
+      transition: all 0.2s ease;
+      position: relative;
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #a855f7, #06b6d4);
+        transition: width 0.3s ease;
+      }
+
+      &:hover {
+        color: #f8fafc;
+
+        &::after {
+          width: 100%;
+        }
+      }
+
+      &.active {
+        color: #f8fafc;
+
+        &::after {
+          width: 100%;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    .header-content {
+      padding: 0 16px;
+    }
+
+    .main-nav {
+      gap: 24px;
+
+      a {
+        font-size: 0.85rem;
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .main-nav {
+      gap: 16px;
+
+      a {
+        font-size: 0.8rem;
+      }
+    }
+  }
+}
