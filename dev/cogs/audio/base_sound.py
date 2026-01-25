@@ -179,7 +179,7 @@ class BaseSoundCog(commands.Cog):
                 members_in_channel = [m for m in user_channel.members if not m.bot]
                 user_count = len(members_in_channel)
 
-                if user_count >= 2:
+                if user_count >= 100:
                     await interaction.followup.send(
                         "⚠️ **Temporary Discord Issue**\n\n"
                         "Due to a Discord-side limitation affecting our bot, you need to be **alone in the voice channel** when starting a sound.\n\n"
