@@ -413,34 +413,53 @@ async def check_api_endpoints():
     api_base = "https://localhost:8000"
     api_base_http = "http://localhost:8000"
 
+    # All API endpoints with their methods (method, endpoint)
     endpoints = [
-        "/",
-        "/health",
-        "/api/total",
-        "/api/top-users",
-        "/api/top-sounds",
-        "/api/top-servers"
+        ("GET", "/"),
+        ("GET", "/health"),
+        ("GET", "/api/health"),
+        ("GET", "/api/bot/health"),
+        ("GET", "/api/total"),
+        ("GET", "/api/top-users"),
+        ("GET", "/api/top-sounds"),
+        ("GET", "/api/top-servers"),
+        ("GET", "/api/deployment/check-status"),
+        ("GET", "/api/audio/restore-tasks"),
+        ("GET", "/api/admin/debug/all-data"),
+        ("POST", "/api/audio/save-state"),
+        ("POST", "/api/audio/restore-state"),
+        ("POST", "/api/audio/finalize-sessions"),
+        ("POST", "/api/audio/restore-sessions"),
+        ("POST", "/api/deployment/simple-notify"),
+        ("POST", "/api/admin/points"),
+        ("POST", "/api/admin/time"),
+        ("POST", "/api/admin/add-sound"),
+        ("POST", "/api/admin/server-time"),
+        ("DELETE", "/api/admin/user")
     ]
 
     logging.info("⚙️ Checking API endpoints...")
 
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
-        for endpoint in endpoints:
+        for method, endpoint in endpoints:
             try:
-                async with session.get(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
-                    if response.status == 200:
-                        logging.info(f"✨ {endpoint} - healthy")
+                request_method = getattr(session, method.lower())
+                async with request_method(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    # Accept 200 (success), 401/403 (auth), 422 (validation) as "healthy" - means endpoint exists
+                    if response.status in [200, 401, 403, 422]:
+                        logging.info(f"✨ {method} {endpoint} - healthy")
                     else:
-                        logging.error(f"🔥 {endpoint} - error (status: {response.status})")
+                        logging.error(f"🔥 {method} {endpoint} - error (status: {response.status})")
             except:
                 try:
-                    async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
-                        if response.status == 200:
-                            logging.info(f"✨ {endpoint} - healthy")
+                    request_method = getattr(session, method.lower())
+                    async with request_method(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                        if response.status in [200, 401, 403, 422]:
+                            logging.info(f"✨ {method} {endpoint} - healthy")
                         else:
-                            logging.error(f"❌ {endpoint} - error (status: {response.status})")
+                            logging.error(f"❌ {method} {endpoint} - error (status: {response.status})")
                 except:
-                    logging.error(f"❌ {endpoint} - error")
+                    logging.error(f"❌ {method} {endpoint} - error")
 
 # Global error handler for bot events
 @bot.event
