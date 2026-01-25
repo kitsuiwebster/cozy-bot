@@ -667,6 +667,13 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with audio restore API: {e}')
 
+    try:
+        from api.routes.health import set_bot_instance as set_health_bot_instance
+        set_health_bot_instance(bot)
+        logging.info('🔗 Bot instance shared with health check API')
+    except Exception as e:
+        logging.warning(f'⚠️ Could not share bot instance with health check API: {e}')
+
     logging.info(f'✨ {bot.user.name} is ready and connected!')
 
     try:

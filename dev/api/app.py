@@ -4,6 +4,7 @@ from .routes import top_users, top_servers, admin
 from .routes.stats import router as stats_router
 from .routes.simple_deployment import router as simple_deployment_router
 from .routes.audio_restore import router as audio_restore_router
+from .routes.health import router as health_router
 import logging
 
 # Initialize FastAPI application
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(health_router, prefix="/api", tags=["health"])
 app.include_router(top_users.router, prefix="/api", tags=["users"])
 app.include_router(top_servers.router, prefix="/api", tags=["servers"])
 app.include_router(stats_router, prefix="/api", tags=["stats"])

@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # Install system dependencies including ffmpeg and git
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
