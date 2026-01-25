@@ -413,19 +413,23 @@ async def check_api_endpoints():
     api_base = "https://localhost:8000"
     api_base_http = "http://localhost:8000"
 
-    # All API endpoints with their methods (method, endpoint)
-    endpoints = [
-        ("GET", "/"),
-        ("GET", "/health"),
-        ("GET", "/api/health"),
-        ("GET", "/api/bot/health"),
-        ("GET", "/api/total"),
-        ("GET", "/api/top-users"),
-        ("GET", "/api/top-sounds"),
-        ("GET", "/api/top-servers"),
-        ("GET", "/api/deployment/check-status"),
-        ("GET", "/api/audio/restore-tasks"),
-        ("GET", "/api/admin/debug/all-data"),
+    # GET endpoints - tested via health check
+    get_endpoints = [
+        "/",
+        "/health",
+        "/api/health",
+        "/api/bot/health",
+        "/api/total",
+        "/api/top-users",
+        "/api/top-sounds",
+        "/api/top-servers",
+        "/api/deployment/check-status",
+        "/api/audio/restore-tasks",
+        "/api/admin/debug/all-data"
+    ]
+
+    # POST/DELETE endpoints - listed but not executed (would trigger actions)
+    write_endpoints = [
         ("POST", "/api/audio/save-state"),
         ("POST", "/api/audio/restore-state"),
         ("POST", "/api/audio/finalize-sessions"),
@@ -438,28 +442,32 @@ async def check_api_endpoints():
         ("DELETE", "/api/admin/user")
     ]
 
+    logging.info("")
     logging.info("⚙️ Checking API endpoints...")
 
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
-        for method, endpoint in endpoints:
+        for endpoint in get_endpoints:
             try:
-                request_method = getattr(session, method.lower())
-                async with request_method(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
-                    # Accept 200 (success), 401/403 (auth), 422 (validation) as "healthy" - means endpoint exists
+                async with session.get(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                     if response.status in [200, 401, 403, 422]:
-                        logging.info(f"✨ {method} {endpoint} - healthy")
+                        logging.info(f"✨ GET {endpoint} - healthy")
                     else:
-                        logging.error(f"🔥 {method} {endpoint} - error (status: {response.status})")
+                        logging.error(f"🔥 GET {endpoint} - error (status: {response.status})")
             except:
                 try:
-                    request_method = getattr(session, method.lower())
-                    async with request_method(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status in [200, 401, 403, 422]:
-                            logging.info(f"✨ {method} {endpoint} - healthy")
+                            logging.info(f"✨ GET {endpoint} - healthy")
                         else:
-                            logging.error(f"❌ {method} {endpoint} - error (status: {response.status})")
+                            logging.error(f"❌ GET {endpoint} - error (status: {response.status})")
                 except:
-                    logging.error(f"❌ {method} {endpoint} - error")
+                    logging.error(f"❌ GET {endpoint} - error")
+
+    # Log available write endpoints without executing them
+    logging.info(f"✨ Available write endpoints: {len(write_endpoints)}")
+    for method, endpoint in write_endpoints:
+        logging.info(f"✨    ╰┈➤ {method} {endpoint}")
+    logging.info("")
 
 # Global error handler for bot events
 @bot.event
