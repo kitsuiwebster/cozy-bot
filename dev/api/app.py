@@ -21,6 +21,8 @@ app.add_middleware(
         "http://localhost:3000",
         "https://kitsuiwebster.com",
         "http://90.60.191.159:8000",
+        "https://cozybot.online",
+        "https://api.cozybot.online",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
