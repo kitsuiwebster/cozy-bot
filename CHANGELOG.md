@@ -2,11 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.22] - 2026-01-24
+
+### Added
+
+- User count validation before voice connection with helpful error message for Discord token limitation workaround.
+- Bidirectional merge scripts (merge_to_prod.sh and merge_to_dev.sh) for dev/prod synchronization.
+
+### Fixed
+
+- Voice connection attempts now blocked when 2+ users in channel, preventing timeout issues on production token.
+
 ## [1.0.21] - 2026-01-23
 
 ### Fixed
 
-- Voice connection stability issues: audio now starts in <2s (removed FFmpeg stream loop), race conditions prevented with async locks, ghost connections eliminated, timeout increased to 30s with exponential backoff, and "Already connected" errors resolved.
+- Voice connection stability with instant audio start, race condition prevention, ghost connection cleanup, and improved timeout handling.
+
+### Changed
+
+- Sound filenames now displayed in cyan color across all logs for better readability.
+- Audio restoration monitor now logs individual user tracking instead of bulk counts.
+- Production deployment now uses code mounting for faster hot-reload like development environment.
 
 ## [1.0.20] - 2026-01-22
 

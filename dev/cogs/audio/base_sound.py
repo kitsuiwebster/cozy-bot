@@ -175,6 +175,24 @@ class BaseSoundCog(commands.Cog):
                     await interaction.followup.send("❌ Bot doesn't have 'Speak' permission in this channel.", ephemeral=True)
                     return
 
+                # Check number of users in voice channel (workaround for Discord token issue)
+                members_in_channel = [m for m in user_channel.members if not m.bot]
+                user_count = len(members_in_channel)
+
+                if user_count >= 2:
+                    await interaction.followup.send(
+                        "⚠️ **Temporary Discord Issue**\n\n"
+                        "Due to a Discord-side limitation affecting our bot, you need to be **alone in the voice channel** when starting a sound.\n\n"
+                        "**Workaround:**\n"
+                        "1. Be the only person in the voice channel\n"
+                        "2. Start your sound with `/rain` (or other commands)\n"
+                        "3. Your friends can then join and listen together!\n\n"
+                        "Our team is actively working with Discord Support to resolve this issue. Thank you for your patience! 💙",
+                        ephemeral=True
+                    )
+                    logging.warning(f"⚠️ Blocked connection attempt - {user_count} users in channel (Discord token limitation)")
+                    return
+
                 # Use guild-level lock to prevent simultaneous connection attempts
                 if guild_id not in self.connection_locks:
                     self.connection_locks[guild_id] = asyncio.Lock()
@@ -207,15 +225,23 @@ class BaseSoundCog(commands.Cog):
                                 logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
 
                                 # Check if bot connected anyway despite timeout (stuck session bug workaround)
-                                await asyncio.sleep(1.0)
-                                voice_client = interaction.guild.voice_client
-                                if voice_client and voice_client.is_connected():
-                                    logging.warning(f"⚠️ Connection timed out but bot is physically connected to {voice_client.channel.name}, continuing...")
-                                    logging.info(f"🔍 DEBUG: After timeout workaround, voice_client.is_connected(): {voice_client.is_connected()}")
+                                # For large verified bots, is_connected() takes time to become True
+                                # Wait up to 30s checking every 2s
+                                logging.info(f"⏳ Checking if bot connected despite timeout (will wait up to 30s)...")
+                                for check_num in range(15):  # 15 checks x 2s = 30s max
+                                    await asyncio.sleep(2.0)
+                                    voice_client = interaction.guild.voice_client
+                                    if voice_client and voice_client.is_connected():
+                                        logging.warning(f"⚠️ Connection timed out but bot is now connected to {voice_client.channel.name} (took {(check_num+1)*2}s)")
+                                        logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
+                                        await self.start_disconnect_timer(guild_id)
+                                        logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                                        break
+                                    elif voice_client and voice_client.channel:
+                                        logging.info(f"🔍 DEBUG: Check {check_num+1}/15: voice_client.channel exists but is_connected() still False...")
 
-                                    logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
-                                    await self.start_disconnect_timer(guild_id)
-                                    logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
+                                # If we found valid connection, break from retry loop
+                                if voice_client and voice_client.is_connected():
                                     break
 
                                 # Really not connected, retry or fail

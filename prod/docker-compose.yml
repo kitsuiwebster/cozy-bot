@@ -16,6 +16,8 @@ services:
       # Base volumes always mounted
       - voice-data:/app/data
       - bot-logs:/app/logs
+      # Conditional volume for code mounting (hot-reload)
+      - ${DEV_CODE_MOUNT:-/tmp/empty}:/app:rw
       # Specific environment file - mount to /app/.env like in dev
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env:ro
       # SSL certificates from Let's Encrypt
