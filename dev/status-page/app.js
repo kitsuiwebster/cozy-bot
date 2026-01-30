@@ -59,6 +59,29 @@ async function fetchHeartbeats() {
     }
 }
 
+async function fetchMaintenance() {
+    try {
+        const cacheBuster = Date.now();
+        const response = await fetch(`${STATUS_API_URL}/maintenance?t=${cacheBuster}`, {
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching maintenance:', error);
+        return null;
+    }
+}
+
 // Normalize heartbeat time to milliseconds
 function toTimeMs(value) {
     if (typeof value === 'number') {
@@ -286,12 +309,65 @@ function createMonitorCard(monitor) {
     return card;
 }
 
+function renderMaintenance(maintenanceData) {
+    const activeContainer = document.getElementById('maintenance-container');
+    const historyContainer = document.getElementById('maintenance-history-container');
+    if (!activeContainer || !historyContainer) return;
+
+    activeContainer.innerHTML = '';
+    historyContainer.innerHTML = '';
+    if (!maintenanceData || !maintenanceData.maintenance) {
+        return { hasActive: false };
+    }
+
+    const maintenanceItems = maintenanceData.maintenance.filter(item => item);
+    const activeItems = maintenanceItems.filter(item => item.active || item.status === 'under-maintenance');
+    const inactiveItems = maintenanceItems.filter(item => !(item.active || item.status === 'under-maintenance'));
+
+    if (activeItems.length > 0) {
+        activeItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'maintenance-card active';
+            card.innerHTML = `
+                <div class="maintenance-header">Maintenance in progress</div>
+                <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
+                <div class="maintenance-description">${item.description || ''}</div>
+            `;
+            activeContainer.appendChild(card);
+        });
+    }
+
+    if (inactiveItems.length > 0) {
+        const title = document.createElement('div');
+        title.className = 'maintenance-history-title';
+        title.textContent = 'Maintenance history';
+        historyContainer.appendChild(title);
+
+        inactiveItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'maintenance-card history';
+            const statusText = item.status ? item.status.replace(/-/g, ' ') : 'completed';
+            card.innerHTML = `
+                <div class="maintenance-row">
+                    <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
+                    <div class="maintenance-status">${statusText}</div>
+                </div>
+                <div class="maintenance-description">${item.description || ''}</div>
+            `;
+            historyContainer.appendChild(card);
+        });
+    }
+
+    return { hasActive: activeItems.length > 0 };
+}
+
 // Mettre à jour la page
 async function updateStatus() {
     // Récupérer les monitors et les heartbeats en parallèle
-    const [monitorsData, heartbeatsData] = await Promise.all([
+    const [monitorsData, heartbeatsData, maintenanceData] = await Promise.all([
         fetchMonitors(),
-        fetchHeartbeats()
+        fetchHeartbeats(),
+        fetchMaintenance()
     ]);
 
     if (!monitorsData || !monitorsData.monitors) {
@@ -303,6 +379,8 @@ async function updateStatus() {
         console.error('Invalid heartbeats data structure from API');
         return;
     }
+
+    const maintenanceState = renderMaintenance(maintenanceData);
 
     const monitors = monitorsData.monitors.map(m => ({ ...m }));
 
@@ -336,7 +414,10 @@ async function updateStatus() {
     // Mettre à jour le statut global
     const overallStatus = determineOverallStatus(monitors);
     const statusBadge = document.getElementById('overall-status');
-    if (overallStatus.status === 'operational') {
+    if (maintenanceState.hasActive) {
+        statusBadge.className = 'status-badge plain';
+        statusBadge.innerHTML = `<span class="status-text">Maintenance in progress</span>`;
+    } else if (overallStatus.status === 'operational') {
         statusBadge.className = 'status-badge plain';
         statusBadge.innerHTML = `<span class="status-text">${overallStatus.text}</span>`;
     } else {

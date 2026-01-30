@@ -48,6 +48,73 @@ header {
     border-bottom: 1px solid var(--border);
 }
 
+.maintenance-container {
+    margin-bottom: 1.5rem;
+}
+
+.maintenance-history-container {
+    margin-top: 2rem;
+}
+
+.maintenance-card {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.maintenance-card.history {
+    background: rgba(148, 163, 184, 0.08);
+    border-color: rgba(148, 163, 184, 0.25);
+}
+
+.maintenance-header {
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--warning);
+    font-weight: 700;
+}
+
+.maintenance-title {
+    margin-top: 0.4rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.maintenance-description {
+    margin-top: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.maintenance-history-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.75rem;
+}
+
+.maintenance-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.maintenance-status {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-tertiary);
+    font-weight: 600;
+}
+
 .header-top {
     display: flex;
     align-items: center;

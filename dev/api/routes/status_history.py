@@ -32,6 +32,8 @@ _MONITOR_CONFIG = [
 STATUS_HISTORY_ENABLED = os.getenv("STATUS_HISTORY_ENABLED", "1") == "1"
 STATUS_HISTORY_INTERVAL = int(os.getenv("STATUS_HISTORY_INTERVAL_SECONDS", "60"))
 STATUS_HISTORY_RETENTION_DAYS = int(os.getenv("STATUS_HISTORY_RETENTION_DAYS", "90"))
+STATUS_PAGE_SLUG = os.getenv("STATUS_PAGE_SLUG", "cozy")
+STATUS_PAGE_URL = os.getenv("STATUS_PAGE_URL", "http://uptime-kuma:3001")
 
 
 def _status_doc_id(timestamp_ms: int) -> str:
@@ -70,6 +72,20 @@ async def _collect_status_point() -> Dict[str, Any]:
                 "status": result.get("status"),
             })
         return checks
+
+
+async def _fetch_maintenance() -> List[Dict[str, Any]]:
+    url = f"{STATUS_PAGE_URL}/api/status-page/{STATUS_PAGE_SLUG}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                if response.status < 200 or response.status >= 300:
+                    raise RuntimeError(f"status {response.status}")
+                payload = await response.json()
+                return payload.get("maintenanceList", []) or []
+    except Exception as exc:
+        logging.error(f"❌ Failed to fetch maintenance list: {exc}")
+        return []
 
 
 async def _save_status_point(timestamp_ms: int, checks: List[Dict[str, Any]]) -> None:
@@ -151,3 +167,9 @@ async def get_status_history(
 
     points.sort(key=lambda p: p.get("timestamp_ms", 0))
     return {"points": points}
+
+
+@router.get("/status/maintenance")
+async def get_status_maintenance():
+    maint = await _fetch_maintenance()
+    return {"maintenance": maint}
