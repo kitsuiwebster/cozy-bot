@@ -94,6 +94,7 @@ class AudioStateManager:
                     # Schedule audio restoration (can't do async operations in sync function)
                     self._schedule_audio_restore(guild_id, channel_id, sound_name)
                     restored_count += 1
+                    logging.info("")
                     logging.info(f"🎵 Scheduled restore: {sound_name} in {guild.name}")
                     
                 except Exception as e:
