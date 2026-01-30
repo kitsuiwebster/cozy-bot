@@ -531,3 +531,4 @@ class _NullCouchDBClient:
 
     def load_live_stats(self) -> Optional[Dict]:
         return None
+
