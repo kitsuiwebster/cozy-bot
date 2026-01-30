@@ -554,23 +554,28 @@ footer {
     }
 
     .timeline-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 0.25rem;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.6rem;
+        overflow: visible;
+        padding-bottom: 0;
     }
 
     .timeline-label,
     .timeline-uptime {
         text-align: left;
         min-width: auto;
+        font-size: 0.72rem;
+    }
+
+    .timeline {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .timeline-bar {
         width: 100%;
-        min-width: 520px;
+        min-width: 360px;
         height: 20px;
     }
 
@@ -589,7 +594,7 @@ footer {
     }
 
     .timeline-bar {
-        min-width: 460px;
+        min-width: 320px;
     }
 }
 
