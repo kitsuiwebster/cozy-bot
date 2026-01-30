@@ -84,15 +84,15 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     # Get current version
     VERSION=$(./utils/deployment/get-version.sh 2>/dev/null || echo "latest")
 
-    # Check API health before proceeding
-    echo -e "${BLUE}🔍 Checking API availability...${NC}"
+    # Check Live API health before proceeding
+    echo -e "${BLUE}🔍 Checking Live API availability...${NC}"
     set +e
-    API_HEALTH=$(curl -s "http://localhost:${API_PORT}/api/public/health" 2>/dev/null)
+    API_HEALTH=$(curl -s "http://localhost:${BOT_API_PORT}/api/live/bot/health" 2>/dev/null)
     API_EXIT_CODE=$?
     set -e
 
-    if [ $API_EXIT_CODE -eq 0 ] && echo "$API_HEALTH" | grep -q "healthy"; then
-        echo -e "${GREEN}✅ API is available${NC}"
+    if [ $API_EXIT_CODE -eq 0 ] && echo "$API_HEALTH" | grep -q '"status":"ok"'; then
+        echo -e "${GREEN}✅ Live API is available${NC}"
         echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
         NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/deployment/simple-notify" \
         -H "Content-Type: application/json" \
