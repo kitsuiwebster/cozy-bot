@@ -114,7 +114,11 @@ class CouchDBClient:
         try:
             doc = db.get(doc_id)
             if doc:
-                db.delete(doc)
+                rev = doc.get('_rev')
+                if not rev:
+                    logging.error(f"❌ Failed to delete document {doc_id}: missing _rev")
+                    return False
+                db.delete(doc_id, rev)
                 return True
             return False
         except Exception as e:
