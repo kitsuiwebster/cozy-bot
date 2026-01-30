@@ -116,8 +116,8 @@ class AudioStateManager:
     # Schedule audio restoration to happen after bot is fully ready
     def _schedule_audio_restore(self, guild_id: int, channel_id: int, sound_name: str):
         restore_data = {
-            'guild_id': guild_id,
-            'channel_id': channel_id,
+            'guild_id': str(guild_id),
+            'channel_id': str(channel_id),
             'sound_name': sound_name,
             'timestamp': datetime.now().isoformat()
         }

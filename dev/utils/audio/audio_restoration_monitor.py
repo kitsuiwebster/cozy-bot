@@ -40,6 +40,7 @@ class AudioRestorationMonitor:
     # Process any pending audio restoration tasks
     async def process_pending_tasks(self):
         try:
+            await self.process_pending_couchdb_tasks()
             restore_files = glob.glob('data/restore_task_*.json')
             
             if not restore_files:
@@ -60,6 +61,58 @@ class AudioRestorationMonitor:
                         
         except Exception as e:
             logging.error(f"❌ Error processing pending tasks: {e}")
+
+    async def process_pending_couchdb_tasks(self):
+        try:
+            from utils.storage.couchdb_client import get_couchdb_client
+            db = get_couchdb_client()
+            tasks = db.get_all_restore_tasks()
+            if not tasks:
+                return
+
+            logging.info(f"🎵 Found {len(tasks)} pending audio restoration tasks")
+
+            for task_id, task_data in tasks.items():
+                try:
+                    guild_id = int(task_id)
+                    channel_id = int(task_data.get('channel_id'))
+                    sound_name = task_data.get('sound_name')
+                    if not channel_id or not sound_name:
+                        logging.warning(f"⚠️ Invalid restore task data for guild {task_id}, deleting task")
+                        db.delete_restore_task(task_id)
+                        continue
+
+                    guild = self.bot.get_guild(guild_id)
+                    if not guild:
+                        logging.warning(f"⚠️ Guild {guild_id} not found for restore task")
+                        db.delete_restore_task(task_id)
+                        continue
+
+                    channel = guild.get_channel(channel_id)
+                    if not channel:
+                        logging.warning(f"⚠️ Channel {channel_id} not found for restore task")
+                        db.delete_restore_task(task_id)
+                        continue
+
+                    current_users = [member for member in channel.members if not member.bot]
+                    if not current_users:
+                        logging.info(f"⏭️ Skipping restore for {guild.name} - no users in voice channel")
+                        db.delete_restore_task(task_id)
+                        continue
+
+                    await self.restore_audio_in_channel(guild, channel, sound_name)
+                    db.delete_restore_task(task_id)
+                    logging.info(f"✅ Audio restoration task completed for {guild.name}")
+
+                except Exception as e:
+                    logging.error(f"❌ Failed to process restore task {task_id}: {e}")
+                    # Avoid infinite retries on bad tasks
+                    try:
+                        db.delete_restore_task(task_id)
+                    except Exception:
+                        pass
+        except Exception as e:
+            logging.error(f"❌ Error processing CouchDB restore tasks: {e}")
 
     # Process a single audio restoration task
     async def process_restore_task(self, file_path):
