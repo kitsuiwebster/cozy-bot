@@ -60,14 +60,19 @@ NETWORK_NAME=$(grep "^NETWORK_NAME=" .env | cut -d'=' -f2 | tr -d '"')
 ENVIRONMENT=$(grep "^ENVIRONMENT=" .env | cut -d'=' -f2 | tr -d '"')
 RESTART_POLICY=$(grep "^RESTART_POLICY=" .env | cut -d'=' -f2 | tr -d '"')
 API_PORT=$(grep "^API_PORT=" .env | cut -d'=' -f2 | tr -d '"')
+BOT_API_PORT=$(grep "^BOT_API_PORT=" .env | cut -d'=' -f2 | tr -d '"')
 
 # Fallback to default if API_PORT not found
 if [ -z "$API_PORT" ]; then
     API_PORT=8000
 fi
+if [ -z "$BOT_API_PORT" ]; then
+    BOT_API_PORT=8002
+fi
 
 echo -e "${PURPLE}👉 Container: ${CONTAINER_NAME}${NC}"
 echo -e "${PURPLE}👉 API Port: ${API_PORT}${NC}"
+echo -e "${PURPLE}👉 Live API Port: ${BOT_API_PORT}${NC}"
 
 # Check if container is already running
 echo -e "${BLUE}🔍 Checking existing containers...${NC}"
@@ -82,14 +87,14 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     # Check API health before proceeding
     echo -e "${BLUE}🔍 Checking API availability...${NC}"
     set +e
-    API_HEALTH=$(curl -k -s "https://localhost:${API_PORT}/health" 2>/dev/null)
+    API_HEALTH=$(curl -s "http://localhost:${API_PORT}/api/public/health" 2>/dev/null)
     API_EXIT_CODE=$?
     set -e
 
     if [ $API_EXIT_CODE -eq 0 ] && echo "$API_HEALTH" | grep -q "healthy"; then
         echo -e "${GREEN}✅ API is available${NC}"
         echo -e "${BLUE}📢 Sending pre-deployment notification to users...${NC}"
-        NOTIFICATION_RESULT=$(curl -k -s -X POST "https://localhost:${API_PORT}/api/deployment/simple-notify" \
+        NOTIFICATION_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/deployment/simple-notify" \
         -H "Content-Type: application/json" \
         -d "{\"version\":\"${VERSION}\",\"delay_seconds\":30}" 2>/dev/null)
 
@@ -106,7 +111,7 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
 
             # Finalize user sessions before shutdown
             echo -e "${BLUE}📊 Finalizing user sessions...${NC}"
-            SESSION_FINALIZE_RESULT=$(curl -k -s -X POST "https://localhost:${API_PORT}/api/audio/finalize-sessions" 2>/dev/null)
+            SESSION_FINALIZE_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/audio/finalize-sessions" 2>/dev/null)
             if echo "$SESSION_FINALIZE_RESULT" | grep -q '"success":true'; then
                 SESSIONS_FINALIZED=$(echo "$SESSION_FINALIZE_RESULT" | grep -o '"sessions_finalized":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
                 echo -e "${GREEN}📊 Finalized ${SESSIONS_FINALIZED} user sessions${NC}"
@@ -114,7 +119,7 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
 
             # Save audio state before shutdown
             echo -e "${BLUE}🎵 Saving current audio state...${NC}"
-            AUDIO_SAVE_RESULT=$(curl -k -s -X POST "https://localhost:${API_PORT}/api/audio/save-state" 2>/dev/null)
+            AUDIO_SAVE_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/audio/save-state" 2>/dev/null)
             if echo "$AUDIO_SAVE_RESULT" | grep -q '"success":true'; then
                 SESSIONS_SAVED=$(echo "$AUDIO_SAVE_RESULT" | grep -o '"sessions_saved":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
                 echo -e "${GREEN}💾 Saved ${SESSIONS_SAVED} audio sessions${NC}"
@@ -193,7 +198,7 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     echo -e "${BLUE}👉 Restoring user sessions...${NC}"
     sleep 2  # Give the bot a moment to fully initialize
     set +e  # Don't exit on curl error
-    SESSION_RESTORE_RESULT=$(curl -k -s -X POST "https://localhost:${API_PORT}/api/audio/restore-sessions" 2>/dev/null || echo '{}')
+    SESSION_RESTORE_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/audio/restore-sessions" 2>/dev/null || echo '{}')
     set -e  # Re-enable exit on error
     if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
         SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
