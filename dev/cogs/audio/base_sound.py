@@ -1,4 +1,5 @@
 from discord import FFmpegPCMAudio, ButtonStyle, app_commands
+import time
 from discord.ext import commands
 from discord.ui import Button, View
 import os
@@ -103,12 +104,50 @@ class BaseSoundCog(commands.Cog):
                 'loop_task': None,
                 'target_channel': None,
                 'disconnect_timer': None,
+                'suppress_restart': False,
             }
         return self.guild_states[guild_id]
+
+    # Track sound in background without blocking audio playback
+    async def _track_sound_async(self, guild_id, sound_filename, channel):
+        try:
+            from cogs.stats.gamification import cozy_gamification
+
+            current_users = [member for member in channel.members if not member.bot]
+            logging.info("")
+            logging.info("")
+            logging.info(f"🎵 SOUND START: \033[36m{sound_filename}\033[0m in {channel.name} - {len(current_users)} users listening")
+
+            for member in current_users:
+                cozy_gamification.finalize_current_sound(str(member.id))
+
+            user_ids = [str(member.id) for member in current_users]
+            cozy_gamification.reset_consecutive_time_for_guild(guild_id, user_ids)
+
+            for member in current_users:
+                cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name, save_immediately=False)
+                cozy_gamification.track_sound_start(member.id, sound_filename, save_immediately=False)
+                logging.info(f"🎵 Tracking \033[36m{sound_filename}\033[0m for \033[35m{member.name}\033[0m")
+
+            # Save once after processing all users
+            if current_users:
+                cozy_gamification.save_user_data()
+                cozy_gamification.save_usernames()
+                try:
+                    import main
+                    main.schedule_live_stats_update()
+                except Exception:
+                    pass
+        except Exception as e:
+            logging.error(f"❌ Error tracking sound: {e}")
 
     # Audio playback completion callback
     def after_playing(self, error, guild_id):
         guild_state = self.get_guild_state(guild_id)
+
+        if guild_state.get('suppress_restart'):
+            guild_state['suppress_restart'] = False
+            return
 
         if error:
             logging.error(f"❌ Player error: {error}")
@@ -119,7 +158,11 @@ class BaseSoundCog(commands.Cog):
                 self.bot.loop.create_task(self.restart_audio_loop(guild_id))
 
     async def on_button_click(self, interaction):
+        perf_enabled = os.getenv("COZY_PERF_LOGS") == "1"
+        t0 = time.monotonic()
         await interaction.response.defer()
+        if perf_enabled:
+            logging.info("⏱️ PERF click->defer: 0ms")
 
         guild_id = interaction.guild.id
         guild_state = self.get_guild_state(guild_id)
@@ -141,201 +184,138 @@ class BaseSoundCog(commands.Cog):
 
         user_channel = guild_state.get('target_channel')
 
-        # Debug: Log current voice state
-        logging.info("")
-        logging.info("")
-        logging.info(f"🔍 DEBUG: Current voice_client state: exists={voice_client is not None}, connected={voice_client.is_connected() if voice_client else 'N/A'}, channel={voice_client.channel.name if voice_client and voice_client.channel else 'None'}")
-        logging.info(f"🔍 DEBUG: User wants to connect to: {user_channel.name if user_channel else 'None'}")
-        logging.info(f"🔍 DEBUG: Guild: {interaction.guild.name}, Guild ID: {interaction.guild.id}")
-
         # Check if voice_client is actually connected, not just exists (fixes ghost connection bug)
-        if voice_client and not voice_client.is_connected():
-            logging.warning(f"⚠️ Ghost voice_client detected (exists but not connected). Cleaning up...")
+        if voice_client and not voice_client.channel:
+            logging.warning(f"⚠️ Ghost voice_client detected (exists but not in channel). Cleaning up...")
             try:
                 await voice_client.disconnect()
             except:
                 pass
             voice_client = None
+            await asyncio.sleep(0.5)
             logging.info(f"🔍 DEBUG: After cleanup, voice_client is now None")
 
-        # Connect to voice channel with retry logic
+        # Refresh voice_client reference
+        voice_client = interaction.guild.voice_client
+
+        # Connect to voice channel with workaround for discord.py bug
+        did_connect = False
+        did_move = False
+
         if voice_client is None:
-            logging.info(f"🔍 DEBUG: voice_client is None, will attempt to connect")
-            if user_channel:
-                # Check channel permissions before connecting
-                permissions = user_channel.permissions_for(interaction.guild.me)
-                logging.info(f"🔍 DEBUG: Channel '{user_channel.name}' (ID: {user_channel.id}) type: {user_channel.type}")
-                logging.info(f"🔍 DEBUG: Permissions - Connect: {permissions.connect}, Speak: {permissions.speak}, View: {permissions.view_channel}")
-
-                if not permissions.connect:
-                    await interaction.followup.send("❌ Bot doesn't have 'Connect' permission in this channel.", ephemeral=True)
-                    return
-
-                if not permissions.speak:
-                    await interaction.followup.send("❌ Bot doesn't have 'Speak' permission in this channel.", ephemeral=True)
-                    return
-
-                # Check number of users in voice channel (workaround for Discord token issue)
-                members_in_channel = [m for m in user_channel.members if not m.bot]
-                user_count = len(members_in_channel)
-
-                if user_count >= 100:
-                    await interaction.followup.send(
-                        "⚠️ **Temporary Discord Issue**\n\n"
-                        "Due to a Discord-side limitation affecting our bot, you need to be **alone in the voice channel** when starting a sound.\n\n"
-                        "**Workaround:**\n"
-                        "1. Be the only person in the voice channel\n"
-                        "2. Start your sound with `/rain` (or other commands)\n"
-                        "3. Your friends can then join and listen together!\n\n"
-                        "Our team is actively working with Discord Support to resolve this issue. Thank you for your patience! 💙",
-                        ephemeral=True
-                    )
-                    logging.warning(f"⚠️ Blocked connection attempt - {user_count} users in channel (Discord token limitation)")
-                    return
-
-                # Use guild-level lock to prevent simultaneous connection attempts
-                if guild_id not in self.connection_locks:
-                    self.connection_locks[guild_id] = asyncio.Lock()
-
-                async with self.connection_locks[guild_id]:
-                    # Double-check if already connected (another request might have connected while waiting for lock)
-                    voice_client = interaction.guild.voice_client
-                    if voice_client and voice_client.is_connected():
-                        logging.info(f"✅ Another request already connected to {voice_client.channel.name} while waiting for lock")
-                    else:
-                        max_retries = 3
-                        retry_delay = 2.0  # Start with 2 seconds
-
-                        for attempt in range(max_retries):
-                            try:
-                                logging.info(f"🔍 DEBUG: Attempting to connect (attempt {attempt + 1}/{max_retries})")
-                                # Increased timeout to 30 seconds for better reliability with slow Discord servers
-                                voice_client = await asyncio.wait_for(user_channel.connect(), timeout=30.0)
-                                logging.info(f"🔍 DEBUG: Connected to channel, voice_client.is_connected(): {voice_client.is_connected()}")
-
-                                # Wait briefly for voice state to stabilize
-                                await asyncio.sleep(1.0)
-                                logging.info(f"🔍 DEBUG: After delay, voice_client.is_connected(): {voice_client.is_connected()}")
-
-                                logging.info(f"🔍 DEBUG: About to start disconnect timer")
-                                await self.start_disconnect_timer(guild_id)
-                                logging.info(f"🔍 DEBUG: Disconnect timer started successfully")
-                                break
-                            except asyncio.TimeoutError:
-                                logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} timed out")
-
-                                # Check if bot connected anyway despite timeout (stuck session bug workaround)
-                                # For large verified bots, is_connected() takes time to become True
-                                # Wait up to 30s checking every 2s
-                                logging.info(f"⏳ Checking if bot connected despite timeout (will wait up to 30s)...")
-                                for check_num in range(15):  # 15 checks x 2s = 30s max
-                                    await asyncio.sleep(2.0)
-                                    voice_client = interaction.guild.voice_client
-                                    if voice_client and voice_client.is_connected():
-                                        logging.warning(f"⚠️ Connection timed out but bot is now connected to {voice_client.channel.name} (took {(check_num+1)*2}s)")
-                                        logging.info(f"🔍 DEBUG: About to start disconnect timer (timeout workaround)")
-                                        await self.start_disconnect_timer(guild_id)
-                                        logging.info(f"🔍 DEBUG: Disconnect timer started successfully (timeout workaround)")
-                                        break
-                                    elif voice_client and voice_client.channel:
-                                        logging.info(f"🔍 DEBUG: Check {check_num+1}/15: voice_client.channel exists but is_connected() still False...")
-
-                                # If we found valid connection, break from retry loop
-                                if voice_client and voice_client.is_connected():
-                                    break
-
-                                # Really not connected, retry or fail
-                                if attempt == max_retries - 1:
-                                    await interaction.followup.send("❌ Connection to voice channel timed out after multiple attempts. Discord voice servers may be unstable.", ephemeral=True)
-                                    return
-
-                                # Exponential backoff
-                                logging.info(f"⏳ Waiting {retry_delay}s before retry...")
-                                await asyncio.sleep(retry_delay)
-                                retry_delay *= 1.5  # Increase delay for next retry
-                            except Exception as e:
-                                logging.error(f"❌ DEBUG: Connection attempt {attempt + 1} failed with exception: {type(e).__name__}: {str(e)}")
-                                # Handle "Already connected" error by graceful cleanup
-                                if "already connected" in str(e).lower():
-                                    logging.warning(f"⚠️ Already connected error detected, checking existing connection...")
-                                    try:
-                                        existing_vc = interaction.guild.voice_client
-                                        if existing_vc:
-                                            # If it's actually connected, use it
-                                            if existing_vc.is_connected():
-                                                logging.info(f"✅ Using existing valid connection to {existing_vc.channel.name}")
-                                                voice_client = existing_vc
-                                                await self.start_disconnect_timer(guild_id)
-                                                break
-                                            else:
-                                                # Disconnect ghost connection gracefully
-                                                logging.warning(f"🧹 Cleaning up ghost connection...")
-                                                await existing_vc.disconnect()
-                                                await asyncio.sleep(2)
-                                    except Exception as cleanup_error:
-                                        logging.error(f"❌ Cleanup error: {cleanup_error}")
-                                        await asyncio.sleep(2)
-
-                                logging.error(f"❌ Connection attempt {attempt + 1} failed: {str(e)}")
-                                if attempt == max_retries - 1:
-                                    await interaction.followup.send(f"❌ Failed to connect to voice channel: {str(e)}", ephemeral=True)
-                                    return
-
-                                # Exponential backoff
-                                logging.info(f"⏳ Waiting {retry_delay}s before retry...")
-                                await asyncio.sleep(retry_delay)
-                                retry_delay *= 1.5
-            else:
-                logging.error(f"❌ DEBUG: No target voice channel found")
-                await interaction.followup.send("❌ No target voice channel found", ephemeral=True)
+            if not user_channel:
+                await interaction.followup.send("❌ You need to be in a voice channel!", ephemeral=True)
                 return
 
-            logging.info(f"🔍 DEBUG: Finished connection attempts, voice_client state: exists={voice_client is not None}, connected={voice_client.is_connected() if voice_client else 'N/A'}")
+            try:
+                logging.info(f"🔍 Connecting to {user_channel.name}...")
+
+                # Connect without timeout (like romeo-bot)
+                voice_client = await user_channel.connect()
+                logging.info(f"✅ Connected! is_connected={voice_client.is_connected()}")
+                did_connect = True
+                if perf_enabled:
+                    logging.info(f"⏱️ PERF click->connected: {int((time.monotonic() - t0) * 1000)}ms")
+
+                await self.start_disconnect_timer(guild_id)
+
+            except Exception as e:
+                import traceback
+                logging.error(f"❌ Connection error: {e}")
+                logging.error(f"❌ Traceback: {traceback.format_exc()}")
+                await interaction.followup.send(f"❌ Connection failed: {str(e)}", ephemeral=True)
+                return
         else:
             # Already connected - check if we need to move
-            logging.info(f"🔍 DEBUG: Bot already connected to {voice_client.channel.name}")
-            logging.info(f"🔍 DEBUG: Current channel: {voice_client.channel.name}, Target channel: {user_channel.name if user_channel else 'None'}")
+            
             if user_channel and voice_client.channel != user_channel:
                 logging.info(f"🔄 Bot needs to move from {voice_client.channel.name} to {user_channel.name}")
-                try:
-                    await asyncio.wait_for(voice_client.move_to(user_channel), timeout=10.0)
-                    logging.info(f"✅ Successfully moved to {user_channel.name}")
-                except asyncio.TimeoutError:
-                    logging.error(f"❌ Timeout while moving to {user_channel.name}")
-                    await interaction.followup.send("❌ Failed to move to voice channel: timeout. Please try again.", ephemeral=True)
-                    return
-                except Exception as e:
-                    logging.error(f"❌ Error moving to {user_channel.name}: {str(e)}")
-                    await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
-                    return
+
+                # Try to move with retries
+                max_move_retries = 2
+                for move_attempt in range(max_move_retries):
+                    try:
+                        await asyncio.wait_for(voice_client.move_to(user_channel), timeout=15.0)
+                        await asyncio.sleep(0.5)
+
+                        if voice_client.channel == user_channel:
+                            logging.info(f"✅ Successfully moved to {user_channel.name}")
+                            did_move = True
+                            if perf_enabled:
+                                logging.info(f"⏱️ PERF click->moved: {int((time.monotonic() - t0) * 1000)}ms")
+                            break
+                        else:
+                            logging.warning(f"⚠️ move_to() completed but bot not in target channel")
+                            if move_attempt == max_move_retries - 1:
+                                await interaction.followup.send("❌ Failed to move to voice channel. Please try again.", ephemeral=True)
+                                return
+
+                    except asyncio.TimeoutError:
+                        logging.error(f"❌ Timeout while moving (attempt {move_attempt + 1})")
+
+                        # Check if move succeeded anyway
+                        await asyncio.sleep(1)
+                        if voice_client.channel == user_channel:
+                            logging.info(f"✅ Move succeeded despite timeout")
+                            break
+
+                        if move_attempt == max_move_retries - 1:
+                            await interaction.followup.send("❌ Failed to move to voice channel: timeout. Please try again.", ephemeral=True)
+                            return
+                        await asyncio.sleep(1)
+
+                    except Exception as e:
+                        logging.error(f"❌ Error moving (attempt {move_attempt + 1}): {str(e)}")
+                        if move_attempt == max_move_retries - 1:
+                            await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
+                            return
+                        await asyncio.sleep(1)
+
             elif user_channel:
-                logging.info(f"✅ Bot already in correct channel: {voice_client.channel.name}")
+                pass
 
-        logging.info(f"🔍 DEBUG: About to clear other cog states")
         self.clear_other_cog_states(interaction.guild.id)
-        logging.info(f"🔍 DEBUG: Cleared other cog states")
 
-        logging.info(f"🔍 DEBUG: Checking if audio is playing: {voice_client.is_playing()}")
+        # Simple verification
+        if not voice_client or not voice_client.channel:
+            await interaction.followup.send("❌ Not connected to voice", ephemeral=True)
+            return
+
+        
+
+        # Warn if bot is server-muted/deafened/suppressed (no audio will be heard)
+        try:
+            bot_voice = interaction.guild.me.voice if interaction.guild and interaction.guild.me else None
+            if bot_voice and (bot_voice.mute or bot_voice.deaf or bot_voice.suppress):
+                logging.warning(
+                    f"⚠️ Bot voice state: mute={bot_voice.mute}, deaf={bot_voice.deaf}, suppress={bot_voice.suppress} "
+                    f"(audio may be inaudible)"
+                )
+        except Exception as e:
+            logging.warning(f"⚠️ Could not read bot voice state: {e}")
+
+        # Stop any playing audio
+        was_playing = False
         if voice_client.is_playing():
+            guild_state['suppress_restart'] = True
+            guild_state['is_playing'] = False
+            guild_state['current_sound'] = None
             voice_client.stop()
-            logging.info(f"🔍 DEBUG: Stopped playing audio")
+            was_playing = True
+            if perf_enabled:
+                logging.info(f"⏱️ PERF click->stopped-prev: {int((time.monotonic() - t0) * 1000)}ms")
 
-        # Verify voice client is properly connected before playing
-        logging.info(f"🔍 DEBUG: Verification checks - voice_client={voice_client is not None}, is_connected={voice_client.is_connected() if voice_client else 'N/A'}")
+        # Short stabilization delay (avoid fixed 2s on every click)
+        if did_connect or did_move:
+            await asyncio.sleep(0.4)
+        elif was_playing:
+            await asyncio.sleep(0.1)
+        else:
+            await asyncio.sleep(0.05)
+        if perf_enabled:
+            logging.info(f"⏱️ PERF click->after-stabilize: {int((time.monotonic() - t0) * 1000)}ms")
 
-        if not voice_client:
-            await interaction.followup.send("❌ Voice client is None. This shouldn't happen - please report this bug.", ephemeral=True)
-            logging.error(f"❌ CRITICAL: voice_client is None after connection logic. Guild: {interaction.guild.name}, User: {interaction.user.name}")
-            return
-
-        if not voice_client.is_connected():
-            await interaction.followup.send("❌ Bot appears connected but Discord reports not connected. Try disconnecting the bot and trying again.", ephemeral=True)
-            logging.error(f"❌ CRITICAL: voice_client.is_connected() is False. Guild: {interaction.guild.name}, Channel: {voice_client.channel if hasattr(voice_client, 'channel') else 'unknown'}")
-            return
-
-        logging.info(f"✅ DEBUG: All verification checks passed, proceeding to play audio")
-
-        # Determine sound path and start playback with FFmpeg infinite loop
+        # Determine sound path and start playback - ignore is_connected() check
         try:
             if sound_filename.startswith('rain'):
                 sound_path = f"cogs/audio/rain/{sound_filename}"
@@ -350,10 +330,14 @@ class BaseSoundCog(commands.Cog):
             else:
                 sound_path = f"cogs/audio/{sound_filename}"
             if os.path.exists(sound_path):
-                logging.info(f"🔍 DEBUG: About to play audio. voice_client.is_connected(): {voice_client.is_connected()}, sound_path: {sound_path}")
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=open(os.devnull, 'w'))
-                voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
-                logging.info(f"🔍 DEBUG: Successfully started playing audio")
+                # Play audio like romeo-bot - simple and direct
+                if perf_enabled:
+                    logging.info(f"⏱️ PERF click->before-ffmpeg: {int((time.monotonic() - t0) * 1000)}ms")
+                audio_source = FFmpegPCMAudio(sound_path, executable="ffmpeg", options='-loglevel panic')
+                if not voice_client.is_playing():
+                    voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
+                if perf_enabled:
+                    logging.info(f"⏱️ PERF click->play-called: {int((time.monotonic() - t0) * 1000)}ms")
 
                 guild_state['is_playing'] = True
                 guild_state['current_sound'] = sound_filename
@@ -361,28 +345,13 @@ class BaseSoundCog(commands.Cog):
                 global global_current_sounds
                 global_current_sounds[interaction.guild.id] = sound_filename
 
-                # Track sound for all users in channel
-                from cogs.stats.gamification import cozy_gamification
-                voice_client = interaction.guild.voice_client
-                if voice_client and voice_client.channel:
-                    current_users = [member for member in voice_client.channel.members if not member.bot]
-                    logging.info("")
-                    logging.info("")
-                    logging.info(f"🎵 SOUND START: \033[36m{sound_filename}\033[0m in {voice_client.channel.name} ({interaction.guild.name}) - {len(current_users)} users listening")
-
-                    for member in current_users:
-                        cozy_gamification.finalize_current_sound(str(member.id))
-
-                    user_ids = [str(member.id) for member in current_users]
-                    cozy_gamification.reset_consecutive_time_for_guild(interaction.guild.id, user_ids)
-
-                    for member in current_users:
-                        cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name)
-                        cozy_gamification.track_sound_start(member.id, sound_filename)
-                        logging.info(f"🎵 Tracking \033[36m{sound_filename}\033[0m for \033[35m{member.name}\033[0m")
+                # Track sound in background - don't block audio playback
+                asyncio.create_task(self._track_sound_async(interaction.guild.id, sound_filename, voice_client.channel))
 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
+                if perf_enabled:
+                    logging.info(f"⏱️ PERF click->followup: {int((time.monotonic() - t0) * 1000)}ms")
             else:
                 await interaction.followup.send(f"❌ Sound file not found: {sound_filename}", ephemeral=True)
         except Exception as e:
@@ -470,6 +439,7 @@ class BaseSoundCog(commands.Cog):
         
         if voice_client:
             if voice_client.is_playing():
+                guild_state['suppress_restart'] = True
                 voice_client.stop()
             await voice_client.disconnect()
             guild_state['is_playing'] = False
@@ -479,6 +449,12 @@ class BaseSoundCog(commands.Cog):
             global global_current_sounds
             if interaction.guild.id in global_current_sounds:
                 del global_current_sounds[interaction.guild.id]
+
+            try:
+                import main
+                main.schedule_live_stats_update()
+            except Exception:
+                pass
             
             await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
         else:
@@ -491,17 +467,21 @@ class BaseSoundCog(commands.Cog):
             voice_client = guild_state.get('voice_client')
             current_sound = guild_state['current_sound']
 
-            guild = self.bot.get_guild(guild_id)
-            guild_name = guild.name if guild else f"guild {guild_id}"
-            logging.info("")
-            logging.info("")
-            logging.info(f"👉 Restarting \033[36m{current_sound}\033[0m in {guild_name}")
-
             # Get voice client from guild if not in state
             if not voice_client:
                 guild = self.bot.get_guild(guild_id)
                 if guild:
                     voice_client = guild.voice_client
+            # Skip if voice is not connected
+            if not voice_client or (hasattr(voice_client, "is_connected") and not voice_client.is_connected()):
+                logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
+                return
+
+            guild = self.bot.get_guild(guild_id)
+            guild_name = guild.name if guild else f"guild {guild_id}"
+            logging.info("")
+            logging.info("")
+            logging.info(f"👉 Restarting \033[36m{current_sound}\033[0m in {guild_name}")
 
             # Only restart if we should still be playing
             if not current_sound or not guild_state['is_playing'] or not voice_client:
@@ -526,16 +506,18 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/{current_sound}"
             
             # Restart audio if file exists and voice client is ready
-            if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
+            # NOTE: Using voice_client.channel check instead of is_connected() due to discord.py 2.3.2 bug
+            if os.path.exists(sound_path) and voice_client.channel and not voice_client.is_playing():
                 audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=open(os.devnull, 'w'))
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             
         except Exception as e:
+            if "Not connected to voice" in str(e):
+                logging.info("🔄 restart_audio_loop skipped: voice not connected")
+                return
             logging.error(f"❌ Failed to restart audio loop: {e}")
             # Try again after a longer delay if restart failed
             await asyncio.sleep(1)
             guild_state = self.get_guild_state(guild_id)
             if guild_state['is_playing'] and guild_state['current_sound']:
                 self.bot.loop.create_task(self.restart_audio_loop(guild_id))
-
-

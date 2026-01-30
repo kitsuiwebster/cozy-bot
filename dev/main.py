@@ -8,11 +8,32 @@ import json
 import asyncio
 import fcntl
 import aiohttp
+import threading
+import warnings
 from utils.deployment.deployment_notifier import DeploymentNotifier
 from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 
 # Load environment variables from configuration file
 load_dotenv()
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API.*", category=DeprecationWarning)
+
+# Minimal mode: skip non-voice-critical background work to reduce event loop load
+COZY_MINIMAL = os.getenv("COZY_MINIMAL", "0") == "1"
+
+def _env_enabled(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value == "1"
+
+COZY_ENABLE_API_CHECKS = _env_enabled("COZY_ENABLE_API_CHECKS", not COZY_MINIMAL)
+COZY_ENABLE_BACKUPS = _env_enabled("COZY_ENABLE_BACKUPS", not COZY_MINIMAL)
+COZY_ENABLE_DEPLOY_NOTIFIER = _env_enabled("COZY_ENABLE_DEPLOY_NOTIFIER", not COZY_MINIMAL)
+COZY_ENABLE_AUDIO_RESTORE = _env_enabled("COZY_ENABLE_AUDIO_RESTORE", not COZY_MINIMAL)
+COZY_ENABLE_VOICE_TRACKING = _env_enabled("COZY_ENABLE_VOICE_TRACKING", not COZY_MINIMAL)
+COZY_ENABLE_COUCHDB_SUMMARY = _env_enabled("COZY_ENABLE_COUCHDB_SUMMARY", not COZY_MINIMAL)
+COZY_ENABLE_BOT_API = _env_enabled("COZY_ENABLE_BOT_API", True)
+BOT_API_PORT = int(os.getenv("BOT_API_PORT", "8002"))
 
 # Configure enhanced logging system with visual formatting
 import sys
@@ -64,7 +85,34 @@ handler.setFormatter(FancyFormatter())
 logger.addHandler(handler)
 discord_logger.propagate = False
 discord_logger.addHandler(handler)
-discord_logger.setLevel(logging.ERROR)
+
+# Suppress noisy Discord warning about missing message content intent
+class _LogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        if "Privileged message content intent is missing" in msg:
+            return False
+        return True
+
+handler.addFilter(_LogFilter())
+# Allow overriding Discord log level for debugging (e.g. DEBUG/INFO)
+discord_log_level = os.getenv("DISCORD_LOG_LEVEL", "WARNING").upper()
+discord_log_level_value = getattr(logging, discord_log_level, logging.WARNING)
+discord_logger.setLevel(discord_log_level_value)
+
+# Enable full Discord logging (voice + gateway + HTTP + websocket)
+discord_logger_names = [
+    'discord',
+    'discord.client',
+    'discord.gateway',
+    'discord.http',
+    'discord.voice',
+    'discord.voice_client',
+    'discord.voice_state',
+    'discord.ws',
+]
+for logger_name in discord_logger_names:
+    logging.getLogger(logger_name).setLevel(discord_log_level_value)
 
 # Configure Discord bot intents
 intents = discord.Intents.default()
@@ -77,6 +125,85 @@ intents.voice_states = True
 # Initialize Discord bot instance with command prefix and intents
 bot = commands.Bot(command_prefix="/", intents=intents)
 logging.debug(f"⚔️ Bot guilds: {bot.guilds}")
+
+# Track user join in background to avoid blocking Discord events
+async def _track_user_join_async(user_id, member, guild_id):
+    try:
+        from cogs.stats.gamification import cozy_gamification
+
+        # Don't save immediately for user tracking
+        result = cozy_gamification.join_session(user_id, member.name, save_immediately=False)
+        cozy_gamification.update_username(user_id, member.name, member.global_name or member.name, save_immediately=False)
+
+        # Find currently playing sound to track for new user
+        current_sound = None
+        guild_id_int = int(guild_id)
+        for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
+            cog = bot.get_cog(cog_name)
+            if cog and hasattr(cog, 'guild_states'):
+                guild_state = cog.guild_states.get(guild_id_int, {})
+                if guild_state.get('is_playing') and guild_state.get('current_sound'):
+                    current_sound = guild_state['current_sound']
+                    logging.info("")
+                    logging.info("")
+                    logging.info(f"🔍 Found current sound \033[36m{current_sound}\033[0m in {cog_name} for guild {guild_id}")
+                    break
+
+        if current_sound:
+            cozy_gamification.finalize_current_sound(user_id)
+            cozy_gamification.track_sound_start(user_id, current_sound, save_immediately=False)
+            logging.info(f"🎵 Tracking \033[36m{current_sound}\033[0m for \033[35m{member.name}\033[0m")
+        else:
+            logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
+
+        # Save once after all operations
+        cozy_gamification.save_user_data()
+        cozy_gamification.save_usernames()
+    except Exception as e:
+        logging.error(f"❌ Error tracking user join: {e}")
+
+# Track bot join in background to avoid blocking Discord connection
+async def _track_bot_join_async(guild_id, guild_name, channel, current_users):
+    try:
+        from cogs.stats.gamification import cozy_gamification
+
+        for user in current_users:
+            user_id = str(user.id)
+            user_voice_sessions[guild_id]['users'][user_id] = {
+                'join_time': datetime.now(),
+                'accumulated_time': 0.0
+            }
+            # Don't save immediately to avoid blocking the event loop
+            result = cozy_gamification.join_session(user_id, user.name, force_bonus=True, save_immediately=False)
+            cozy_gamification.update_username(user_id, user.name, user.global_name or user.name, save_immediately=False)
+            logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {channel.name} in {guild_name}")
+
+        # Save once after processing all users
+        if current_users:
+            cozy_gamification.save_user_data()
+            cozy_gamification.save_usernames()
+
+        # Restart tracking for users already in channel if bot is playing
+        if current_users:
+            voice_client = channel.guild.voice_client
+            if voice_client and voice_client.is_playing():
+                current_user_ids = [str(u.id) for u in current_users]
+                cozy_gamification.reset_consecutive_time_for_guild(guild_id, current_user_ids)
+
+                from cogs.audio.base_sound import global_current_sounds
+                current_guild_sound = global_current_sounds.get(int(guild_id))
+
+                if current_guild_sound:
+                    for user in current_users:
+                        # Don't save immediately to avoid blocking
+                        cozy_gamification.track_sound_start(str(user.id), current_guild_sound, save_immediately=False)
+                        logging.info(f"👉 RECONNECT FIX: Restarted tracking \033[36m{current_guild_sound}\033[0m for \\033[35m{user.name}\\033[0m")
+                    # Save once after processing all users
+                    cozy_gamification.save_user_data()
+                else:
+                    logging.info("👉 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
+    except Exception as e:
+        logging.error(f"❌ Error tracking bot join: {e}")
 
 # Format duration in seconds to human readable format
 def format_duration(seconds):
@@ -98,17 +225,16 @@ def format_duration(seconds):
             return f"{hours}h {minutes}m"
         return f"{hours}h"
 
-# Save voice time data to disk with file locking
+# Save voice time data to CouchDB
 def save_voice_time_data(silent=False):
-    data_file = 'data/voice_time_data.json'
-    temp_file = data_file + '.tmp'
-    os.makedirs('data', exist_ok=True)
-
     try:
-        # Reload from disk first to merge with any external changes (like API modifications)
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+
+        # Reload from CouchDB first to merge with any external changes (like API modifications)
         file_data = load_voice_time_data()
 
-        # Merge: keep active sessions from memory, preserve file data for inactive sessions
+        # Merge: keep active sessions from memory, preserve CouchDB data for inactive sessions
         merged_data = file_data.copy()
         for guild_id, guild_data in guild_voice_time.items():
             # If there's an active session (start_time is not None), use memory data
@@ -118,28 +244,21 @@ def save_voice_time_data(silent=False):
             elif guild_id not in file_data:
                 merged_data[guild_id] = guild_data
 
-        with open(temp_file, 'w') as file:
-            fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-            json.dump(merged_data, file, indent=2)
-            file.flush()
-            os.fsync(file.fileno())
+        db.save_voice_time_data(merged_data)
 
-        os.rename(temp_file, data_file)
         if not silent:
-            logging.info('✅ SERVER TIME SAVE: Saved successfully')
+            logging.info('✅ SERVER TIME SAVE: Saved successfully to CouchDB')
 
     except Exception as e:
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-        logging.error(f'❌ Failed to save voice time data: {e}')
+        logging.error(f'❌ Failed to save voice time data to CouchDB: {e}')
 
-# Load voice time data from disk
+# Load voice time data from CouchDB
 def load_voice_time_data():
-    data_file = 'data/voice_time_data.json'
     try:
-        with open(data_file, 'r') as file:
-            return json.load(file)
-    except FileNotFoundError:
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.load_voice_time_data()
+    except Exception:
         return {}
 
 # Initialize global tracking variables
@@ -190,7 +309,7 @@ async def periodic_backup():
             active_user_updates = {}
             
             # Process active server sessions
-            for guild_id, guild_data in guild_voice_time.items():
+            for idx, (guild_id, guild_data) in enumerate(guild_voice_time.items()):
                 if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
                     guild = bot.get_guild(int(guild_id))
                     if not guild or not guild.voice_client or not guild.voice_client.channel:
@@ -210,17 +329,21 @@ async def periodic_backup():
                     new_total = accumulated_time + current_session_time
                     guild_voice_time[guild_id] = [datetime.now().isoformat(), new_total]
                     active_session_updates[guild_id] = current_session_time
+                if idx % 50 == 0:
+                    await asyncio.sleep(0)
             
             # Track users currently in voice with bot
             users_in_voice_with_bot = set()
-            for guild in bot.guilds:
+            for idx, guild in enumerate(bot.guilds):
                 if guild.voice_client and guild.voice_client.channel:
                     for member in guild.voice_client.channel.members:
                         if not member.bot:
                             users_in_voice_with_bot.add(str(member.id))
+                if idx % 50 == 0:
+                    await asyncio.sleep(0)
             
             # Process active user listening sessions
-            for user_id, user_stats in cozy_gamification.user_data.items():
+            for idx, (user_id, user_stats) in enumerate(cozy_gamification.user_data.items()):
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     try:
@@ -310,30 +433,45 @@ async def periodic_backup():
                             }
                     except Exception as e:
                         logging.warning(f"⚠️ Error processing active session for user {user_id}: {e}")
+                if idx % 200 == 0:
+                    await asyncio.sleep(0)
             
             # Restart tracking for users who lost sessions after reconnection
             from cogs.stats.gamification import cozy_gamification
             users_with_active_sessions = set()
-            for user_id, user_stats in cozy_gamification.user_data.items():
+            for idx, (user_id, user_stats) in enumerate(cozy_gamification.user_data.items()):
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     users_with_active_sessions.add(str(user_id))
+                if idx % 200 == 0:
+                    await asyncio.sleep(0)
 
             users_missing_sessions = users_in_voice_with_bot - users_with_active_sessions
             if users_missing_sessions:
-                for guild in bot.guilds:
+                for idx, guild in enumerate(bot.guilds):
                     if guild.voice_client and guild.voice_client.channel:
                         guild_id = str(guild.id)
                         from cogs.audio.base_sound import global_current_sounds
                         current_guild_sound = global_current_sounds.get(guild.id)
 
                         if current_guild_sound:
+                            users_to_restore = []
                             for member in guild.voice_client.channel.members:
                                 if not member.bot and str(member.id) in users_missing_sessions:
-                                    cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name)
-                                    cozy_gamification.track_sound_start(str(member.id), current_guild_sound)
-                                    logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking \033[36m{current_guild_sound}\033[0m")
+                                    users_to_restore.append(member)
                                     users_missing_sessions.remove(str(member.id))
+
+                            # Batch save to avoid multiple CouchDB writes
+                            for member in users_to_restore:
+                                cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name, save_immediately=False)
+                                cozy_gamification.track_sound_start(str(member.id), current_guild_sound, save_immediately=False)
+                                logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking \033[36m{current_guild_sound}\033[0m")
+
+                            if users_to_restore:
+                                await asyncio.to_thread(cozy_gamification.save_user_data)
+                                await asyncio.to_thread(cozy_gamification.save_usernames)
+                    if idx % 50 == 0:
+                        await asyncio.sleep(0)
             
             # Log voice time changes since last save
             if guild_voice_time_changes or active_session_updates:
@@ -366,9 +504,9 @@ async def periodic_backup():
                     logging.info(f"  👉 {time_str} for {username} (\033[36m{update_info['sound']}\033[0m active session){points_str}")
 
             if guild_voice_time:
-                save_voice_time_data(silent=True)
+                await asyncio.to_thread(save_voice_time_data, silent=True)
 
-            cozy_gamification.save_user_data(force_detailed_log=True)
+            await asyncio.to_thread(cozy_gamification.save_user_data, force_detailed_log=True)
             logging.info("✅ PERIODIC BACKUP: Complete backup finished")
 
         except Exception as e:
@@ -381,6 +519,7 @@ def save_current_stats_for_api():
     try:
         active_listeners = 0
         servers_with_bot = 0
+        listeners_by_sound = {}
 
         for guild in bot.guilds:
             voice_state = guild.voice_client
@@ -393,80 +532,138 @@ def save_current_stats_for_api():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     active_listeners += 1
+                    sound_name = current_sound.get('name')
+                    if sound_name:
+                        listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + 1
+
+        total_servers = 0
+        if hasattr(cozy_gamification, 'servernames'):
+            total_servers = len(cozy_gamification.servernames)
 
         stats = {
             'current_listeners': active_listeners,
             'servers_with_bot': servers_with_bot,
-            'total_servers': len(bot.guilds),
+            'total_servers': total_servers,
+            'listeners_by_sound': listeners_by_sound,
             'last_updated': datetime.now().isoformat()
         }
 
-        os.makedirs('data', exist_ok=True)
-        with open('data/current_stats.json', 'w') as f:
-            json.dump(stats, f, indent=2)
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        db.save_live_stats(stats)
 
     except Exception as e:
         logging.error(f'❌ Failed to save current stats: {e}')
 
+# Schedule a live stats snapshot without blocking the event loop
+LIVE_STATS_FLUSH_SECONDS = int(os.getenv("COZY_LIVE_STATS_FLUSH_SECONDS", "5"))
+_live_stats_dirty = False
+_live_stats_task_started = False
+
+async def _live_stats_flush_loop():
+    global _live_stats_dirty
+    while True:
+        try:
+            if _live_stats_dirty:
+                _live_stats_dirty = False
+                await asyncio.to_thread(save_current_stats_for_api)
+        except Exception as e:
+            logging.error(f'❌ Live stats flush failed: {e}')
+        await asyncio.sleep(LIVE_STATS_FLUSH_SECONDS)
+
+def schedule_live_stats_update():
+    global _live_stats_dirty, _live_stats_task_started
+    try:
+        _live_stats_dirty = True
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running() and not _live_stats_task_started:
+            _live_stats_task_started = True
+            loop.create_task(_live_stats_flush_loop())
+    except Exception as e:
+        logging.error(f'❌ Failed to schedule live stats update: {e}')
+
+def start_bot_api_server():
+    try:
+        import uvicorn
+        from bot_api.app import app, set_bot_instance
+        set_bot_instance(bot)
+        uvicorn.run(app, host="0.0.0.0", port=BOT_API_PORT, log_level="warning")
+    except Exception as e:
+        logging.error(f"❌ Bot API server failed: {e}")
+
 # Check all API endpoints health
 async def check_api_endpoints():
-    api_base = "https://localhost:8000"
-    api_base_http = "http://localhost:8000"
+    public_api_base = os.getenv("API_BASE_URL_PUBLIC", "http://api:8000")
+    live_api_base = os.getenv("BOT_API_BASE_URL", "http://localhost:8002")
 
-    # GET endpoints - tested via health check
-    get_endpoints = [
-        "/",
-        "/health",
-        "/api/health",
-        "/api/bot/health",
-        "/api/total",
-        "/api/top-users",
-        "/api/top-sounds",
-        "/api/top-servers",
-        "/api/deployment/check-status",
-        "/api/audio/restore-tasks",
-        "/api/admin/debug/all-data"
-    ]
-
-    # POST/DELETE endpoints - listed but not executed (would trigger actions)
-    write_endpoints = [
-        ("POST", "/api/audio/save-state"),
-        ("POST", "/api/audio/restore-state"),
-        ("POST", "/api/audio/finalize-sessions"),
-        ("POST", "/api/audio/restore-sessions"),
-        ("POST", "/api/deployment/simple-notify"),
-        ("POST", "/api/admin/points"),
-        ("POST", "/api/admin/time"),
-        ("POST", "/api/admin/add-sound"),
-        ("POST", "/api/admin/server-time"),
-        ("DELETE", "/api/admin/user")
+    apis = [
+        {
+            "name": "Public API",
+            "emoji": "🔥",
+            "base": public_api_base,
+            "get_endpoints": [
+                "/",
+                "/health",
+                "/api/public/health",
+                "/api/public/total",
+                "/api/public/top-users",
+                "/api/public/top-sounds",
+                "/api/public/top-servers",
+                "/api/public/deployment/check-status",
+                "/api/public/audio/restore-tasks",
+                "/api/public/admin/debug/all-data"
+            ],
+            "write_endpoints": [
+                ("POST", "/api/public/admin/points"),
+                ("POST", "/api/public/admin/time"),
+                ("POST", "/api/public/admin/add-sound"),
+                ("POST", "/api/public/admin/server-time"),
+                ("DELETE", "/api/public/admin/user")
+            ]
+        },
+        {
+            "name": "Live API",
+            "emoji": "✨",
+            "base": live_api_base,
+            "get_endpoints": [
+                "/health",
+                "/api/live/bot/health"
+            ],
+            "write_endpoints": [
+                ("POST", "/api/live/audio/save-state"),
+                ("POST", "/api/live/audio/restore-state"),
+                ("POST", "/api/live/audio/finalize-sessions"),
+                ("POST", "/api/live/audio/restore-sessions"),
+                ("POST", "/api/live/deployment/simple-notify")
+            ]
+        }
     ]
 
     logging.info("")
     logging.info("⚙️ Checking API endpoints...")
 
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
-        for endpoint in get_endpoints:
-            try:
-                async with session.get(f"{api_base}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
-                    if response.status in [200, 401, 403, 422]:
-                        logging.info(f"✨ GET {endpoint} - healthy")
-                    else:
-                        logging.error(f"🔥 GET {endpoint} - error (status: {response.status})")
-            except:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+        for api in apis:
+            logging.info("")
+            logging.info(f"{api['emoji']} {api['name']} endpoints:")
+            for endpoint in api["get_endpoints"]:
                 try:
-                    async with session.get(f"{api_base_http}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    async with session.get(f"{api['base']}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status in [200, 401, 403, 422]:
-                            logging.info(f"✨ GET {endpoint} - healthy")
+                            logging.info(f"{api['emoji']} GET {endpoint} - healthy")
                         else:
-                            logging.error(f"❌ GET {endpoint} - error (status: {response.status})")
+                            logging.error(f"{api['emoji']} GET {endpoint} - error (status: {response.status})")
                 except:
-                    logging.error(f"❌ GET {endpoint} - error")
+                    logging.error(f"{api['emoji']} GET {endpoint} - error")
 
-    # Log available write endpoints without executing them
-    logging.info(f"✨ Available write endpoints: {len(write_endpoints)}")
-    for method, endpoint in write_endpoints:
-        logging.info(f"✨    ╰┈➤ {method} {endpoint}")
+            logging.info("")
+            logging.info(f"{api['emoji']} Available write endpoints ({api['name']}): {len(api['write_endpoints'])}")
+            for method, endpoint in api["write_endpoints"]:
+                logging.info(f"{api['emoji']}    ╰┈➤ {method} {endpoint}")
+            logging.info("")
     logging.info("")
 
 # Global error handler for bot events
@@ -477,6 +674,9 @@ async def on_error(event, *args, **kwargs):
 # Handle voice state changes for tracking
 @bot.event
 async def on_voice_state_update(member, before, after):
+    # Skip tracking if disabled to avoid blocking voice handshake
+    if not COZY_ENABLE_VOICE_TRACKING:
+        return
     # Handle bot joining/leaving voice channels
     if member.id == bot.user.id:
         guild_id = str(member.guild.id)
@@ -498,37 +698,14 @@ async def on_voice_state_update(member, before, after):
                 'users': {}
             }
 
-            from cogs.stats.gamification import cozy_gamification
             current_users = [m for m in after.channel.members if not m.bot]
             logging.info("")
             logging.info("")
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
-            for user in current_users:
-                user_id = str(user.id)
-                user_voice_sessions[guild_id]['users'][user_id] = {
-                    'join_time': datetime.now(),
-                    'accumulated_time': 0.0
-                }
-                result = cozy_gamification.join_session(user_id, user.name, force_bonus=True)
-                cozy_gamification.update_username(user_id, user.name, user.global_name or user.name)
-                logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {after.channel.name} in {member.guild.name}")
-            
-            # Restart tracking for users already in channel
-            if current_users:
-                voice_client = member.guild.voice_client
-                if voice_client and voice_client.is_playing():
-                    current_user_ids = [str(u.id) for u in current_users]
-                    cozy_gamification.reset_consecutive_time_for_guild(guild_id, current_user_ids)
 
-                    from cogs.audio.base_sound import global_current_sounds
-                    current_guild_sound = global_current_sounds.get(int(guild_id))
-
-                    if current_guild_sound:
-                        for user in current_users:
-                            cozy_gamification.track_sound_start(str(user.id), current_guild_sound)
-                            logging.info(f"👉 RECONNECT FIX: Restarted tracking \033[36m{current_guild_sound}\033[0m for \\033[35m{user.name}\\033[0m")
-                    else:
-                        logging.info("👉 RECONNECT FIX: Bot is playing audio but couldn't identify current sound")
+            # Track in background to not block Discord connection
+            asyncio.create_task(_track_bot_join_async(guild_id, member.guild.name, after.channel, current_users))
+            schedule_live_stats_update()
 
         # Bot left voice channel
         elif before.channel is not None and after.channel is None:
@@ -556,7 +733,8 @@ async def on_voice_state_update(member, before, after):
                 logging.info("")
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
                 logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
-                save_voice_time_data()
+                asyncio.create_task(asyncio.to_thread(save_voice_time_data))
+                schedule_live_stats_update()
 
             if guild_id in user_voice_sessions:
                 from cogs.stats.gamification import cozy_gamification
@@ -610,31 +788,12 @@ async def on_voice_state_update(member, before, after):
             'join_time': datetime.now(),
             'accumulated_time': 0.0
         }
-        result = cozy_gamification.join_session(user_id, member.name)
-        cozy_gamification.update_username(user_id, member.name, member.global_name or member.name)
-
-        # Find currently playing sound to track for new user
-        current_sound = None
-        guild_id_int = int(guild_id)
-        for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
-            cog = bot.get_cog(cog_name)
-            if cog and hasattr(cog, 'guild_states'):
-                guild_state = cog.guild_states.get(guild_id_int, {})
-                if guild_state.get('is_playing') and guild_state.get('current_sound'):
-                    current_sound = guild_state['current_sound']
-                    logging.info("")
-                    logging.info("")
-                    logging.info(f"🔍 Found current sound \033[36m{current_sound}\033[0m in {cog_name} for guild {guild_id}")
-                    break
-
-        if current_sound:
-            cozy_gamification.finalize_current_sound(user_id)
-            cozy_gamification.track_sound_start(user_id, current_sound)
-            logging.info(f"🎵 Tracking \033[36m{current_sound}\033[0m for \033[35m{member.name}\033[0m")
-        else:
-            logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
 
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
+
+        # Track in background to avoid blocking Discord events
+        asyncio.create_task(_track_user_join_async(user_id, member, guild_id))
+        schedule_live_stats_update()
 
     # User left bot's channel
     elif before.channel == bot_channel and after.channel != bot_channel:
@@ -660,6 +819,7 @@ async def on_voice_state_update(member, before, after):
             logging.info(f"👉 SOUND TRACKING: Finalized current sound for \033[35m{member.name}\033[0m")
 
             del session['users'][user_id] 
+            schedule_live_stats_update()
 
 # Bot ready event handler
 @bot.event
@@ -679,6 +839,140 @@ async def on_ready():
     print("║                                                                 ║")
     print("╚═════════════════════════════════════════════════════════════════╝")
     print("="*60 + "\n")
+
+    # System information
+    import sys
+    import platform
+    try:
+        import discord
+        discord_version = discord.__version__
+    except:
+        discord_version = "unknown"
+
+    try:
+        import nacl
+        nacl_version = nacl.__version__
+    except:
+        nacl_version = "unknown"
+
+    try:
+        import aiohttp
+        aiohttp_version = aiohttp.__version__
+    except:
+        aiohttp_version = "unknown"
+    
+    logging.info("")
+    logging.info(f"🐍 Python version: {sys.version.split()[0]}")
+    logging.info(f"🐍 discord.py version: {discord_version}")
+    logging.info(f"🔐 PyNaCl version: {nacl_version}")
+    logging.info(f"🌐 aiohttp version: {aiohttp_version}")
+    logging.info(f"💻 Platform: {platform.system()} {platform.release()}")
+    logging.info(f"🏗️ Architecture: {platform.machine()}")
+    logging.info(f"🔧 Python implementation: {platform.python_implementation()}")
+
+    # Check FFmpeg availability
+    import subprocess
+    try:
+        result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True, timeout=2)
+        ffmpeg_first_line = result.stdout.split('\n')[0] if result.stdout else "unknown"
+        # Keep only version info to avoid long line
+        ffmpeg_short = ffmpeg_first_line.split("Copyright")[0].strip()
+        logging.info(f"🎵 FFmpeg: {ffmpeg_short}")
+    except Exception as e:
+        logging.warning(f"⚠️ FFmpeg check failed: {e}")
+
+    # Docker/Network information
+    # Container info
+    import socket
+    try:
+        hostname = socket.gethostname()
+        logging.info(f"📦 Container hostname: {hostname}")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not get hostname: {e}")
+
+    # Get container IP
+    try:
+        container_ip = socket.gethostbyname(socket.gethostname())
+        logging.info(f"🌐 Container IP: {container_ip}")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not get container IP: {e}")
+
+    # Get DNS servers
+    try:
+        with open('/etc/resolv.conf', 'r') as f:
+            dns_servers = [line.split()[1] for line in f if line.startswith('nameserver')]
+            if dns_servers:
+                logging.info(f"🔍 DNS servers: {', '.join(dns_servers)}")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not read DNS config: {e}")
+
+    # Get default gateway
+    try:
+        import subprocess
+        result = subprocess.run(['ip', 'route'], capture_output=True, text=True, timeout=2)
+        for line in result.stdout.split('\n'):
+            if line.startswith('default'):
+                gateway = line.split()[2]
+                logging.info(f"⛩️ Default gateway: {gateway}")
+                break
+    except Exception as e:
+        logging.debug(f"Could not get gateway: {e}")
+
+    # Discord Intents
+    intents = bot.intents
+    intent_list = []
+    if intents.guilds: intent_list.append("guilds")
+    if intents.members: intent_list.append("members")
+    if intents.message_content: intent_list.append("message_content")
+    if intents.voice_states: intent_list.append("voice_states")
+    if intents.presences: intent_list.append("presences")
+    if intents.typing: intent_list.append("typing")
+
+    if intent_list:
+        logging.info(f"✅ Enabled intents: {', '.join(intent_list)}")
+    else:
+        logging.info("❌ No intents enabled")
+
+    if not intents.voice_states:
+        logging.error("❌ CRITICAL: voice_states intent is NOT enabled! Voice will NOT work!")
+
+    logging.info("")
+
+    # Check libsodium (for voice encryption)
+    try:
+        import nacl.secret
+        import nacl.utils
+        logging.info("✅ libsodium (PyNaCl): Available")
+    except Exception as e:
+        logging.error(f"❌ libsodium check failed: {e}")
+
+    # Check voice client availability
+    try:
+        from discord.voice_client import VoiceClient
+        logging.info("✅ VoiceClient: Available")
+    except Exception as e:
+        logging.error(f"❌ VoiceClient import failed: {e}")
+
+    logging.info("")
+
+    # Timezone
+    import time
+    try:
+        import datetime
+        tz_name = time.tzname[time.daylight]
+        utc_offset = time.timezone if not time.daylight else time.altzone
+        offset_hours = -utc_offset // 3600
+        logging.info(f"🕐 Timezone: {tz_name} (UTC{offset_hours:+d})")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not get timezone: {e}")
+
+    # Locale
+    try:
+        import locale
+        current_locale = locale.getlocale()
+        logging.info(f"🌐 Locale: {current_locale[0] if current_locale[0] else 'C'}")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not get locale: {e}")
 
     try:
         from api.routes.stats import set_bot_instance
@@ -703,6 +997,27 @@ async def on_ready():
 
     logging.info(f'✨ {bot.user.name} is ready and connected!')
 
+    # Bot Discord information
+    logging.info("")
+    logging.info(f"👤 Bot name: {bot.user.name}#{bot.user.discriminator}")
+    logging.info(f"🆔 Bot User ID: {bot.user.id}")
+
+    # Shard info
+    if bot.shard_id is not None:
+        logging.info(f"🔀 Shard ID: {bot.shard_id}/{bot.shard_count}")
+    else:
+        logging.info(f"🔀 Sharding: Not enabled (single process)")
+
+    # Application info
+    try:
+        app_info = await bot.application_info()
+        if app_info.bot_public:
+            logging.info(f"🌍 Bot visibility: Public")
+        else:
+            logging.info(f"🔒 Bot visibility: Private")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not fetch app info: {e}")
+
     try:
         logging.info('👉 Syncing application commands...')
         synced = await bot.tree.sync()
@@ -712,29 +1027,73 @@ async def on_ready():
 
     logging.info('🚀 Bot startup complete - All systems operational')
 
-    await check_api_endpoints()
+    if COZY_ENABLE_API_CHECKS:
+        await check_api_endpoints()
 
     bot.heartbeat_interval = 360
     bot.loop.create_task(change_status())
 
-    global periodic_backup_task
-    if periodic_backup_task is None or periodic_backup_task.done():
-        periodic_backup_task = bot.loop.create_task(periodic_backup())
-        logging.info('🕐 Started periodic backup task')
-    else:
-        logging.info('🕐 Periodic backup task already running')
+    if COZY_ENABLE_BACKUPS:
+        global periodic_backup_task
+        if periodic_backup_task is None or periodic_backup_task.done():
+            periodic_backup_task = bot.loop.create_task(periodic_backup())
+            logging.info('🕐 Started periodic backup task')
+        else:
+            logging.info('🕐 Periodic backup task already running')
 
-    deployment_notifier = DeploymentNotifier(bot)
-    bot.loop.create_task(deployment_notifier.start_monitoring())
-    logging.info('📢 Started deployment notifier task')
+    if COZY_ENABLE_DEPLOY_NOTIFIER:
+        deployment_notifier = DeploymentNotifier(bot)
+        bot.loop.create_task(deployment_notifier.start_monitoring())
+        logging.info('📢 Started deployment notifier task')
 
-    audio_monitor = AudioRestorationMonitor(bot)
-    bot.loop.create_task(audio_monitor.start_monitoring())
-    logging.info('🎵 Started audio restoration monitor task')
+    if COZY_ENABLE_AUDIO_RESTORE:
+        audio_monitor = AudioRestorationMonitor(bot)
+        bot.loop.create_task(audio_monitor.start_monitoring())
+        logging.info('🎵 Started audio restoration monitor task')
+
+    # Python packages summary
+    try:
+        import pkg_resources
+        installed_packages = [(d.project_name, d.version) for d in pkg_resources.working_set]
+        installed_packages.sort(key=lambda x: x[0].lower())
+
+        logging.info('')
+        logging.info('📦 Python packages:')
+        for package_name, version in installed_packages:
+            logging.info(f'   ╰┈➤ {package_name} {version}')
+    except Exception as e:
+        logging.warning(f'⚠️ Could not list Python packages: {e}')
+
+    # CouchDB statistics summary
+    if COZY_ENABLE_COUCHDB_SUMMARY:
+        from cogs.stats.gamification import cozy_gamification
+        logging.info('')
+        logging.info('📂 CouchDB storage:')
+        logging.info(f'   ╰┈➤ 📂 {len(cozy_gamification.user_data)} user records')
+        logging.info(f'   ╰┈➤ 📂 {len(cozy_gamification.usernames)} username cache entries')
+        logging.info(f'   ╰┈➤ 📂 {len(cozy_gamification.servernames)} server cache entries')
+        logging.info(f'   ╰┈➤ 📂 {len(guild_voice_time)} voice time tracking records')
 
     server_count = len(bot.guilds)
     total_member_count = sum(guild.member_count for guild in bot.guilds)
-    logging.info(f'👉 Serving {total_member_count:,} members across {server_count} servers')
+
+    # Calculate global statistics
+    total_cozy_points = sum(user.get('total_points', 0) for user in cozy_gamification.user_data.values())
+    total_sessions = sum(user.get('sessions_joined', 0) for user in cozy_gamification.user_data.values())
+    total_listening_seconds = sum(user.get('listening_time', 0) for user in cozy_gamification.user_data.values())
+
+    # Format total time
+    total_hours = total_listening_seconds // 3600
+    total_minutes = (total_listening_seconds % 3600) // 60
+
+    logging.info('')
+    logging.info(f'   ╰┈➤ 👥 {total_member_count:,} server members')
+    logging.info(f'   ╰┈➤ 🏠 {server_count} servers')
+    logging.info(f'   ╰┈➤ ⭐ {total_cozy_points:,} total cozy points')
+    logging.info(f'   ╰┈➤ 🎵 {total_sessions:,} total sound sessions')
+    logging.info(f'   ╰┈➤ ⏱️  {total_hours:,}h {total_minutes}m total time spent')
+
+    logging.info('')
     logging.info('🏠 Connected servers:')
     for guild in bot.guilds:
         logging.info(f'   ╰┈➤ {guild.name} ({guild.member_count:,} members)')
@@ -754,7 +1113,7 @@ async def run_bot():
             ('cogs.audio.sea.sea', '🌊'),
             ('cogs.audio.sparkles.sparkles', '✨'),
             ('cogs.audio.background_music.background-music', '🎵'),
-            ('cogs.audio.noise.noise', '🤍'),
+            ('cogs.audio.noise.noise', '📡'),
             ('cogs.audio.stop', '🛑'),
             ('cogs.menu', '📋'),
             ('cogs.stats.profile', '🏅'),
@@ -766,10 +1125,17 @@ async def run_bot():
             ('cogs.credits', '🎵')
         ]
 
+        logging.info('')
         logging.info('🔧 Loading bot extensions...')
         for ext_name, emoji in extensions:
             await bot.load_extension(ext_name)
-            space = '  ' if emoji == '🌧️' else ' '
+            # Add extra space for emojis that take more visual space
+            if emoji == '🌧️':
+                space = '  '
+            elif emoji == '🗑️':
+                space = '  '
+            else:
+                space = ' '
             logging.info(f'✅️ {emoji}{space} {ext_name} loaded successfully')
 
     except Exception as e:
@@ -788,7 +1154,12 @@ async def run_bot():
 
 # Main entry point for bot execution
 if __name__ == "__main__":
+    # Welcome message
+    print("✨ Welcome to CozyBot CLI v1.0.22 by @kitsuiwebster\n")
+
     loop = asyncio.get_event_loop()
+    if COZY_ENABLE_BOT_API:
+        threading.Thread(target=start_bot_api_server, daemon=True).start()
 
     try:
         loop.run_until_complete(run_bot())
@@ -803,4 +1174,3 @@ if __name__ == "__main__":
             logging.error(f'❌ Failed to save gamification data on shutdown: {e}')
     finally:
         loop.close()
-
