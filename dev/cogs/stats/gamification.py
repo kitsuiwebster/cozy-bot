@@ -3,13 +3,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import asyncio
-import fcntl
 import logging
 import traceback
-
-# Encryption disabled - using plain JSON until CouchDB setup
-ENCRYPTION_ENABLED = False
-logging.info("📝 Using plain JSON storage (encryption disabled)")
+from utils.storage.couchdb_client import get_couchdb_client
 
 # Terminal color formatting helpers
 def colorize_points(text):
@@ -21,13 +17,14 @@ def colorize_duration(text):
 # Main gamification system class
 class CozyGamification:
     def __init__(self):
-        self.data_file = 'data/cozy_points.json'
-        self.usernames_file = 'data/usernames.json'
-        self.servernames_file = 'data/servernames.json'
+        # Get CouchDB client
+        self.db = get_couchdb_client()
+
+        # Load data from CouchDB
         self.user_data = self.load_user_data()
         self.usernames = self.load_usernames()
         self.servernames = self.load_servernames()
-        
+
         # Track changes since last save for logging
         self.changes_since_save = {
             'user_listening_time': {},
@@ -40,152 +37,60 @@ class CozyGamification:
         
     def load_user_data(self) -> Dict:
         try:
-            os.makedirs('data', exist_ok=True)
-
-            if ENCRYPTION_ENABLED:
-                # Check if unencrypted .json is newer than encrypted .enc
-                json_exists = os.path.exists(self.data_file)
-                enc_exists = os.path.exists(self.data_file + '.enc')
-
-                if json_exists and enc_exists:
-                    json_mtime = os.path.getmtime(self.data_file)
-                    enc_mtime = os.path.getmtime(self.data_file + '.enc')
-                    if json_mtime > enc_mtime:
-                        logging.info('👉 Unencrypted file is newer, migrating...')
-                        with open(self.data_file, 'r') as file:
-                            data = json.load(file)
-                            if isinstance(data, dict):
-                                self._migrate_to_encrypted(data)
-                                return data
-
-                data = encryption.load_encrypted_json(self.data_file)
-                if data:
-                    logging.info('🔒 Loaded encrypted gamification data')
-                    return data
-
-                try:
-                    with open(self.data_file, 'r') as file:
-                        data = json.load(file)
-                        if isinstance(data, dict):
-                            logging.info('👉 Migrating unencrypted data to encrypted format...')
-                            self._migrate_to_encrypted(data)
-                            return data
-                except FileNotFoundError:
-                    logging.info('❌ No existing unencrypted data found, starting fresh')
-                    return {}
-            else:
-                with open(self.data_file, 'r') as file:
-                    data = json.load(file)
-                    if isinstance(data, dict):
-                        return data
-                    else:
-                        logging.warning('❌ Invalid gamification data structure, starting fresh')
-                        return {}
-                        
-        except FileNotFoundError:
-            logging.info('❌ No existing gamification data found, starting fresh')
-            return {}
-        except json.JSONDecodeError as e:
-            logging.error(f'❌ Corrupted gamification data file: {e}, starting fresh')
-            # Try to backup corrupted file
-            try:
-                backup_file = self.data_file + f'.corrupted.{datetime.now().strftime("%Y%m%d_%H%M%S")}'
-                os.rename(self.data_file, backup_file)
-                logging.info(f'❌ Corrupted file backed up as: {backup_file}')
-            except Exception:
-                pass
-            return {}
+            data = self.db.load_user_data()
+            logging.debug(f'📂 Loaded {len(data)} user records from CouchDB')
+            return data
         except Exception as e:
-            logging.error(f'❌ Error loading gamification data: {e}')
+            logging.error(f'❌ Error loading gamification data from CouchDB: {e}')
             return {}
-    
-    def _migrate_to_encrypted(self, data: Dict):
-        try:
-            encryption.save_encrypted_json(data, self.data_file)
-            os.remove(self.data_file)
-            logging.info('✅ Data migration to encrypted format completed')
-        except Exception as e:
-            logging.error(f'❌ Failed to migrate data to encrypted format: {e}')
-    
+
     def load_usernames(self) -> Dict:
         try:
-            if ENCRYPTION_ENABLED:
-                # Check if unencrypted .json is newer than encrypted .enc
-                json_exists = os.path.exists(self.usernames_file)
-                enc_exists = os.path.exists(self.usernames_file + '.enc')
-
-                if json_exists and enc_exists:
-                    json_mtime = os.path.getmtime(self.usernames_file)
-                    enc_mtime = os.path.getmtime(self.usernames_file + '.enc')
-                    if json_mtime > enc_mtime:
-                        logging.info('👉 Usernames .json is newer, migrating...')
-                        with open(self.usernames_file, 'r') as file:
-                            data = json.load(file)
-                            if isinstance(data, dict):
-                                self._migrate_usernames_to_encrypted(data)
-                                return data
-
-                data = encryption.load_encrypted_json(self.usernames_file)
-                if data is not None:
-                    logging.info('🔒 Loaded encrypted usernames cache')
-                    return data
-
-                try:
-                    with open(self.usernames_file, 'r') as file:
-                        data = json.load(file)
-                        if isinstance(data, dict):
-                            logging.info('👉 Migrating usernames to encrypted format...')
-                            self._migrate_usernames_to_encrypted(data)
-                            return data
-                except FileNotFoundError:
-                    pass
-                return {}
-            else:
-                with open(self.usernames_file, 'r') as file:
-                    return json.load(file)
-        except FileNotFoundError:
-            return {}
-        except json.JSONDecodeError:
-            return {}
+            data = self.db.load_usernames()
+            logging.debug(f'📂 Loaded {len(data)} username records from CouchDB')
+            return data
         except Exception as e:
-            logging.error(f'❌ Error loading usernames: {e}')
+            logging.error(f'❌ Error loading usernames from CouchDB: {e}')
             return {}
-    
-    def _migrate_usernames_to_encrypted(self, data: Dict):
-        try:
-            encryption.save_encrypted_json(data, self.usernames_file)
-            os.remove(self.usernames_file)
-            logging.info('✅ Usernames migration to encrypted format completed')
-        except Exception as e:
-            logging.error(f'❌ Failed to migrate usernames to encrypted format: {e}')
-    
+
     def save_usernames(self):
         try:
-            os.makedirs('data', exist_ok=True)
-            if ENCRYPTION_ENABLED:
-                encryption.save_encrypted_json(self.usernames, self.usernames_file)
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                # Don't block the event loop
+                loop.run_in_executor(None, self.db.save_usernames, self.usernames)
             else:
-                with open(self.usernames_file, 'w') as file:
-                    json.dump(self.usernames, file, indent=2)
+                self.db.save_usernames(self.usernames)
         except Exception as e:
-            logging.error(f'❌ Failed to save usernames: {e}')
-    
+            logging.error(f'❌ Failed to save usernames to CouchDB: {e}')
+
     def load_servernames(self) -> Dict:
         try:
-            with open(self.servernames_file, 'r') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            return {}
-        except json.JSONDecodeError:
+            data = self.db.load_servernames()
+            logging.debug(f'📂 Loaded {len(data)} server name records from CouchDB')
+            return data
+        except Exception as e:
+            logging.error(f'❌ Error loading servernames from CouchDB: {e}')
             return {}
     
     def save_servernames(self):
         try:
-            os.makedirs('data', exist_ok=True)
-            with open(self.servernames_file, 'w') as file:
-                json.dump(self.servernames, file, indent=2)
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                # Don't block the event loop
+                loop.run_in_executor(None, self.db.save_servernames, self.servernames)
+            else:
+                self.db.save_servernames(self.servernames)
         except Exception as e:
-            logging.error(f'❌ Failed to save server names: {e}')
+            logging.error(f'❌ Failed to save server names to CouchDB: {e}')
     
     def update_servername(self, guild_id: str, guild_name: str):
 
@@ -195,7 +100,7 @@ class CozyGamification:
         }
         self.save_servernames()
     
-    def update_username(self, user_id: str, username: str, display_name: str = None):
+    def update_username(self, user_id: str, username: str, display_name: str = None, save_immediately: bool = True):
 
         user_id = str(user_id)
         self.usernames[user_id] = {
@@ -203,26 +108,23 @@ class CozyGamification:
             'display_name': display_name or username,
             'last_updated': datetime.now().isoformat()
         }
-        self.save_usernames()
+        if save_immediately:
+            self.save_usernames()
     
     def save_user_data(self, force_detailed_log=False):
 
-        # Ensure data directory exists
-        os.makedirs('data', exist_ok=True)
-
-        temp_file = None  # Initialize to avoid UnboundLocalError in exception handler
         try:
-            if ENCRYPTION_ENABLED:
-                encryption.save_encrypted_json(self.user_data, self.data_file)
+            # Save to CouchDB (SYNC operation - runs in executor to avoid blocking)
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                # Don't block the event loop - save in thread pool
+                loop.run_in_executor(None, self.db.save_user_data, self.user_data)
             else:
-                temp_file = self.data_file + '.tmp'
-                with open(temp_file, 'w') as file:
-                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-                    json.dump(self.user_data, file, indent=2)
-                    file.flush()
-                    os.fsync(file.fileno())
-
-                os.rename(temp_file, self.data_file)
+                self.db.save_user_data(self.user_data)
 
             from main import format_duration
 
@@ -275,9 +177,7 @@ class CozyGamification:
                 logging.debug(f"🚫 EVENT SAVE - No changes since last save")
 
         except Exception as e:
-            if temp_file and os.path.exists(temp_file):
-                os.remove(temp_file)
-            logging.error(f'❌ Failed to save gamification data: {e}\n{traceback.format_exc()}')
+            logging.error(f'❌ Failed to save gamification data to CouchDB: {e}\n{traceback.format_exc()}')
     
     def get_user_stats(self, user_id: str) -> Dict:
 
@@ -429,7 +329,7 @@ class CozyGamification:
                 'reason': "Listening time"
             }
     
-    def track_sound_start(self, user_id: str, sound_name: str):
+    def track_sound_start(self, user_id: str, sound_name: str, save_immediately: bool = True):
 
         user_stats = self.get_user_stats(user_id)
 
@@ -456,7 +356,8 @@ class CozyGamification:
 
         user_stats['listening_time_by_sound'][sound_name]['session_count'] += 1
 
-        self.save_user_data()
+        if save_immediately:
+            self.save_user_data()
     
     def reset_consecutive_time_for_guild(self, guild_id: str, users_in_vocal: List[str]):
 
@@ -600,14 +501,14 @@ class CozyGamification:
             return self.get_sound_display_name(favorite[0])
         return None
     
-    def join_session(self, user_id: str, username: str = None, force_bonus: bool = False):
+    def join_session(self, user_id: str, username: str = None, force_bonus: bool = False, save_immediately: bool = True):
 
         user_stats = self.get_user_stats(user_id)
-        
+
         # Check for recent join to prevent duplicate points from reconnections
         last_join_time = user_stats.get('last_join_time')
         current_time = datetime.now()
-        
+
         # Prevent duplicate join points within 2 minutes
         award_join_points = True
         if not force_bonus and last_join_time:
@@ -630,7 +531,7 @@ class CozyGamification:
         user_stats['last_join_time'] = current_time.isoformat()
 
         if username:
-            self.update_username(user_id, username, username)
+            self.update_username(user_id, username, username, save_immediately=save_immediately)
 
         # Update daily streak
         today = datetime.now().strftime('%Y-%m-%d')
@@ -645,7 +546,7 @@ class CozyGamification:
 
         result = None
         if award_join_points:
-            result = self.add_points(user_id, 5, "Joining session")
+            result = self.add_points(user_id, 5, "Joining session", save_data=save_immediately)
         else:
             result = {
                 'points_added': 0,
@@ -655,8 +556,9 @@ class CozyGamification:
                 'new_achievements': [],
                 'reason': "Joining session (duplicate prevention)"
             }
-        
-        self.save_user_data()
+
+        if save_immediately:
+            self.save_user_data()
         return result
     
     def is_consecutive_day(self, last_date: str, current_date: str) -> bool:
@@ -899,4 +801,3 @@ class CozyGamification:
 
 # Global instance
 cozy_gamification = CozyGamification()
-

@@ -3,32 +3,26 @@ from discord import app_commands
 from discord.ext import commands
 import json
 from .gamification import cozy_gamification
+from utils.storage.couchdb_client import get_couchdb_client
 
 # Cog for displaying leaderboards (top users, servers, sounds)
 class TopsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.db = get_couchdb_client()
 
-    # Load voice channel usage statistics from persistent storage
+    # Load voice channel usage statistics from CouchDB
     def load_voice_time_data(self):
-        data_file = 'data/voice_time_data.json'
         try:
-            with open(data_file, 'r') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            return {}
-        except json.JSONDecodeError:
+            return self.db.load_voice_time_data()
+        except Exception as e:
             return {}
 
-    # Load server names cache from JSON file
+    # Load server names cache from CouchDB
     def load_servernames_data(self):
-        data_file = 'data/servernames.json'
         try:
-            with open(data_file, 'r') as file:
-                return json.load(file)
-        except FileNotFoundError:
-            return {}
-        except json.JSONDecodeError:
+            return self.db.load_servernames()
+        except Exception as e:
             return {}
 
     @app_commands.command(name="top-servers", description="Display the top servers")
@@ -114,13 +108,10 @@ class TopsCog(commands.Cog):
     @app_commands.command(name="top-sounds", description="View the most listened sounds")
     async def top_sounds_command(self, interaction: discord.Interaction):
         try:
-            # Load cozy points data to aggregate sound listening times
-            # Load user data from plain JSON
-            data_file = 'data/cozy_points.json'
+            # Load cozy points data from CouchDB
             try:
-                with open(data_file, 'r') as file:
-                    user_data = json.load(file)
-            except FileNotFoundError:
+                user_data = self.db.load_user_data()
+            except Exception:
                 await interaction.response.send_message("No listening data found yet! Start playing some sounds! 🎵")
                 return
                     

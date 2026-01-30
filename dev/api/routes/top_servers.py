@@ -20,26 +20,22 @@ class TopServersResponse(BaseModel):
     servers: List[ServerStats]
     total_count: int
 
-# Load voice channel usage statistics from persistent storage
+# Load voice channel usage statistics from CouchDB
 def load_voice_time_data():
-    data_file = 'data/voice_time_data.json'
     try:
-        with open(data_file, 'r') as file:
-            return json.load(file)
-    except FileNotFoundError:
-        return {}
-    except json.JSONDecodeError:
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.load_voice_time_data()
+    except Exception:
         return {}
 
-# Load server names cache from JSON file
+# Load server names cache from CouchDB
 def load_servernames_data():
-    data_file = 'data/servernames.json'
     try:
-        with open(data_file, 'r') as file:
-            return json.load(file)
-    except FileNotFoundError:
-        return {}
-    except json.JSONDecodeError:
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.load_servernames()
+    except Exception:
         return {}
 
 # Convert seconds to human-readable duration format

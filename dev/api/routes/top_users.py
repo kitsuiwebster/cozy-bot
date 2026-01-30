@@ -35,26 +35,22 @@ class TopUsersResponse(BaseModel):
     users: List[UserStats]
     total_count: int
 
-# Load cozy points data (plain JSON)
+# Load cozy points data from CouchDB
 def load_cozy_points_data():
-    data_file = 'data/cozy_points.json'
     try:
-        with open(data_file, 'r') as file:
-            return json.load(file)
-    except FileNotFoundError:
-        return {}
-    except json.JSONDecodeError:
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.load_user_data()
+    except Exception:
         return {}
 
-# Load usernames cache (plain JSON)
+# Load usernames cache from CouchDB
 def load_usernames_data():
-    data_file = 'data/usernames.json'
     try:
-        with open(data_file, 'r') as file:
-            return json.load(file)
-    except FileNotFoundError:
-        return {}
-    except json.JSONDecodeError:
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.load_usernames()
+    except Exception:
         return {}
 
 # Convert seconds to human-readable listening time format

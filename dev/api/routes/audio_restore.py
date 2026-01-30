@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
     from utils.audio.audio_state_manager import audio_state_manager
-    logging.info("✅ Audio state manager imported successfully")
+    logging.info("🎮 utils.audio.audio_state_manager loaded successfully")
 except ImportError as e:
     logging.error(f"❌ Failed to import audio_state_manager: {e}")
     audio_state_manager = None
@@ -42,7 +42,11 @@ class RestoreStatusResponse(BaseModel):
 async def save_audio_state():
     try:
         if not audio_state_manager or not bot_instance:
-            raise HTTPException(status_code=503, detail="Audio manager not available")
+            return AudioStateResponse(
+                success=False,
+                sessions_saved=0,
+                message="Audio manager not available in API process"
+            )
         
         # Save current audio state
         sessions_saved = audio_state_manager.save_current_state(bot_instance)
@@ -62,7 +66,11 @@ async def save_audio_state():
 async def restore_audio_state():
     try:
         if not audio_state_manager or not bot_instance:
-            raise HTTPException(status_code=503, detail="Audio manager not available")
+            return RestoreStatusResponse(
+                success=False,
+                sessions_restored=0,
+                message="Audio manager not available in API process"
+            )
         
         # Restore audio state
         sessions_restored = audio_state_manager.restore_audio_state(bot_instance)
@@ -82,7 +90,11 @@ async def restore_audio_state():
 async def finalize_all_sessions():
     try:
         if not bot_instance:
-            raise HTTPException(status_code=503, detail="Bot instance not available")
+            return {
+                "success": False,
+                "sessions_finalized": 0,
+                "message": "Bot instance not available in API process"
+            }
         
         # Import voice session tracking from main
         import main
@@ -138,7 +150,11 @@ async def finalize_all_sessions():
 async def restore_user_sessions():
     try:
         if not bot_instance:
-            raise HTTPException(status_code=503, detail="Bot instance not available")
+            return {
+                "success": False,
+                "sessions_restored": 0,
+                "message": "Bot instance not available in API process"
+            }
         
         # Import voice session tracking from main
         import main
@@ -206,31 +222,26 @@ async def restore_user_sessions():
 @router.get("/audio/restore-tasks")
 async def get_restore_tasks():
     try:
-        import glob
-        restore_files = glob.glob('data/restore_task_*.json')
-        
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+
+        all_tasks = db.get_all_restore_tasks()
+
         tasks = []
-        for file_path in restore_files:
-            try:
-                import json
-                with open(file_path, 'r') as f:
-                    task_data = json.load(f)
-                tasks.append({
-                    'file': file_path,
-                    'guild_id': task_data.get('guild_id'),
-                    'sound_name': task_data.get('sound_name'),
-                    'timestamp': task_data.get('timestamp')
-                })
-            except Exception as e:
-                logging.error(f"❌ Failed to read restore task {file_path}: {e}")
-                continue
-        
+        for task_id, task_data in all_tasks.items():
+            tasks.append({
+                'task_id': task_id,
+                'guild_id': task_data.get('guild_id'),
+                'sound_name': task_data.get('sound_name'),
+                'timestamp': task_data.get('timestamp')
+            })
+
         return {
             "success": True,
             "pending_tasks": len(tasks),
             "tasks": tasks
         }
-        
+
     except Exception as e:
         logging.error(f"❌ Failed to get restore tasks: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get restore tasks: {str(e)}")

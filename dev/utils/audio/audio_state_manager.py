@@ -3,11 +3,12 @@ import os
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
+from utils.storage.couchdb_client import get_couchdb_client
 
 # Manage saving and restoring audio state during deployments
 class AudioStateManager:
     def __init__(self):
-        self.state_file = 'data/audio_restore_state.json'
+        self.db = get_couchdb_client()
 
     # Save current audio state to JSON file
     def save_current_state(self, bot_instance):
@@ -38,33 +39,30 @@ class AudioStateManager:
                             }
                             audio_states.append(state_entry)
             
-            # Save to file
+            # Save to CouchDB
             state_data = {
                 'timestamp': datetime.now().isoformat(),
                 'audio_states': audio_states
             }
-            
-            os.makedirs('data', exist_ok=True)
-            with open(self.state_file, 'w') as f:
-                json.dump(state_data, f, indent=2)
-            
-            logging.info(f"📦 Audio state saved: {len(audio_states)} active sessions")
+
+            self.db.save_audio_state(state_data)
+
+            logging.info(f"📦 Audio state saved to CouchDB: {len(audio_states)} active sessions")
             return len(audio_states)
             
         except Exception as e:
             logging.error(f"❌ Failed to save audio state: {e}")
             return 0
 
-    # Restore audio state from JSON file
+    # Restore audio state from CouchDB
     def restore_audio_state(self, bot_instance):
         try:
-            if not os.path.exists(self.state_file):
-                logging.info("📦 No audio state file found")
+            state_data = self.db.load_audio_state()
+            if not state_data:
+                logging.info("")
+                logging.info("📦 No audio state found in CouchDB")
                 return 0
-            
-            with open(self.state_file, 'r') as f:
-                state_data = json.load(f)
-            
+
             audio_states = state_data.get('audio_states', [])
             restored_count = 0
             
@@ -102,10 +100,10 @@ class AudioStateManager:
                     logging.error(f"❌ Failed to restore audio for guild {state.get('guild_id', 'unknown')}: {e}")
                     continue
             
-            # Clean up state file
+            # Clean up state
             try:
-                os.remove(self.state_file)
-                logging.info("🧹 Audio state file cleaned up")
+                self.db.delete_audio_state()
+                logging.info("🧹 Audio state cleaned up from CouchDB")
             except:
                 pass
             
@@ -123,11 +121,9 @@ class AudioStateManager:
             'sound_name': sound_name,
             'timestamp': datetime.now().isoformat()
         }
-        
-        # Save individual restore task
-        restore_file = f'data/restore_task_{guild_id}.json'
-        with open(restore_file, 'w') as f:
-            json.dump(restore_data, f, indent=2)
+
+        # Save individual restore task to CouchDB
+        self.db.save_restore_task(str(guild_id), restore_data)
 
 # Global instance
 audio_state_manager = AudioStateManager()
