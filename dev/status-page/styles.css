@@ -386,6 +386,10 @@ h1 {
     color: var(--error);
 }
 
+.timeline-uptime.muted {
+    color: var(--text-tertiary);
+}
+
 footer {
     margin-top: 3.5rem;
     padding: 2.5rem 0 2rem 0;

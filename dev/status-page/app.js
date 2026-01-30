@@ -4,11 +4,11 @@ const STATUS_API_URL = '/api/public/status';
 
 // Périodes d'uptime à afficher
 const UPTIME_PERIODS = [
-    { label: '90 days', days: 90 },
-    { label: '30 days', days: 30 },
-    { label: '7 days', days: 7 },
-    { label: '24 hours', hours: 24 },
-    { label: '1 hour', hours: 1 }
+    { label: '90d', days: 90 },
+    { label: '30d', days: 30 },
+    { label: '7d', days: 7 },
+    { label: '24h', hours: 24 },
+    { label: '1h', hours: 1 }
 ];
 
 // Récupérer les monitors depuis l'API Kuma
@@ -231,7 +231,10 @@ function createMonitorCard(monitor) {
         const { uptime, segments, hasData } = calculateUptimeForPeriod(monitor.heartbeats, period);
 
         // Vert si 100%, jaune si >= 90%, rouge si < 90%
-        const uptimeClass = uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low';
+        const uptimeClass = hasData
+            ? (uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low')
+            : 'muted';
+        const uptimeText = hasData ? `${uptime}%` : '—';
 
         const segmentsHTML = segments.map(seg => {
             // Formater les dates pour le tooltip (heure de Paris)
@@ -262,7 +265,7 @@ function createMonitorCard(monitor) {
             <div class="timeline-row">
                 <div class="timeline-label">${period.label}</div>
                 <div class="timeline-bar">${segmentsHTML}</div>
-                <div class="timeline-uptime ${uptimeClass}">${uptime}%</div>
+                <div class="timeline-uptime ${uptimeClass}">${uptimeText}</div>
             </div>
         `;
     });
