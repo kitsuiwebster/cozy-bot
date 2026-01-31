@@ -91,7 +91,7 @@ function toTimeMs(value) {
 }
 
 // Calculer l'uptime pour une période donnée
-function calculateUptimeForPeriod(heartbeats, period, maintenanceActive) {
+function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
     if (!heartbeats || heartbeats.length === 0) {
         return { uptime: 0, segments: [], hasData: false };
     }
@@ -163,10 +163,6 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceActive) {
     const dataCoverage = actualDataSpan / periodMs * 100;
     const hasEnoughData = dataCoverage >= 10;
 
-    // Calculer l'uptime global
-    const upCount = relevantHeartbeats.filter(hb => hb.status === 1).length;
-    const uptime = (upCount / relevantHeartbeats.length) * 100;
-
     // Créer des segments de TEMPS FIXES
     const segments = [];
 
@@ -183,9 +179,14 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceActive) {
 
         let status;
         let segmentUptime = 0;
+        const maintenanceOverlap = (maintenanceRanges || []).some(range => {
+            return segmentStart < range.end && segmentEnd > range.start;
+        });
 
-        if (segmentHeartbeats.length === 0) {
-            // Pas de données pour ce segment
+        if (maintenanceOverlap) {
+            status = 'maintenance';
+            segmentUptime = 100;
+        } else if (segmentHeartbeats.length === 0) {
             status = 'unknown';
         } else {
             // Calculer l'uptime du segment
@@ -193,9 +194,7 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceActive) {
             segmentUptime = (upInSegment / segmentHeartbeats.length) * 100;
 
             // Déterminer le statut
-            if (maintenanceActive) {
-                status = 'maintenance';
-            } else if (segmentUptime >= 100) {
+            if (segmentUptime >= 100) {
                 status = 'up'; // Vert: 100%
             } else if (segmentUptime >= 50) {
                 status = 'degraded'; // Jaune: 50-99%
@@ -217,8 +216,20 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceActive) {
         });
     }
 
-    const finalUptime = maintenanceActive && hasEnoughData ? 100 : uptime;
-    return { uptime: finalUptime.toFixed(2), segments, hasData: hasEnoughData };
+    // Calculer l'uptime global (maintenance compte comme up)
+    let uptime = 0;
+    let consideredSegments = 0;
+    segments.forEach(seg => {
+        if (seg.status === 'unknown') {
+            return;
+        }
+        consideredSegments += 1;
+        uptime += parseFloat(seg.uptime);
+    });
+
+    const uptimeValue = consideredSegments > 0 ? (uptime / consideredSegments) : 0;
+
+    return { uptime: uptimeValue.toFixed(2), segments, hasData: hasEnoughData };
 }
 
 // Déterminer le statut global
@@ -241,14 +252,14 @@ function determineOverallStatus(monitors) {
 }
 
 // Créer l'HTML pour un monitor
-function createMonitorCard(monitor, maintenanceActive) {
+function createMonitorCard(monitor, maintenanceActive, maintenanceRanges) {
     const card = document.createElement('div');
     card.className = 'monitor-card';
 
     const statusClass = maintenanceActive ? 'maintenance' : (monitor.active ? 'up' : 'down');
     const statusText = maintenanceActive
         ? 'Maintenance in progress'
-        : (monitor.active ? '✓ Currently Operational' : '✗ Currently Down');
+        : (monitor.active ? 'Currently Operational' : 'Currently Down');
 
     // Afficher toujours toutes les périodes, même sans données
     var periodsToShow = UPTIME_PERIODS;
@@ -256,12 +267,10 @@ function createMonitorCard(monitor, maintenanceActive) {
     let timelinesHTML = '';
 
     periodsToShow.forEach(period => {
-        const { uptime, segments, hasData } = calculateUptimeForPeriod(monitor.heartbeats, period, maintenanceActive);
+        const { uptime, segments, hasData } = calculateUptimeForPeriod(monitor.heartbeats, period, maintenanceRanges);
 
         // Vert si 100%, jaune si >= 90%, rouge si < 90%
-        const uptimeClass = maintenanceActive
-            ? 'maintenance'
-            : (hasData ? (uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low') : 'muted');
+        const uptimeClass = hasData ? (uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low') : 'muted';
         const uptimeText = hasData ? `${uptime}%` : '—';
 
         const segmentsHTML = segments.map(seg => {
@@ -406,6 +415,21 @@ async function updateStatus() {
     }
 
     const maintenanceState = renderMaintenance(maintenanceData);
+    const maintenanceRanges = [];
+
+    if (maintenanceData) {
+        const maintenanceItems = (maintenanceData.active || []).concat(maintenanceData.history || []);
+        maintenanceItems.forEach(item => {
+            if (!item || !item.started_at) {
+                return;
+            }
+            const start = toTimeMs(item.started_at);
+            const end = item.ended_at ? toTimeMs(item.ended_at) : Date.now();
+            if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+                maintenanceRanges.push({ start, end });
+            }
+        });
+    }
 
     const monitors = monitorsData.monitors.map(m => ({ ...m }));
 
@@ -440,7 +464,7 @@ async function updateStatus() {
     const overallStatus = determineOverallStatus(monitors);
     const statusBadge = document.getElementById('overall-status');
     if (maintenanceState.hasActive) {
-        statusBadge.className = 'status-badge maintenance';
+        statusBadge.className = 'status-badge plain maintenance-text';
         statusBadge.innerHTML = `<span class="status-text">Maintenance in progress</span>`;
     } else if (overallStatus.status === 'operational') {
         statusBadge.className = 'status-badge plain';
@@ -460,7 +484,7 @@ async function updateStatus() {
     }
 
     monitors.forEach(monitor => {
-        const card = createMonitorCard(monitor, maintenanceState.hasActive);
+        const card = createMonitorCard(monitor, maintenanceState.hasActive, maintenanceRanges);
         container.appendChild(card);
     });
 

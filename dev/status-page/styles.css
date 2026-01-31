@@ -64,6 +64,10 @@ header {
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
 }
 
+.maintenance-card + .maintenance-card {
+    margin-top: 1rem;
+}
+
 .maintenance-card.history {
     background: rgba(148, 163, 184, 0.08);
     border-color: rgba(148, 163, 184, 0.25);
@@ -236,6 +240,10 @@ h1 {
     color: var(--success);
     font-size: 1rem;
     letter-spacing: 0.02em;
+}
+
+.status-badge.plain.maintenance-text .status-text {
+    color: var(--accent);
 }
 
 .status-badge.operational {
@@ -615,6 +623,40 @@ footer {
     box-shadow: 0 0 8px var(--error);
 }
 
+.legend-mini {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.legend-mini .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    display: inline-block;
+    margin-right: 0.35rem;
+    box-shadow: none;
+}
+
+.legend-mini .legend-dot.operational {
+    background: var(--success);
+}
+
+.legend-mini .legend-dot.degraded {
+    background: var(--warning);
+}
+
+.legend-mini .legend-dot.maintenance {
+    background: var(--accent);
+}
+
+.legend-mini .legend-dot.down {
+    background: var(--error);
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 2rem 1.25rem 3rem;
@@ -638,6 +680,11 @@ footer {
 
     .header-update {
         font-size: 0.85rem;
+    }
+
+    .legend-mini {
+        width: 100%;
+        gap: 0.6rem;
     }
 
     .monitor-card {
