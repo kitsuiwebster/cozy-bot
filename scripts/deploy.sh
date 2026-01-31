@@ -150,9 +150,9 @@ else
     echo "✅ No existing container found"
 fi
 
-# Stop only the bot container (keep Kuma and CouchDB running)
+# Stop only the bot container
 echo ""
-echo "🛑 Stopping only the bot container (Kuma & CouchDB stay up)..."
+echo "🛑 Stopping only the bot container..."
 docker compose --env-file .env stop discord-bot 2>/dev/null || true
 REMOVED_CONTAINER=$(docker compose --env-file .env rm -f discord-bot 2>&1 || true)
 if echo "$REMOVED_CONTAINER" | grep -q "discord-bot"; then
