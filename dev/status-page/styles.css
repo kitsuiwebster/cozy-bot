@@ -91,6 +91,12 @@ header {
     line-height: 1.5;
 }
 
+.maintenance-meta {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
 .maintenance-history-title {
     font-size: 0.85rem;
     font-weight: 600;

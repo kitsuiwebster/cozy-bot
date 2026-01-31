@@ -333,9 +333,15 @@ function renderMaintenance(maintenanceData) {
         activeItems.forEach(item => {
             const card = document.createElement('div');
             card.className = 'maintenance-card active';
+            const startedAt = item.started_at ? new Date(item.started_at).toLocaleString('en-GB', {
+                timeZone: 'Europe/Paris',
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            }) : null;
             card.innerHTML = `
                 <div class="maintenance-header">⚠️ Maintenance in progress</div>
                 <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
+                ${startedAt ? `<div class=\"maintenance-meta\">Started ${startedAt} (Paris)</div>` : ''}
                 <div class="maintenance-description">${item.description || ''}</div>
             `;
             activeContainer.appendChild(card);
@@ -352,11 +358,25 @@ function renderMaintenance(maintenanceData) {
             const card = document.createElement('div');
             card.className = 'maintenance-card history';
             const statusText = item.status ? item.status.replace(/-/g, ' ') : 'completed';
+            const startedAt = item.started_at ? new Date(item.started_at).toLocaleString('en-GB', {
+                timeZone: 'Europe/Paris',
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            }) : null;
+            const endedAt = item.ended_at ? new Date(item.ended_at).toLocaleString('en-GB', {
+                timeZone: 'Europe/Paris',
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            }) : null;
+            const rangeText = startedAt || endedAt
+                ? `${startedAt ? `Started ${startedAt}` : ''}${startedAt && endedAt ? ' • ' : ''}${endedAt ? `Ended ${endedAt}` : ''} (Paris)`
+                : '';
             card.innerHTML = `
                 <div class="maintenance-row">
                     <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
                     <div class="maintenance-status">${statusText}</div>
                 </div>
+                ${rangeText ? `<div class=\"maintenance-meta\">${rangeText}</div>` : ''}
                 <div class="maintenance-description">${item.description || ''}</div>
             `;
             historyContainer.appendChild(card);

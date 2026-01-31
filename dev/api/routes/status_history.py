@@ -121,6 +121,8 @@ async def _sync_maintenance() -> List[Dict[str, Any]]:
         if not maintenance_id:
             continue
         active_ids.add(maintenance_id)
+        previous = existing.get(maintenance_id, {})
+        started_at = previous.get("started_at") or datetime.utcnow().isoformat()
         payload = {
             "id": item.get("id"),
             "title": item.get("title"),
@@ -128,6 +130,10 @@ async def _sync_maintenance() -> List[Dict[str, Any]]:
             "status": item.get("status") or "under-maintenance",
             "active": True,
             "timezone": item.get("timezone") or item.get("timezoneOption"),
+            "started_at": started_at,
+            "ended_at": previous.get("ended_at"),
+            "date_range": item.get("dateRange"),
+            "time_range": item.get("timeRange"),
         }
         await asyncio.to_thread(db.save_maintenance, maintenance_id, payload)
 
@@ -137,6 +143,7 @@ async def _sync_maintenance() -> List[Dict[str, Any]]:
             payload = doc.copy()
             payload["active"] = False
             payload["status"] = "completed"
+            payload["ended_at"] = payload.get("ended_at") or datetime.utcnow().isoformat()
             await asyncio.to_thread(db.save_maintenance, maintenance_id, payload)
 
     # Return full history for API consumption
