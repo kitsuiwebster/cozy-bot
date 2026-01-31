@@ -401,6 +401,18 @@ class CouchDBClient:
         """Get all restore tasks"""
         return self.get_documents_by_prefix('restore_task:')
 
+    # Maintenance operations
+
+    def save_maintenance(self, maintenance_id: str, data: Dict) -> bool:
+        """Save maintenance entry"""
+        doc = data.copy()
+        doc['type'] = 'maintenance'
+        return self.save_document(self.db, f'maintenance:{maintenance_id}', doc)
+
+    def load_all_maintenance(self) -> Dict:
+        """Load all maintenance entries"""
+        return self.get_documents_by_prefix('maintenance:')
+
     # Live stats operations (for API access when bot is separate)
 
     def save_live_stats(self, stats: Dict) -> bool:

@@ -91,7 +91,7 @@ function toTimeMs(value) {
 }
 
 // Calculer l'uptime pour une période donnée
-function calculateUptimeForPeriod(heartbeats, period) {
+function calculateUptimeForPeriod(heartbeats, period, maintenanceActive) {
     if (!heartbeats || heartbeats.length === 0) {
         return { uptime: 0, segments: [], hasData: false };
     }
@@ -193,7 +193,9 @@ function calculateUptimeForPeriod(heartbeats, period) {
             segmentUptime = (upInSegment / segmentHeartbeats.length) * 100;
 
             // Déterminer le statut
-            if (segmentUptime >= 100) {
+            if (maintenanceActive) {
+                status = 'maintenance';
+            } else if (segmentUptime >= 100) {
                 status = 'up'; // Vert: 100%
             } else if (segmentUptime >= 50) {
                 status = 'degraded'; // Jaune: 50-99%
@@ -215,7 +217,8 @@ function calculateUptimeForPeriod(heartbeats, period) {
         });
     }
 
-    return { uptime: uptime.toFixed(2), segments, hasData: hasEnoughData };
+    const finalUptime = maintenanceActive && hasEnoughData ? 100 : uptime;
+    return { uptime: finalUptime.toFixed(2), segments, hasData: hasEnoughData };
 }
 
 // Déterminer le statut global
@@ -238,12 +241,14 @@ function determineOverallStatus(monitors) {
 }
 
 // Créer l'HTML pour un monitor
-function createMonitorCard(monitor) {
+function createMonitorCard(monitor, maintenanceActive) {
     const card = document.createElement('div');
     card.className = 'monitor-card';
 
-    const statusClass = monitor.active ? 'up' : 'down';
-    const statusText = monitor.active ? '✓ Currently Operational' : '✗ Currently Down';
+    const statusClass = maintenanceActive ? 'maintenance' : (monitor.active ? 'up' : 'down');
+    const statusText = maintenanceActive
+        ? 'Maintenance in progress'
+        : (monitor.active ? '✓ Currently Operational' : '✗ Currently Down');
 
     // Afficher toujours toutes les périodes, même sans données
     var periodsToShow = UPTIME_PERIODS;
@@ -251,12 +256,12 @@ function createMonitorCard(monitor) {
     let timelinesHTML = '';
 
     periodsToShow.forEach(period => {
-        const { uptime, segments, hasData } = calculateUptimeForPeriod(monitor.heartbeats, period);
+        const { uptime, segments, hasData } = calculateUptimeForPeriod(monitor.heartbeats, period, maintenanceActive);
 
         // Vert si 100%, jaune si >= 90%, rouge si < 90%
-        const uptimeClass = hasData
-            ? (uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low')
-            : 'muted';
+        const uptimeClass = maintenanceActive
+            ? 'maintenance'
+            : (hasData ? (uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low') : 'muted');
         const uptimeText = hasData ? `${uptime}%` : '—';
 
         const segmentsHTML = segments.map(seg => {
@@ -316,20 +321,20 @@ function renderMaintenance(maintenanceData) {
 
     activeContainer.innerHTML = '';
     historyContainer.innerHTML = '';
-    if (!maintenanceData || !maintenanceData.maintenance) {
+    if (!maintenanceData) {
         return { hasActive: false };
     }
 
-    const maintenanceItems = maintenanceData.maintenance.filter(item => item);
-    const activeItems = maintenanceItems.filter(item => item.active || item.status === 'under-maintenance');
-    const inactiveItems = maintenanceItems.filter(item => !(item.active || item.status === 'under-maintenance'));
+    const maintenanceItems = (maintenanceData.active || []).concat(maintenanceData.history || []).filter(item => item);
+    const activeItems = (maintenanceData.active || []).filter(item => item);
+    const inactiveItems = (maintenanceData.history || []).filter(item => item);
 
     if (activeItems.length > 0) {
         activeItems.forEach(item => {
             const card = document.createElement('div');
             card.className = 'maintenance-card active';
             card.innerHTML = `
-                <div class="maintenance-header">Maintenance in progress</div>
+                <div class="maintenance-header">⚠️ Maintenance in progress</div>
                 <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
                 <div class="maintenance-description">${item.description || ''}</div>
             `;
@@ -415,7 +420,7 @@ async function updateStatus() {
     const overallStatus = determineOverallStatus(monitors);
     const statusBadge = document.getElementById('overall-status');
     if (maintenanceState.hasActive) {
-        statusBadge.className = 'status-badge plain';
+        statusBadge.className = 'status-badge maintenance';
         statusBadge.innerHTML = `<span class="status-text">Maintenance in progress</span>`;
     } else if (overallStatus.status === 'operational') {
         statusBadge.className = 'status-badge plain';
@@ -435,7 +440,7 @@ async function updateStatus() {
     }
 
     monitors.forEach(monitor => {
-        const card = createMonitorCard(monitor);
+        const card = createMonitorCard(monitor, maintenanceState.hasActive);
         container.appendChild(card);
     });
 

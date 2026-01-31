@@ -110,6 +110,40 @@ async def _prune_old_points() -> None:
         await asyncio.to_thread(db.delete_document, db.db, doc_id)
 
 
+async def _sync_maintenance() -> List[Dict[str, Any]]:
+    db = get_couchdb_client()
+    active_items = await _fetch_maintenance()
+    existing = await asyncio.to_thread(db.load_all_maintenance)
+
+    active_ids = set()
+    for item in active_items:
+        maintenance_id = str(item.get("id"))
+        if not maintenance_id:
+            continue
+        active_ids.add(maintenance_id)
+        payload = {
+            "id": item.get("id"),
+            "title": item.get("title"),
+            "description": item.get("description"),
+            "status": item.get("status") or "under-maintenance",
+            "active": True,
+            "timezone": item.get("timezone") or item.get("timezoneOption"),
+        }
+        await asyncio.to_thread(db.save_maintenance, maintenance_id, payload)
+
+    # Mark previously active items as completed if they're no longer active
+    for maintenance_id, doc in existing.items():
+        if doc.get("active") and maintenance_id not in active_ids:
+            payload = doc.copy()
+            payload["active"] = False
+            payload["status"] = "completed"
+            await asyncio.to_thread(db.save_maintenance, maintenance_id, payload)
+
+    # Return full history for API consumption
+    history = await asyncio.to_thread(db.load_all_maintenance)
+    return [{"id": k, **v} for k, v in history.items()]
+
+
 async def status_history_loop() -> None:
     if not STATUS_HISTORY_ENABLED:
         logging.info("🔥 Status history disabled (STATUS_HISTORY_ENABLED=0)")
@@ -126,6 +160,9 @@ async def status_history_loop() -> None:
 
             if iteration % 60 == 0:
                 await _prune_old_points()
+
+            if iteration % 5 == 0:
+                await _sync_maintenance()
         except Exception as exc:
             logging.error(f"❌ Status history loop error: {exc}")
 
@@ -171,5 +208,8 @@ async def get_status_history(
 
 @router.get("/status/maintenance")
 async def get_status_maintenance():
-    maint = await _fetch_maintenance()
-    return {"maintenance": maint}
+    history = await _sync_maintenance()
+    active = [item for item in history if item.get("active")]
+    inactive = [item for item in history if not item.get("active")]
+    inactive.sort(key=lambda item: item.get("id", 0), reverse=True)
+    return {"active": active, "history": inactive}
