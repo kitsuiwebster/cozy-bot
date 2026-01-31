@@ -185,7 +185,7 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
 
         if (maintenanceOverlap) {
             status = 'maintenance';
-            segmentUptime = 100;
+            segmentUptime = 0;
         } else if (segmentHeartbeats.length === 0) {
             status = 'unknown';
         } else {
