@@ -238,11 +238,18 @@ async def simple_deployment_notify(request: DeploymentRequest):
         "status": "pending"
     }
 
-    os.makedirs('data', exist_ok=True)
-    with open('data/deployment_notification.json', 'w') as f:
-        json.dump(notification_data, f, indent=2)
+    try:
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        doc = notification_data.copy()
+        doc["type"] = "deployment_notification"
+        db.save_document(db.db, "deployment_notification", doc)
+    except Exception:
+        os.makedirs('data', exist_ok=True)
+        with open('data/deployment_notification.json', 'w') as f:
+            json.dump(notification_data, f, indent=2)
 
-    logging.info(f"📢 Deployment notification file created for {total_users} users")
+    logging.info(f"📢 Deployment notification created for {total_users} users")
     return {
         "message": "Deployment notification file created",
         "users_found": total_users,

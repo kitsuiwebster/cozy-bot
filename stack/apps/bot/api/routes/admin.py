@@ -13,25 +13,33 @@ from cogs.stats.gamification import cozy_gamification
 # Initialize FastAPI router for admin endpoints
 router = APIRouter()
 
-# Load server voice time data from disk
+# Load server voice time data (prefer CouchDB, fallback to disk)
 def load_voice_time_data():
     try:
-        with open('data/voice_time_data.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.load_voice_time_data()
     except Exception:
-        return {}
+        try:
+            with open('data/voice_time_data.json', 'r') as f:
+                return json.load(f)
+        except Exception:
+            return {}
 
-# Save server voice time data to disk
+# Save server voice time data (prefer CouchDB, fallback to disk)
 def save_voice_time_data(data):
     try:
-        os.makedirs('data', exist_ok=True)
-        with open('data/voice_time_data.json', 'w') as f:
-            json.dump(data, f, indent=2)
-        return True
+        from utils.storage.couchdb_client import get_couchdb_client
+        db = get_couchdb_client()
+        return db.save_voice_time_data(data)
     except Exception:
-        return False
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open('data/voice_time_data.json', 'w') as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception:
+            return False
 
 # Find server name by guild_id from the servernames cache
 def get_server_name_by_id(guild_id: str) -> Optional[str]:
@@ -334,7 +342,7 @@ async def delete_user(request: DeleteUserRequest):
 @router.post("/server-time", response_model=ServerTimeResponse, dependencies=[Depends(validate_api_key)])
 async def modify_server_time(request: ServerTimeRequest):
     try:
-        guild_id = request.guild_id
+        guild_id = str(request.guild_id)
 
         # Load server voice time data
         voice_time_data = load_voice_time_data()

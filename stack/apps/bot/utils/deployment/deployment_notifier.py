@@ -8,8 +8,39 @@ from datetime import datetime
 class DeploymentNotifier:
     def __init__(self, bot):
         self.bot = bot
-        self.notification_file = 'data/deployment_notification.json'
         self.check_interval = 2  # Check every 2 seconds
+
+    def _load_notification(self):
+        try:
+            from utils.storage.couchdb_client import get_couchdb_client
+            db = get_couchdb_client()
+            doc = db.get_document(db.db, "deployment_notification")
+            if doc and "type" in doc:
+                doc = {k: v for k, v in doc.items() if k != "type"}
+            return doc
+        except Exception:
+            try:
+                with open('data/deployment_notification.json', 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return None
+
+    def _save_notification(self, data):
+        try:
+            from utils.storage.couchdb_client import get_couchdb_client
+            db = get_couchdb_client()
+            doc = data.copy()
+            doc["type"] = "deployment_notification"
+            db.save_document(db.db, "deployment_notification", doc)
+            return
+        except Exception:
+            pass
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open('data/deployment_notification.json', 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            pass
 
     # Start monitoring for deployment notifications
     async def start_monitoring(self):
@@ -17,7 +48,7 @@ class DeploymentNotifier:
         
         while not self.bot.is_closed():
             try:
-                if os.path.exists(self.notification_file):
+                if self._load_notification():
                     await self.handle_deployment_notification()
                     
                 await asyncio.sleep(self.check_interval)
@@ -29,8 +60,9 @@ class DeploymentNotifier:
     # Handle a pending deployment notification
     async def handle_deployment_notification(self):
         try:
-            with open(self.notification_file, 'r') as f:
-                data = json.load(f)
+            data = self._load_notification()
+            if not data:
+                return
             
             if data.get("status") != "pending":
                 return
@@ -136,8 +168,7 @@ class DeploymentNotifier:
             # Mark as sent and start countdown
             data["status"] = "sent"
             data["notifications_sent"] = notifications_sent
-            with open(self.notification_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            self._save_notification(data)
             
             logging.info(f"📢 Sent {notifications_sent} deployment notifications")
             
@@ -148,16 +179,14 @@ class DeploymentNotifier:
             # Mark as complete
             data["status"] = "complete"
             data["completed_at"] = datetime.now().isoformat()
-            with open(self.notification_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            self._save_notification(data)
             
             logging.info(f"✅ Deployment notification period completed")
             
         except Exception as e:
             logging.error(f"❌ Error handling deployment notification: {e}")
-            # Clean up file on error
+            # Best-effort clean up fallback file on error
             try:
-                os.remove(self.notification_file)
-            except:
+                os.remove('data/deployment_notification.json')
+            except Exception:
                 pass
-
