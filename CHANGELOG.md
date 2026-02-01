@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 - Deploy script improvements for Live API checks, notifications, and restore flow.
 - Status maintenance history tracking and banner metadata (started/ended timestamps).
 - Bot voice handling moved to dedicated threads/workers for DB writes and background tasks.
+- Leaderboard shared header component and consistent header stats across pages.
+- Status API-backed monitor history endpoints and public status API routes.
 
 ### Changed
 
@@ -25,6 +27,13 @@ All notable changes to this project will be documented in this file.
 - Status page and web UI typography/colors aligned.
 - Status page now reads from `/api/status/*` instead of Public API routes.
 - Make targets aligned and expanded per service (status API DB helper, UI links, seeds).
+- Status page monitor ordering with Bot (Live API) first.
+- Bot presence rotation now alternates server count and `/menu`.
+- Noise menu entry uses 📡 icon.
+- Web modal UI polish and refreshed leaderboard visuals.
+- Web API polling tuned (live stats 5s, header totals 60s, manual refresh for lists).
+- Status page mobile layout uses desktop viewport width.
+- Credits button removed and streak bonus copy corrected.
 
 ### Fixed
 
@@ -34,6 +43,12 @@ All notable changes to this project will be documented in this file.
 - Makefile command coverage and help output accuracy.
 - Audio restore cleanup errors when deleting CouchDB docs without `_rev`.
 - Voice connection stability improvements (reliable channel join and consistent playback start).
+- Status page uptime percentage calculations and maintenance coloring.
+- Status page Nginx proxying with full URI handling.
+- CORS handling for public API calls.
+- Admin API writes now persist to CouchDB consistently.
+- Audio playback change latency and restore write reliability.
+- Live stats glow/animation and cached values between page switches.
 
 ### Removed
 
