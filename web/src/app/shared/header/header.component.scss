@@ -1,11 +1,11 @@
 .cozy-header {
-  background: rgba(15, 20, 25, 0.8);
-  backdrop-filter: blur(10px);
-  padding: 12px 0;
+  background: rgba(15, 20, 25, 0.6);
+  backdrop-filter: blur(6px);
+  padding: 14px 0;
   position: sticky;
   top: 0;
   z-index: 1000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 
   .header-content {
     max-width: 1200px;
@@ -13,21 +13,22 @@
     padding: 0 24px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .main-nav {
     display: flex;
-    gap: 40px;
+    gap: 28px;
     align-items: center;
 
     a {
-      color: #94a3b8;
+      color: #cbd5e1;
       text-decoration: none;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       font-weight: 500;
-      font-family: "Courier New", monospace;
-      padding: 4px 0;
+      font-family: inherit;
+      padding: 6px 10px;
+      border-radius: 10px;
       transition: all 0.2s ease;
       position: relative;
 
@@ -35,26 +36,29 @@
         content: '';
         position: absolute;
         bottom: 0;
-        left: 0;
-        width: 0;
+        left: 10px;
+        width: calc(100% - 20px);
         height: 2px;
-        background: linear-gradient(90deg, #a855f7, #06b6d4);
+        background: linear-gradient(90deg, rgba(168, 85, 247, 0.9), rgba(14, 116, 144, 0.9));
+        opacity: 0;
         transition: width 0.3s ease;
       }
 
       &:hover {
         color: #f8fafc;
+        background: rgba(148, 163, 184, 0.08);
 
         &::after {
-          width: 100%;
+          opacity: 1;
         }
       }
 
       &.active {
         color: #f8fafc;
+        background: rgba(148, 163, 184, 0.12);
 
         &::after {
-          width: 100%;
+          opacity: 1;
         }
       }
     }
