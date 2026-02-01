@@ -34,7 +34,7 @@ echo "================================================="
 
 echo ""
 # Change to environment directory
-cd "$(dirname "$0")/../$ENV" || exit 1
+cd "$(dirname "$0")/../stack/infra" || exit 1
 echo "📁 Working directory: $(pwd)"
 
 # Environment validation
@@ -93,7 +93,7 @@ if [ ! -z "$EXISTING_CONTAINER" ]; then
     echo "👉 Container ID: ${EXISTING_CONTAINER}"
 
     # Get current version
-    VERSION=$(./utils/deployment/get-version.sh 2>/dev/null || echo "latest")
+    VERSION=$(./../apps/bot/utils/deployment/get-version.sh 2>/dev/null || echo "latest")
 
     # Check Live API health before proceeding
     echo ""

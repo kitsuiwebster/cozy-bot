@@ -1,14 +1,15 @@
-.PHONY: help start-all stop-all \
+.PHONY: help start-all stop-all ui \
         start stop restart rebuild-bot logs-bot \
         start-api stop-api restart-api rebuild-api logs-api \
         start-status stop-status restart-status rebuild-status logs-status \
+        start-status-api stop-status-api restart-status-api rebuild-status-api logs-status-api status-api-db \
         start-kuma stop-kuma restart-kuma rebuild-kuma logs-kuma \
-        start-db stop-db restart-db rebuild-db logs-db \
+        start-db stop-db restart-db rebuild-db logs-db seed-db \
         start-couchdb stop-couchdb restart-couchdb rebuild-couchdb logs-couchdb \
-        rebuild rebuild-all logs logs-all logs-core status status-all clean
+        rebuild rebuild-all logs logs-all logs-core status-all clean
 
-ENV_DIR ?= dev
-COMPOSE := docker compose -f $(ENV_DIR)/docker-compose.yml
+ENV_DIR ?= stack
+COMPOSE := docker compose -f $(ENV_DIR)/infra/docker-compose.yml
 
 # Default target - show help
 help:
@@ -29,7 +30,6 @@ help:
 	@echo "  make restart           - Restart bot"
 	@echo "  make rebuild           - Rebuild bot"
 	@echo "  make logs              - Bot logs"
-	@echo "  make status            - Show bot status"
 	@echo ""
 	@echo "🌐 Public API:"
 	@echo "  make start-api         - Start Public API"
@@ -45,6 +45,14 @@ help:
 	@echo "  make rebuild-status    - Recreate Status Page"
 	@echo "  make logs-status       - Status page logs"
 	@echo ""
+	@echo "🛰️  Status API:"
+	@echo "  make start-status-api  - Start Status API"
+	@echo "  make stop-status-api   - Stop Status API"
+	@echo "  make restart-status-api- Restart Status API"
+	@echo "  make rebuild-status-api- Rebuild Status API"
+	@echo "  make logs-status-api   - Status API logs"
+	@echo "  make status-api-db     - Open Status API SQLite"
+	@echo ""
 	@echo "📈 Uptime Kuma:"
 	@echo "  make start-kuma        - Start Uptime Kuma"
 	@echo "  make stop-kuma         - Stop Kuma"
@@ -58,12 +66,16 @@ help:
 	@echo "  make restart-db        - Restart CouchDB"
 	@echo "  make rebuild-db        - Recreate CouchDB"
 	@echo "  make logs-db           - CouchDB logs"
+	@echo "  make seed-db           - Seed CouchDB views"
 	@echo ""
 	@echo "🧩 Mixed:"
 	@echo "  make logs-core        - Bot + Public API logs"
 	@echo ""
 	@echo "🧹 Maintenance:"
 	@echo "  make clean            - Clean up Docker resources"
+	@echo ""
+	@echo "🔗 UI Links:"
+	@echo "  make ui               - Show UI links"
 
 # ============================================
 # START / STOP
@@ -103,6 +115,17 @@ start-status:
 	@echo "🏗️  Starting Status Page..."
 	@$(COMPOSE) up -d status-page
 
+start-status-api:
+	@echo "🏗️  Starting Status API..."
+	@$(COMPOSE) up -d status-api
+
+# ============================================
+# STATUS API DB
+# ============================================
+
+status-api-db:
+	@docker run --rm -it --user 0 -v cozy-status-api-data:/data keinos/sqlite3 sqlite3 /data/status.db
+
 start-api:
 	@echo "🌐 Starting Public API..."
 	@$(COMPOSE) up -d api
@@ -128,6 +151,10 @@ restart-api:
 restart-status:
 	@echo "🔄 Restarting Status Page..."
 	@$(COMPOSE) restart status-page
+
+restart-status-api:
+	@echo "🔄 Restarting Status API..."
+	@$(COMPOSE) restart status-api
 
 # ============================================
 # REBUILD
@@ -155,6 +182,14 @@ rebuild-status:
 	@$(COMPOSE) rm -f status-page
 	@$(COMPOSE) up -d status-page
 	@echo "✅ Status Page recreated!"
+
+rebuild-status-api:
+	@echo "🔨 Rebuilding Status API..."
+	@$(COMPOSE) stop status-api
+	@$(COMPOSE) rm -f status-api
+	@$(COMPOSE) build --no-cache status-api
+	@$(COMPOSE) up -d status-api
+	@echo "✅ Status API rebuilt and restarted!"
 
 rebuild-kuma:
 	@echo "🔨 Recreating Uptime Kuma..."
@@ -195,6 +230,9 @@ logs-kuma:
 logs-status:
 	@$(COMPOSE) logs -f status-page
 
+logs-status-api:
+	@$(COMPOSE) logs -f status-api
+
 logs-couchdb:
 	@$(COMPOSE) logs -f couchdb
 
@@ -228,17 +266,17 @@ stop-couchdb:
 
 stop-db: stop-couchdb
 
+seed-db:
+	@echo "🌱 Seeding CouchDB views..."
+	@./stack/infra/couchdb-seed/seed-db.sh
+
 stop-status:
 	@echo "🛑 Stopping Status Page only..."
 	@$(COMPOSE) stop status-page && $(COMPOSE) rm -f status-page
 
-# ============================================
-# STATUS & MAINTENANCE
-# ============================================
-
-status:
-	@echo "📊 Bot Status:"
-	@docker ps --filter name=cozy-live-bot --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+stop-status-api:
+	@echo "🛑 Stopping Status API only..."
+	@$(COMPOSE) stop status-api && $(COMPOSE) rm -f status-api
 
 status-all:
 	@echo "📊 All Services Status:"
@@ -248,3 +286,19 @@ clean:
 	@echo "🧹 Cleaning up..."
 	@docker system prune -a -f
 	@docker volume prune -f
+
+# ============================================
+# UI LINKS
+# ============================================
+
+ui:
+	@echo "🔗 UI Links:"
+	@. ./stack/infra/.env && \
+	STATUS_PORT=$${STATUS_PAGE_PORT:-8080} && \
+	KUMA_PORT=$${UPTIME_KUMA_PORT:-3001} && \
+	API_PORT=$${API_PORT:-8001} && \
+	DB_PORT=$${COUCHDB_PORT:-5985} && \
+	echo "  Status Page:   http://localhost:$${STATUS_PORT}" && \
+	echo "  Uptime Kuma:   http://localhost:$${KUMA_PORT}" && \
+	echo "  Public API:    http://localhost:$${API_PORT}/docs" && \
+	echo "  CouchDB:       http://localhost:$${DB_PORT}/_utils"

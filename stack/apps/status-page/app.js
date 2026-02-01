@@ -1,6 +1,6 @@
 // Configuration
 // Use Nginx proxy to avoid CORS issues
-const STATUS_API_URL = '/api/public/status';
+const STATUS_API_URL = '/api/status';
 
 // Périodes d'uptime à afficher
 const UPTIME_PERIODS = [

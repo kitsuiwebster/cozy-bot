@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script de migration des données JSON vers CouchDB
-Migre les données depuis prod_backup/JSONS/ vers CouchDB
+Migre les données depuis stack/jsons/ vers CouchDB
 """
 
 import json
@@ -14,10 +14,10 @@ import base64
 from pathlib import Path
 from typing import Dict, Any
 
-# Charger les variables d'environnement depuis dev/.env
+# Charger les variables d'environnement depuis stack/infra/.env
 try:
     from dotenv import load_dotenv
-    env_path = Path(__file__).parent.parent / 'dev' / '.env'
+    env_path = Path(__file__).parent.parent / 'stack' / 'infra' / '.env'
     if env_path.exists():
         load_dotenv(env_path)
         print(f"✅ Variables d'environnement chargées depuis {env_path}")
@@ -316,7 +316,7 @@ def main():
 
     # Chemin vers les fichiers JSON (absolu)
     workspace_dir = Path(__file__).parent.parent
-    json_dir = workspace_dir / 'prod_backup' / 'JSONS'
+    json_dir = workspace_dir / 'stack' / 'jsons'
 
     if not json_dir.exists():
         print(f"❌ Répertoire non trouvé: {json_dir}")

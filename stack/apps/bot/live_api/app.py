@@ -44,7 +44,7 @@ class DeploymentRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "mode": "bot_api"}
+    return {"status": "ok", "mode": "live_api"}
 
 @app.get("/api/live/bot/health", response_model=BotHealthResponse)
 async def bot_health():
