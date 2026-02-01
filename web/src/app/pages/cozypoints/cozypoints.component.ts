@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Title, Meta } from '@angular/platform-browser';
 import { CozybotService, CozyUser, LeaderboardResponse, LiveStats } from '../../services/cozybot.service';
 import { interval, Subscription } from 'rxjs';
+import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
 @Component({
   selector: 'app-cozypoints',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LeaderboardHeaderComponent],
   templateUrl: './cozypoints.component.html',
   styleUrls: ['./cozypoints.component.scss']
 })
@@ -34,6 +35,26 @@ export class CozypointsComponent implements OnInit, OnDestroy {
 
   private statsSubscription: Subscription | null = null;
   private headerStatsSubscription: Subscription | null = null;
+
+  getHeaderStats(): LeaderboardHeaderStat[] {
+    return [
+      {
+        value: this.getTotalUsers(),
+        label: 'Total Users',
+        animating: this.animatingUsers
+      },
+      {
+        value: this.liveStats.total_servers,
+        label: 'Total Servers',
+        animating: this.animatingTotalServers
+      },
+      {
+        value: this.getTotalTimeDays(),
+        label: 'Total Time',
+        animating: this.animatingTime
+      }
+    ];
+  }
 
   constructor(
     private cozybotService: CozybotService,

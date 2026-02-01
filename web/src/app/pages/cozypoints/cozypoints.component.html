@@ -1,68 +1,19 @@
 <div class="container">
-  <div class="header">
-    <div class="header-content">
-      <div class="bot-info">
-        <div class="bot-avatar">
-          <img src="assets/images/cozybot/cozybot-logo3.png" alt="CozyPoints Logo" />
-        </div>
-        <div class="bot-details">
-          <h1 [class.animating]="animatingTitle">CozyBot</h1>
-          <p class="bot-description">Discord Bot • CozyPoints System</p>
-          <div class="add-to-server-section">
-            <a href="https://discord.com/oauth2/authorize?client_id=1156917047284994178&permissions=8&scope=bot" 
-               target="_blank" 
-               class="add-to-server-btn">
-              Add to your Discord server
-            </a>
-          </div>
-        </div>
-      </div>
-      <div class="stats">
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingUsers">{{ getTotalUsers() }}</span>
-          <span class="stat-label">Total Users</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingTotalServers">{{ liveStats.total_servers }}</span>
-          <span class="stat-label">Total Servers</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingPoints">{{ getTotalPoints() | number }}</span>
-          <span class="stat-label">Total CozyPoints</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingTime">{{ getTotalTimeDays() }}</span>
-          <span class="stat-label">Total Time</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live Stats en haut au centre en gros -->
-  <div class="live-stats-section">
-    <div class="live-stats">
-      <div class="live-stat-combined" [class.loading]="statsLoading">
-        <span class="live-stat-text">
-          <span class="live-stat-number" 
-                [class.animating]="animatingListeners"
-                [class.pulse-glow]="liveStats.current_listeners > 0">{{ liveStats.current_listeners }}</span>
-          <span class="live-stat-word">{{ liveStats.current_listeners === 1 ? 'person' : 'people' }} in</span>
-          <span class="live-stat-number" 
-                [class.animating]="animatingServers"
-                [class.pulse-glow]="liveStats.servers_with_bot > 0">{{ liveStats.servers_with_bot }}</span>
-          <span class="live-stat-word">{{ liveStats.servers_with_bot === 1 ? 'server' : 'servers' }}</span>
-        </span>
-        <span class="live-stat-label">🎧 listening now</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Back to leaderboard button -->
-  <div class="back-section">
-    <div class="back-info">
-      <a href="/cozybot" class="back-link">← Back to CozyBot Leaderboard</a>
-    </div>
-  </div>
+  <app-leaderboard-header
+    title="CozyBot"
+    subtitle="Discord Bot • CozyPoints System"
+    [animatingTitle]="animatingTitle"
+    [showViewSelector]="false"
+    [stats]="getHeaderStats()"
+    [statsLoading]="statsLoading"
+    [currentListeners]="liveStats.current_listeners"
+    [serversWithBot]="liveStats.servers_with_bot"
+    [animatingListeners]="animatingListeners"
+    [animatingServers]="animatingServers"
+    ctaHref="/cozybot"
+    ctaText="← Back to CozyBot Leaderboard"
+    ctaVariant="back"
+  ></app-leaderboard-header>
 
   <div class="content-section">
     <div class="section-header">

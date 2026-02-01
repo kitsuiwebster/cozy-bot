@@ -5,11 +5,12 @@ import { Title, Meta } from '@angular/platform-browser';
 import { CozybotService, CozyUser, LeaderboardResponse, LiveStats, CozyServer, CozySound, ServersResponse, SoundsResponse, UserDetails } from '../../services/cozybot.service';
 import { interval, Subscription } from 'rxjs';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
+import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
 @Component({
   selector: 'app-cozybot',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgxChartsModule],
+  imports: [CommonModule, FormsModule, NgxChartsModule, LeaderboardHeaderComponent],
   templateUrl: './cozybot.component.html',
   styleUrls: ['./cozybot.component.scss']
 })
@@ -56,6 +57,26 @@ export class CozybotComponent implements OnInit, OnDestroy {
   
   private statsSubscription: Subscription | null = null;
   private headerStatsSubscription: Subscription | null = null;
+
+  getHeaderStats(): LeaderboardHeaderStat[] {
+    return [
+      {
+        value: this.getTotalUsers(),
+        label: 'Total Users',
+        animating: this.animatingUsers
+      },
+      {
+        value: this.liveStats.total_servers,
+        label: 'Total Servers',
+        animating: this.animatingTotalServers
+      },
+      {
+        value: this.getTotalTimeDays(),
+        label: 'Total Time',
+        animating: this.animatingTime
+      }
+    ];
+  }
 
   // Configuration du graphique des sons
   soundsChartData: { name: string; value: number }[] = [];
@@ -120,6 +141,12 @@ export class CozybotComponent implements OnInit, OnDestroy {
     window.history.replaceState({}, '', newUrl);
     this.currentPage = 1; // Reset to first page when changing view
     this.loadData();
+  }
+
+  onSelectedViewChange(view: string): void {
+    if (view === 'users' || view === 'servers' || view === 'sounds') {
+      this.selectedView = view;
+    }
   }
 
   // Pagination methods
