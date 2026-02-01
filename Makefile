@@ -267,7 +267,7 @@ stop-couchdb:
 stop-db: stop-couchdb
 
 seed-db:
-	@echo "🌱 Seeding CouchDB views..."
+	@echo "🌱 Seeding CouchDB views and docs..."
 	@./stack/infra/couchdb-seed/seed-db.sh
 
 stop-status:

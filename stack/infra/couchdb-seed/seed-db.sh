@@ -7,11 +7,12 @@ VIEWS_FILE="$SCRIPT_DIR/views.json"
 
 if [ -f "$ENV_FILE" ]; then
     # Load .env safely without executing (handles JSON-like values)
-    ENV_EXPORTS=$(python3 - <<'PY'
+    ENV_EXPORTS=$(ENV_FILE="$ENV_FILE" python3 - <<'PY'
 from pathlib import Path
+import os
 import shlex
 
-env_path = Path("${ENV_FILE}")
+env_path = Path(os.environ["ENV_FILE"])
 lines = env_path.read_text().splitlines()
 for line in lines:
     line = line.strip()
