@@ -123,6 +123,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }
 
     // Always load users data for header stats
+    const cachedUsers = this.cozybotService.getTopUsersCache();
+    if (cachedUsers) {
+      this.leaderboard = cachedUsers.users;
+      this.totalUsersCount = cachedUsers.total_count;
+    }
     this.loadUsers();
     // Always load sounds data for sessions stats
     this.loadSounds();
@@ -604,6 +609,13 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   startLiveStats(): void {
+    const cachedStats = this.cozybotService.getLiveStatsCache();
+    if (cachedStats) {
+      this.liveStats = cachedStats;
+      this.previousStats = { ...cachedStats };
+      this.statsLoading = false;
+    }
+
     // Charger une première fois immédiatement
     this.loadLiveStats();
     

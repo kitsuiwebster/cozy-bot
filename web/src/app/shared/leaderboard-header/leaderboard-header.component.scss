@@ -216,6 +216,7 @@
 
           &.pulse-glow {
             animation: pulseGlow 3s ease-in-out infinite;
+            color: #a855f7;
           }
         }
 
@@ -302,14 +303,44 @@
 }
 
 @keyframes numberChange {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); }
+  0% { 
+    transform: scale(1);
+    color: #f8fafc;
+    text-shadow: 0 0 30px rgba(168, 85, 247, 0.5);
+  }
+  25% { 
+    transform: scale(1.15);
+    color: #a855f7;
+    text-shadow: 0 0 40px rgba(168, 85, 247, 0.8);
+  }
+  50% { 
+    transform: scale(1.1);
+    color: #06b6d4;
+    text-shadow: 
+      0 0 50px rgba(168, 85, 247, 1),
+      0 0 80px rgba(6, 182, 212, 0.6);
+  }
+  75% { 
+    transform: scale(1.05);
+    color: #a855f7;
+    text-shadow: 0 0 35px rgba(168, 85, 247, 0.7);
+  }
+  100% { 
+    transform: scale(1);
+    color: #f8fafc;
+    text-shadow: 0 0 30px rgba(168, 85, 247, 0.5);
+  }
 }
 
 @keyframes pulseGlow {
-  0%, 100% { text-shadow: 0 0 30px rgba(168, 85, 247, 0.5); }
-  50% { text-shadow: 0 0 50px rgba(168, 85, 247, 0.8); }
+  0%, 100% { 
+    text-shadow: 0 0 30px rgba(168, 85, 247, 0.5);
+    color: #a855f7;
+  }
+  50% { 
+    text-shadow: 0 0 50px rgba(168, 85, 247, 0.8);
+    color: #06b6d4;
+  }
 }
 
 @media (max-width: 1024px) {
