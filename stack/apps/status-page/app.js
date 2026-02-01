@@ -431,7 +431,12 @@ async function updateStatus() {
         });
     }
 
-    const monitors = monitorsData.monitors.map(m => ({ ...m }));
+    const monitors = monitorsData.monitors.map(m => ({ ...m })).map(m => {
+        if (m.id === 'live-bot') {
+            return { ...m, name: 'Bot (Live API)' };
+        }
+        return m;
+    });
 
     const heartbeatsByMonitor = {};
     heartbeatsData.points.forEach(point => {
@@ -473,6 +478,18 @@ async function updateStatus() {
         statusBadge.className = `status-badge ${overallStatus.status}`;
         statusBadge.innerHTML = `<span class="status-text">${overallStatus.text}</span>`;
     }
+
+    const monitorOrder = ['live-bot', 'public-api', 'db'];
+    monitors.sort((a, b) => {
+        const ai = monitorOrder.indexOf(a.id);
+        const bi = monitorOrder.indexOf(b.id);
+        const aRank = ai === -1 ? Number.MAX_SAFE_INTEGER : ai;
+        const bRank = bi === -1 ? Number.MAX_SAFE_INTEGER : bi;
+        if (aRank !== bRank) {
+            return aRank - bRank;
+        }
+        return a.name.localeCompare(b.name);
+    });
 
     // Afficher les monitors
     const container = document.getElementById('monitors-container');
