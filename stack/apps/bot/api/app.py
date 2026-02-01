@@ -71,10 +71,11 @@ app.add_middleware(
         "https://kitsuiwebster.com",
         "http://90.60.191.159:8000",
         "https://cozybot.online",
+        "https://www.cozybot.online",
         "https://api.cozybot.online",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -94,4 +95,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "mode": "public_api"}
-
