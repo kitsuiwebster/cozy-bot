@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import top_users, top_servers, admin
-from .routes.status_history import router as status_history_router, status_history_loop
 from .routes.stats import router as stats_router
 from .routes.simple_deployment import router as simple_deployment_router
 from .routes.audio_restore import router as audio_restore_router
@@ -87,7 +86,6 @@ app.include_router(stats_router, prefix="/api/public", tags=["stats"])
 app.include_router(admin.router, prefix="/api/public/admin", tags=["admin"])
 app.include_router(simple_deployment_router, prefix="/api/public", tags=["simple-deployment"])
 app.include_router(audio_restore_router, prefix="/api/public", tags=["audio"])
-app.include_router(status_history_router, prefix="/api/public", tags=["status"])
 
 @app.get("/")
 async def root():
@@ -97,8 +95,3 @@ async def root():
 async def health_check():
     return {"status": "healthy", "mode": "public_api"}
 
-
-@app.on_event("startup")
-async def start_status_history_loop():
-    import asyncio
-    asyncio.create_task(status_history_loop())
