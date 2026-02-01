@@ -10,6 +10,6 @@ import { RouterLink } from '@angular/router';
   styleUrls: ['./footer.component.scss']
 })
 export class FooterComponent {
-  version = '1.0.22';
+  version = '2.0.0';
   currentYear = new Date().getFullYear();
 }

@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-02-01
+
+### Added
+
+- Public/Live API split with explicit `/api/public/*` and `/api/live/*` routes plus endpoint health logging.
+- Status API microservice with 90-day history and maintenance tracking (SQLite) for the custom status page.
+- Custom status page redesign with live refresh, responsive layout, legends, and maintenance banners.
+- Status page proxying for Public API + Status API and Kuma fallback, plus UI link helper (`make ui`).
+- Uptime Kuma seed support and status page integration.
+- CouchDB view seeding script (`make seed-db`) and organized seed files.
+- Deploy script improvements for Live API checks, notifications, and restore flow.
+- Status maintenance history tracking and banner metadata (started/ended timestamps).
+- Bot voice handling moved to dedicated threads/workers for DB writes and background tasks.
+
+### Changed
+
+- Stack layout reorganized under `stack/` with clear app/infra separation and consistent make targets.
+- Dev/prod configuration unified to a single stack with environment-driven values only.
+- Docker compose services/ports/volumes renamed for consistency across environments.
+- Bot/API logging cleaned up and grouped; new API endpoint listing sections in bot startup logs.
+- Status page and web UI typography/colors aligned.
+- Status page now reads from `/api/status/*` instead of Public API routes.
+- Make targets aligned and expanded per service (status API DB helper, UI links, seeds).
+
+### Fixed
+
+- Voice restore pipeline and task cleanup reliability.
+- Status page API routing and JSON responses for monitors/history/maintenance.
+- CouchDB conflicts, maintenance visibility, and periodic backup stability.
+- Makefile command coverage and help output accuracy.
+- Audio restore cleanup errors when deleting CouchDB docs without `_rev`.
+- Voice connection stability improvements (reliable channel join and consistent playback start).
+
+### Removed
+
+- Legacy dev-only compose files and redundant dev/prod suffix handling in the stack.
+
 ## [1.0.22] - 2026-01-24
 
 ### Added
