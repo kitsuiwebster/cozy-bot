@@ -267,7 +267,7 @@ stop-couchdb:
 stop-db: stop-couchdb
 
 seed-db:
-	@echo "🌱 Seeding CouchDB views..."
+	@echo "🌱 Seeding CouchDB views and docs..."
 	@./stack/infra/couchdb-seed/seed-db.sh
 
 stop-status:
@@ -302,3 +302,4 @@ ui:
 	echo "  Uptime Kuma:   http://localhost:$${KUMA_PORT}" && \
 	echo "  Public API:    http://localhost:$${API_PORT}/docs" && \
 	echo "  CouchDB:       http://localhost:$${DB_PORT}/_utils"
+

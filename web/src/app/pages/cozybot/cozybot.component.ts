@@ -5,11 +5,12 @@ import { Title, Meta } from '@angular/platform-browser';
 import { CozybotService, CozyUser, LeaderboardResponse, LiveStats, CozyServer, CozySound, ServersResponse, SoundsResponse, UserDetails } from '../../services/cozybot.service';
 import { interval, Subscription } from 'rxjs';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
+import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
 @Component({
   selector: 'app-cozybot',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgxChartsModule],
+  imports: [CommonModule, FormsModule, NgxChartsModule, LeaderboardHeaderComponent],
   templateUrl: './cozybot.component.html',
   styleUrls: ['./cozybot.component.scss']
 })
@@ -25,16 +26,21 @@ export class CozybotComponent implements OnInit, OnDestroy {
   
   totalCount = 0;
   totalUsersCount = 0;
+  headerTotalUsersCount = 0;
+  headerTotalTimeSeconds = 0;
   loading = true;
   error = '';
   selectedView: 'users' | 'servers' | 'sounds' = 'users';
   
   // Pagination
   currentPage = 1;
-  pageSize = 100;
+  pageSize = 30;
   hasNextPage = false;
   hasPreviousPage = false;
   totalPages = 1;
+  private readonly pageSizeUsers = 30;
+  private readonly pageSizeServers = 50;
+  private readonly pageSizeSounds = 30;
   
   // Live stats
   liveStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
@@ -56,6 +62,26 @@ export class CozybotComponent implements OnInit, OnDestroy {
   
   private statsSubscription: Subscription | null = null;
   private headerStatsSubscription: Subscription | null = null;
+
+  getHeaderStats(): LeaderboardHeaderStat[] {
+    return [
+      {
+        value: this.getHeaderTotalUsers(),
+        label: 'Total Users',
+        animating: this.animatingUsers
+      },
+      {
+        value: this.liveStats.total_servers,
+        label: 'Total Servers',
+        animating: this.animatingTotalServers
+      },
+      {
+        value: this.getHeaderTotalTimeDays(),
+        label: 'Total Time',
+        animating: this.animatingTime
+      }
+    ];
+  }
 
   // Configuration du graphique des sons
   soundsChartData: { name: string; value: number }[] = [];
@@ -102,6 +128,13 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }
 
     // Always load users data for header stats
+    const cachedUsers = this.cozybotService.getTopUsersCache();
+    if (cachedUsers) {
+      this.leaderboard = cachedUsers.users;
+      this.totalUsersCount = cachedUsers.total_count;
+      this.headerTotalUsersCount = cachedUsers.total_count;
+      this.headerTotalTimeSeconds = this.getTotalListeningTimeSeconds(cachedUsers.users);
+    }
     this.loadUsers();
     // Always load sounds data for sessions stats
     this.loadSounds();
@@ -109,6 +142,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     if (this.selectedView !== 'users' && this.selectedView !== 'sounds') {
       this.loadData();
     }
+    this.updatePageSize();
     this.startLiveStats();
     this.startHeaderStatsRefresh();
   }
@@ -119,6 +153,19 @@ export class CozybotComponent implements OnInit, OnDestroy {
     const newUrl = `${currentUrl}?view=${this.selectedView}`;
     window.history.replaceState({}, '', newUrl);
     this.currentPage = 1; // Reset to first page when changing view
+    this.updatePageSize();
+    this.loadData();
+  }
+
+  onSelectedViewChange(view: string): void {
+    if (view === 'users' || view === 'servers' || view === 'sounds') {
+      this.selectedView = view;
+    }
+  }
+
+  manualRefreshCurrentView(): void {
+    this.currentPage = 1;
+    this.updatePageSize();
     this.loadData();
   }
 
@@ -144,8 +191,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
 
     if (this.selectedView === 'users') {
       this.leaderboard = this.allUsers.slice(startIndex, endIndex);
-      // Enrichir les données de la nouvelle page
-      this.enrichUserData();
     } else if (this.selectedView === 'servers') {
       this.servers = this.allServers.slice(startIndex, endIndex);
     } else if (this.selectedView === 'sounds') {
@@ -210,6 +255,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
   loadData(): void {
     this.loading = true;
     this.error = '';
+
+    this.updatePageSize();
     
     if (this.selectedView === 'users') {
       this.loadUsers();
@@ -220,20 +267,29 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }
   }
 
+  private updatePageSize(): void {
+    if (this.selectedView === 'users') {
+      this.pageSize = this.pageSizeUsers;
+    } else if (this.selectedView === 'servers') {
+      this.pageSize = this.pageSizeServers;
+    } else {
+      this.pageSize = this.pageSizeSounds;
+    }
+  }
+
   private loadUsers(): void {
     this.loading = this.selectedView === 'users';
     this.cozybotService.getTopUsers().subscribe({
       next: (response: LeaderboardResponse) => {
         this.allUsers = response.users;
         this.totalUsersCount = response.total_count;
+        this.headerTotalUsersCount = response.total_count;
+        this.headerTotalTimeSeconds = this.getTotalListeningTimeSeconds(response.users);
 
         if (this.selectedView === 'users') {
           this.updatePagination();
         }
         this.loading = false;
-
-        // Enrichir les données de chaque utilisateur avec current_sound et days_since_last_activity
-        this.enrichUserData();
 
         // Animer les stats du header au premier chargement
         if (this.allUsers.length > 0) {
@@ -247,37 +303,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
         }
         this.loading = false;
       }
-    });
-  }
-
-  /**
-   * Enrichit les données des utilisateurs avec current_sound et days_since_last_activity
-   */
-  private enrichUserData(): void {
-    // Enrichir uniquement les utilisateurs de la page courante pour limiter les appels API
-    const usersToEnrich = this.leaderboard;
-
-    usersToEnrich.forEach(user => {
-      this.cozybotService.getUserDetails(user.username).subscribe({
-        next: (details) => {
-          // Mettre à jour les données du user dans allUsers
-          const userIndex = this.allUsers.findIndex(u => u.user_id === user.user_id);
-          if (userIndex !== -1) {
-            this.allUsers[userIndex].current_sound = details.current_sound;
-            this.allUsers[userIndex].days_since_last_activity = details.days_since_last_activity;
-          }
-
-          // Mettre à jour aussi dans leaderboard (page courante)
-          const leaderboardIndex = this.leaderboard.findIndex(u => u.user_id === user.user_id);
-          if (leaderboardIndex !== -1) {
-            this.leaderboard[leaderboardIndex].current_sound = details.current_sound;
-            this.leaderboard[leaderboardIndex].days_since_last_activity = details.days_since_last_activity;
-          }
-        },
-        error: (err) => {
-          console.error(`Error loading details for user ${user.username}:`, err);
-        }
-      });
     });
   }
 
@@ -375,11 +400,26 @@ export class CozybotComponent implements OnInit, OnDestroy {
     return this.totalUsersCount;
   }
 
+  getHeaderTotalUsers(): number {
+    return this.headerTotalUsersCount || this.totalUsersCount;
+  }
+
   getTotalTimeDays(): string {
     const totalSeconds = this.allUsers.reduce((total, user) => total + user.listening_time_seconds, 0);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     return `${days}d ${hours}h`;
+  }
+
+  getHeaderTotalTimeDays(): string {
+    const totalSeconds = this.headerTotalTimeSeconds || this.getTotalListeningTimeSeconds(this.allUsers);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    return `${days}d ${hours}h`;
+  }
+
+  private getTotalListeningTimeSeconds(users: CozyUser[]): number {
+    return users.reduce((total, user) => total + user.listening_time_seconds, 0);
   }
 
   getTotalSessions(): number {
@@ -388,31 +428,10 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   private startHeaderStatsRefresh(): void {
-    // Refresh header stats en quinconce toutes les 15 secondes
-    let counter = 0;
-    this.headerStatsSubscription = interval(15000).subscribe(() => {
-      const refreshType = counter % 6;
-      switch (refreshType) {
-        case 0:
-          this.refreshTitleAnimation();
-          break;
-        case 1:
-          this.refreshUsersStats();
-          break;
-        case 2:
-          this.refreshServersStats();
-          break;
-        case 3:
-          this.refreshPointsStats();
-          break;
-        case 4:
-          this.refreshTimeStats();
-          break;
-        case 5:
-          this.refreshSessionsStats();
-          break;
-      }
-      counter++;
+    // Refresh header totals only every 60 seconds
+    this.headerStatsSubscription = interval(60000).subscribe(() => {
+      this.refreshTitleAnimation();
+      this.refreshHeaderTotals();
     });
   }
 
@@ -421,135 +440,32 @@ export class CozybotComponent implements OnInit, OnDestroy {
     setTimeout(() => this.animatingTitle = false, 800);
   }
 
-  private refreshUsersStats(): void {
+  private refreshHeaderTotals(): void {
     this.cozybotService.getTopUsers().subscribe({
       next: (response: LeaderboardResponse) => {
-        const currentUsers = this.totalUsersCount;
+        const currentUsers = this.headerTotalUsersCount;
         const newUsers = response.total_count;
+        const newTimeSeconds = this.getTotalListeningTimeSeconds(response.users);
+        const currentTime = this.getHeaderTotalTimeDays();
+        const days = Math.floor(newTimeSeconds / 86400);
+        const hours = Math.floor((newTimeSeconds % 86400) / 3600);
+        const newTime = `${days}d ${hours}h`;
 
         if (currentUsers !== newUsers) {
           this.animatingUsers = true;
           setTimeout(() => this.animatingUsers = false, 500);
         }
 
-        this.allUsers = response.users;
-        this.totalUsersCount = response.total_count;
-
-        if (this.selectedView === 'users') {
-          this.updateDisplayedData();
-          // enrichUserData() sera appelé par updateDisplayedData()
-        }
-      },
-      error: (error) => {
-        console.error('Error refreshing users stats:', error);
-      }
-    });
-  }
-
-  private refreshServersStats(): void {
-    // Recharger les live stats
-    this.cozybotService.getLiveStats().subscribe({
-      next: (stats: LiveStats) => {
-        const currentServers = stats.total_servers;
-        if (this.previousTotalServers !== currentServers) {
-          this.animatingTotalServers = true;
-          setTimeout(() => this.animatingTotalServers = false, 500);
-          this.previousTotalServers = currentServers;
-        }
-        this.liveStats = stats;
-      },
-      error: (error) => {
-        console.error('Error refreshing servers stats:', error);
-      }
-    });
-  }
-
-  private refreshPointsStats(): void {
-    this.cozybotService.getTopUsers().subscribe({
-      next: (response: LeaderboardResponse) => {
-        const currentPoints = this.getTotalPoints();
-        const newPoints = response.users.reduce((total, user) => total + user.total_points, 0);
-
-        if (currentPoints !== newPoints) {
-          this.animatingPoints = true;
-          setTimeout(() => this.animatingPoints = false, 500);
-        }
-
-        this.allUsers = response.users;
-        this.totalUsersCount = response.total_count;
-
-        if (this.selectedView === 'users') {
-          this.updateDisplayedData();
-          // enrichUserData() sera appelé par updateDisplayedData()
-        }
-      },
-      error: (error) => {
-        console.error('Error refreshing points stats:', error);
-      }
-    });
-  }
-
-  private refreshTimeStats(): void {
-    this.cozybotService.getTopUsers().subscribe({
-      next: (response: LeaderboardResponse) => {
-        const currentTime = this.getTotalTimeDays();
-        const totalSeconds = response.users.reduce((total, user) => total + user.listening_time_seconds, 0);
-        const days = Math.floor(totalSeconds / 86400);
-        const hours = Math.floor((totalSeconds % 86400) / 3600);
-        const newTime = `${days}d ${hours}h`;
-
         if (currentTime !== newTime) {
           this.animatingTime = true;
           setTimeout(() => this.animatingTime = false, 500);
         }
 
-        this.allUsers = response.users;
-        this.totalUsersCount = response.total_count;
-
-        if (this.selectedView === 'users') {
-          this.updateDisplayedData();
-          // enrichUserData() sera appelé par updateDisplayedData()
-        }
+        this.headerTotalUsersCount = response.total_count;
+        this.headerTotalTimeSeconds = newTimeSeconds;
       },
       error: (error) => {
-        console.error('Error refreshing time stats:', error);
-      }
-    });
-  }
-
-  private refreshSessionsStats(): void {
-    this.cozybotService.getTopSounds().subscribe({
-      next: (response: SoundsResponse) => {
-        const currentSessions = this.getTotalSessions();
-
-        // Filtrer pour ne garder que les sons avec exactement 3 emojis ou noise01.mp3
-        this.allSounds = response.sounds.filter(sound =>
-          this.hasThreeEmojis(sound.display_name) || sound.sound_name === 'noise01.mp3'
-        );
-
-        // Remplacer le display_name de noise01.mp3 par les emojis
-        this.allSounds = this.allSounds.map(sound => {
-          if (sound.sound_name === 'noise01.mp3') {
-            return { ...sound, display_name: '📡🤍🌌' };
-          }
-          return sound;
-        });
-
-        this.prepareSoundsChartData();
-        const newSessions = this.getTotalSessions();
-
-        if (currentSessions !== newSessions) {
-          this.animatingSessions = true;
-          setTimeout(() => this.animatingSessions = false, 500);
-        }
-
-        // Mettre à jour l'affichage si on est sur la vue sounds
-        if (this.selectedView === 'sounds') {
-          this.updateDisplayedData();
-        }
-      },
-      error: (error) => {
-        console.error('Error refreshing sessions stats:', error);
+        console.error('Error refreshing header totals:', error);
       }
     });
   }
@@ -577,6 +493,13 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   startLiveStats(): void {
+    const cachedStats = this.cozybotService.getLiveStatsCache();
+    if (cachedStats) {
+      this.liveStats = cachedStats;
+      this.previousStats = { ...cachedStats };
+      this.statsLoading = false;
+    }
+
     // Charger une première fois immédiatement
     this.loadLiveStats();
     

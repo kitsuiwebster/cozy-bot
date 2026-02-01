@@ -11,7 +11,7 @@ jobs:
       - name: 🚀 Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
 
       - name: 🔑 Add SSH host key
         run: |
@@ -22,7 +22,7 @@ jobs:
       - name: 🛡️ Deploy to Production
         timeout-minutes: 6
         run: |
-          ssh -T -o "ServerAliveInterval=5" -o "ServerAliveCountMax=1" -o "ExitOnForwardFailure=yes" -p 2248 kitsui@90.60.191.159 bash -s <<'EOF'
+          ${{ secrets.SSH_COMMAND_PROD }} bash -s <<'EOF'
           set -euo pipefail
           export LC_ALL=C.UTF-8
           export LANG=C.UTF-8
@@ -42,4 +42,3 @@ jobs:
           echo "✅ Production deployment completed!"
           EOF
 
-            

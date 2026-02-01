@@ -28,6 +28,7 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     min-height: 100vh;
+    min-width: 768px;
     background-image:
         radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
         radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%);
@@ -661,90 +662,6 @@ footer {
     background: var(--error);
 }
 
-@media (max-width: 768px) {
-    .container {
-        padding: 2rem 1.25rem 3rem;
-    }
-
-    header {
-        text-align: left;
-    }
-
-    .header-top {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .header-meta {
-        width: 100%;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-
-    .header-update {
-        font-size: 0.85rem;
-    }
-
-    .legend-mini {
-        width: 100%;
-        gap: 0.6rem;
-    }
-
-    .monitor-card {
-        padding: 1.25rem;
-    }
-
-    .monitor-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.6rem;
-    }
-
-    .timeline-row {
-        flex-direction: row;
-        align-items: center;
-        gap: 0.6rem;
-        overflow: visible;
-        padding-bottom: 0;
-    }
-
-    .timeline-label,
-    .timeline-uptime {
-        text-align: left;
-        min-width: auto;
-        font-size: 0.72rem;
-    }
-
-    .timeline {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .timeline-bar {
-        width: 100%;
-        min-width: 360px;
-        height: 20px;
-    }
-
-    .footer-content {
-        align-items: flex-start;
-    }
-}
-
-@media (max-width: 520px) {
-    .container {
-        padding: 1.75rem 1rem 2.5rem;
-    }
-
-    h1 {
-        font-size: clamp(2rem, 8vw, 2.6rem);
-    }
-
-    .timeline-bar {
-        min-width: 320px;
-    }
-}
 
 @keyframes heartbeat {
     0%, 100% {

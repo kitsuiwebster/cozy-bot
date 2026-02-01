@@ -277,7 +277,7 @@ async def change_status():
             total_member_count = sum(guild.member_count or 0 for guild in bot.guilds)
             statuses = [
                 discord.Game(name=f"in {server_count} servers"),
-                discord.Game(name=f"with {total_member_count} members"),
+                discord.Game(name="/menu"),
             ]
 
             for status in statuses:

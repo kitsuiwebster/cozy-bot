@@ -6,9 +6,28 @@ ENV_FILE="$SCRIPT_DIR/../.env"
 VIEWS_FILE="$SCRIPT_DIR/views.json"
 
 if [ -f "$ENV_FILE" ]; then
-    set -a
-    . "$ENV_FILE"
-    set +a
+    # Load .env safely without executing (handles JSON-like values)
+    ENV_EXPORTS=$(ENV_FILE="$ENV_FILE" python3 - <<'PY'
+from pathlib import Path
+import os
+import shlex
+
+env_path = Path(os.environ["ENV_FILE"])
+lines = env_path.read_text().splitlines()
+for line in lines:
+    line = line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    # Strip surrounding quotes
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        value = value[1:-1]
+    print(f"export {key}={shlex.quote(value)}")
+PY
+    )
+    eval "$ENV_EXPORTS"
 else
     echo "❌ .env not found at $ENV_FILE"
     exit 1
@@ -55,4 +74,4 @@ if [ "${VIEWS_OK:-0}" -ne 1 ]; then
 fi
 
 echo "📦 Seeding CouchDB data from stack/data..."
-python3 "$SCRIPT_DIR/../../scripts/migrate_to_couchdb.py"
+python3 "$SCRIPT_DIR/../../../scripts/migrate_to_couchdb.py"

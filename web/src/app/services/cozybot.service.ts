@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface CozyUser {
@@ -96,15 +96,34 @@ export interface UserDetails {
 })
 export class CozybotService {
   private apiUrl = environment.apiUrl;
+  private liveStatsCache: LiveStats | null = null;
+  private topUsersCache: LeaderboardResponse | null = null;
+  private userDetailsCache = new Map<string, UserDetails>();
 
   constructor(private http: HttpClient) {}
 
   getTopUsers(): Observable<LeaderboardResponse> {
-    return this.http.get<LeaderboardResponse>(`${this.apiUrl}/top-users`);
+    return this.http.get<LeaderboardResponse>(`${this.apiUrl}/top-users`).pipe(
+      tap((response) => {
+        this.topUsersCache = response;
+      })
+    );
   }
 
   getLiveStats(): Observable<LiveStats> {
-    return this.http.get<LiveStats>(`${this.apiUrl}/total`);
+    return this.http.get<LiveStats>(`${this.apiUrl}/total`).pipe(
+      tap((stats) => {
+        this.liveStatsCache = stats;
+      })
+    );
+  }
+
+  getLiveStatsCache(): LiveStats | null {
+    return this.liveStatsCache;
+  }
+
+  getTopUsersCache(): LeaderboardResponse | null {
+    return this.topUsersCache;
   }
 
   getTopServers(): Observable<ServersResponse> {
@@ -116,6 +135,15 @@ export class CozybotService {
   }
 
   getUserDetails(username: string): Observable<UserDetails> {
-    return this.http.get<UserDetails>(`${this.apiUrl}/user/${username}`);
+    const cached = this.userDetailsCache.get(username);
+    if (cached) {
+      return of(cached);
+    }
+    const encodedUsername = encodeURIComponent(username);
+    return this.http.get<UserDetails>(`${this.apiUrl}/user/${encodedUsername}`).pipe(
+      tap((details) => {
+        this.userDetailsCache.set(username, details);
+      })
+    );
   }
 }

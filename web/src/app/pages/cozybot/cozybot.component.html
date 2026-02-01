@@ -1,78 +1,42 @@
 <div class="container">
-  <div class="header">
-    <div class="header-content">
-      <div class="bot-info">
-        <div class="bot-avatar">
-          <img src="assets/images/cozybot/cozybot-logo3.png" alt="CozyBot Logo" />
-        </div>
-        <div class="bot-details">
-          <h1 [class.animating]="animatingTitle">CozyBot</h1>
-          <p class="bot-description">Discord Bot • Leaderboard</p>
-          <div class="view-selector">
-            <select [(ngModel)]="selectedView" (change)="onViewChange()" class="view-select">
-              <option value="users">Top Users</option>
-              <option value="servers">Top Servers</option>
-              <option value="sounds">Top Sounds</option>
-            </select>
-            <a href="https://discord.com/oauth2/authorize?client_id=1156917047284994178&permissions=8&scope=bot" 
-               target="_blank" 
-               class="add-to-server-btn">
-              Add to your Discord server
-            </a>
-          </div>
-        </div>
-      </div>
-      <div class="stats">
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingUsers">{{ getTotalUsers() }}</span>
-          <span class="stat-label">Total Users</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingTotalServers">{{ liveStats.total_servers }}</span>
-          <span class="stat-label">Total Servers</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" [class.animating]="animatingTime">{{ getTotalTimeDays() }}</span>
-          <span class="stat-label">Total Time</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live Stats en haut au centre en gros -->
-  <div class="live-stats-section">
-    <div class="live-stats">
-      <div class="live-stat-combined" [class.loading]="statsLoading">
-        <span class="live-stat-text">
-          <span class="live-stat-number" 
-                [class.animating]="animatingListeners"
-                [class.pulse-glow]="liveStats.current_listeners > 0">{{ liveStats.current_listeners }}</span>
-          <span class="live-stat-word">{{ liveStats.current_listeners === 1 ? 'person' : 'people' }} in</span>
-          <span class="live-stat-number" 
-                [class.animating]="animatingServers"
-                [class.pulse-glow]="liveStats.servers_with_bot > 0">{{ liveStats.servers_with_bot }}</span>
-          <span class="live-stat-word">{{ liveStats.servers_with_bot === 1 ? 'server' : 'servers' }}</span>
-        </span>
-        <span class="live-stat-label">🎧 listening now</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- How to earn points link -->
-  <div class="points-info-section">
-    <div class="points-info">
-      <a href="/cozypoints" class="points-link">How to earn points? →</a>
-    </div>
-  </div>
+  <app-leaderboard-header
+    title="CozyBot"
+    subtitle="Discord Bot • Leaderboard"
+    [animatingTitle]="animatingTitle"
+    [showViewSelector]="true"
+    [selectedView]="selectedView"
+    (selectedViewChange)="onSelectedViewChange($event)"
+    (viewChange)="onViewChange()"
+    [stats]="getHeaderStats()"
+    [statsLoading]="statsLoading"
+    [currentListeners]="liveStats.current_listeners"
+    [serversWithBot]="liveStats.servers_with_bot"
+    [animatingListeners]="animatingListeners"
+    [animatingServers]="animatingServers"
+    ctaHref="/cozypoints"
+    ctaText="How to earn points? →"
+    ctaVariant="points"
+  ></app-leaderboard-header>
 
   <div class="leaderboard-section">
     <div class="section-header">
-      <h2 *ngIf="selectedView === 'users'">🏆 Top CozyBot users by CozyPoints</h2>
-      <h2 *ngIf="selectedView === 'servers'">🏆 Top CozyBot servers by listening time</h2>
-      <h2 *ngIf="selectedView === 'sounds'">🏆 Top CozyBot sounds by listening time</h2>
-      <p *ngIf="selectedView === 'users'">Ranking based on Discord activity</p>
-      <p *ngIf="selectedView === 'servers'">Ranking based on total listening time</p>
-      <p *ngIf="selectedView === 'sounds'">Ranking based on total listening time</p>
+      <div class="section-header-top">
+        <div class="section-titles">
+          <h2 *ngIf="selectedView === 'users'">🏆 Top CozyBot users by CozyPoints</h2>
+          <h2 *ngIf="selectedView === 'servers'">🏆 Top CozyBot servers by listening time</h2>
+          <h2 *ngIf="selectedView === 'sounds'">🏆 Top CozyBot sounds by listening time</h2>
+          <p *ngIf="selectedView === 'users'">Ranking based on Discord activity</p>
+          <p *ngIf="selectedView === 'servers'">Ranking based on total listening time</p>
+          <p *ngIf="selectedView === 'sounds'">Ranking based on total listening time</p>
+        </div>
+        <button
+          class="refresh-button"
+          type="button"
+          (click)="manualRefreshCurrentView()"
+        >
+          Refresh
+        </button>
+      </div>
       <div *ngIf="selectedView === 'users'" class="total-points-display">
         <span class="points-number" [class.animating]="animatingPoints">{{ getTotalPoints() | number }}</span>
         <span class="points-label">Total CozyPoints earned by all users</span>
@@ -297,7 +261,7 @@
       <!-- Stats principales -->
       <div class="user-main-stats">
         <div class="stat-box">
-          <div class="stat-value">{{ selectedUserDetails.total_points }}</div>
+          <div class="stat-value">{{ formatPoints(selectedUserDetails.total_points) }}</div>
           <div class="stat-label">Points</div>
         </div>
         <div class="stat-box">
