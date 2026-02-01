@@ -40,14 +40,19 @@ HTTP_CODE=$(curl -sS -o /tmp/couchdb_views_out.json -w "%{http_code}" \
 
 if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ]; then
     echo "✅ Views created"
-    exit 0
+    VIEWS_OK=1
 fi
 
 if [ "$HTTP_CODE" = "409" ]; then
     echo "ℹ️  Views already exist"
-    exit 0
+    VIEWS_OK=1
 fi
 
-echo "❌ Failed to seed views (HTTP $HTTP_CODE)"
-cat /tmp/couchdb_views_out.json || true
-exit 1
+if [ "${VIEWS_OK:-0}" -ne 1 ]; then
+    echo "❌ Failed to seed views (HTTP $HTTP_CODE)"
+    cat /tmp/couchdb_views_out.json || true
+    exit 1
+fi
+
+echo "📦 Seeding CouchDB data from stack/data..."
+python3 "$SCRIPT_DIR/../../scripts/migrate_to_couchdb.py"
