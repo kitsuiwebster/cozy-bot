@@ -74,4 +74,4 @@ if [ "${VIEWS_OK:-0}" -ne 1 ]; then
 fi
 
 echo "📦 Seeding CouchDB data from stack/data..."
-python3 "$SCRIPT_DIR/../../scripts/migrate_to_couchdb.py"
+python3 "$SCRIPT_DIR/../../../scripts/migrate_to_couchdb.py"
