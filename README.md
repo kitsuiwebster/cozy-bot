@@ -18,6 +18,10 @@ Welcome to CozyBot, a discord.py bot designed to bring cozy and peaceful ambienc
 
 - [Invite CozyBot to your Discord server](https://discord.com/api/oauth2/authorize?client_id=1156917047284994178&permissions=40550970817344&scope=bot)
 
+### Status Page
+
+- [CozyBot Service Status](https://status.cozybot.online)
+
 ### App Directory
 
 CozyBot is also available in the official Discord App Directory:
@@ -43,9 +47,17 @@ Use the `/sea` command to enjoy the calming sounds of ocean waves. Perfect for r
 
 Use the `/music` command to play background music. Select from a variety of genres to enhance your mood or complement your activities.
 
+### 📡 Noise
+
+Use the `/noise` command to play different types of noise (white noise, etc.).
+
 ### 🛑 Stop
 
 Use the `/stop` command to stop any currently playing sound or music in the voice channel.
+
+### 📋 Menu
+
+Use the `/menu` command to display all available sound commands.
 
 ### 🏆 Gamification System
 
@@ -63,6 +75,10 @@ Earn points by listening to sounds, unlock achievements, and compete with other 
 ## 📅 Future Plans
 
 We are working to improve CozyBot and add more features. Stay tuned for more cozy ambiences!
+
+## 🧰 Maintainers
+
+Looking for local commands and service controls? See `docs/make-commands.md`.
 
 ## 🐞 Report a bug
 
