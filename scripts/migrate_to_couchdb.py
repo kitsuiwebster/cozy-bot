@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script de migration des données JSON vers CouchDB
-Migre les données depuis stack/jsons/ vers CouchDB
+Migre les données depuis stack/data/ vers CouchDB
 """
 
 import json
@@ -316,7 +316,7 @@ def main():
 
     # Chemin vers les fichiers JSON (absolu)
     workspace_dir = Path(__file__).parent.parent
-    json_dir = workspace_dir / 'stack' / 'jsons'
+    json_dir = workspace_dir / 'stack' / 'data'
 
     if not json_dir.exists():
         print(f"❌ Répertoire non trouvé: {json_dir}")
