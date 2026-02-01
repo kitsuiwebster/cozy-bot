@@ -302,3 +302,4 @@ ui:
 	echo "  Uptime Kuma:   http://localhost:$${KUMA_PORT}" && \
 	echo "  Public API:    http://localhost:$${API_PORT}/docs" && \
 	echo "  CouchDB:       http://localhost:$${DB_PORT}/_utils"
+
