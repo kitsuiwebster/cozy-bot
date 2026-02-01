@@ -379,25 +379,6 @@
       min-width: 240px;
     }
 
-    .refresh-button {
-      background: rgba(148, 163, 184, 0.1);
-      color: #e2e8f0;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      border-radius: 10px;
-      padding: 8px 16px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-color: rgba(168, 85, 247, 0.6);
-        color: #a855f7;
-        box-shadow: 0 6px 18px rgba(168, 85, 247, 0.25);
-        transform: translateY(-1px);
-      }
-    }
-
     h2 {
       font-size: 2rem;
       font-weight: 600;

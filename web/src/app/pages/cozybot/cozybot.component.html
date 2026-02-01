@@ -7,6 +7,8 @@
     [selectedView]="selectedView"
     (selectedViewChange)="onSelectedViewChange($event)"
     (viewChange)="onViewChange()"
+    [showRefreshButton]="true"
+    (refresh)="manualRefreshCurrentView()"
     [stats]="getHeaderStats()"
     [statsLoading]="statsLoading"
     [currentListeners]="liveStats.current_listeners"
@@ -29,13 +31,6 @@
           <p *ngIf="selectedView === 'servers'">Ranking based on total listening time</p>
           <p *ngIf="selectedView === 'sounds'">Ranking based on total listening time</p>
         </div>
-        <button
-          class="refresh-button"
-          type="button"
-          (click)="manualRefreshCurrentView()"
-        >
-          Refresh
-        </button>
       </div>
       <div *ngIf="selectedView === 'users'" class="total-points-display">
         <span class="points-number" [class.animating]="animatingPoints">{{ getTotalPoints() | number }}</span>

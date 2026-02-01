@@ -31,6 +31,8 @@ export class LeaderboardHeaderComponent {
   @Input() selectedView = 'users';
   @Output() selectedViewChange = new EventEmitter<string>();
   @Output() viewChange = new EventEmitter<string>();
+  @Input() showRefreshButton = false;
+  @Output() refresh = new EventEmitter<void>();
 
   @Input() viewOptions: LeaderboardHeaderOption[] = [
     { value: 'users', label: 'Top Users' },
@@ -57,5 +59,9 @@ export class LeaderboardHeaderComponent {
   onViewChange(): void {
     this.selectedViewChange.emit(this.selectedView);
     this.viewChange.emit(this.selectedView);
+  }
+
+  onRefresh(): void {
+    this.refresh.emit();
   }
 }

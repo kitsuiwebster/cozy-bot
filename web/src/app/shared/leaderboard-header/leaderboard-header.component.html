@@ -12,6 +12,14 @@
           <select [(ngModel)]="selectedView" (change)="onViewChange()" class="view-select">
             <option *ngFor="let option of viewOptions" [value]="option.value">{{ option.label }}</option>
           </select>
+          <button
+            *ngIf="showRefreshButton"
+            class="refresh-button"
+            type="button"
+            (click)="onRefresh()"
+          >
+            Refresh
+          </button>
           <a *ngIf="showAddToServer"
              [href]="addToServerUrl"
              target="_blank"
