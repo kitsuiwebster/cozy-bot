@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, of, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface CozyUser {
@@ -98,6 +98,7 @@ export class CozybotService {
   private apiUrl = environment.apiUrl;
   private liveStatsCache: LiveStats | null = null;
   private topUsersCache: LeaderboardResponse | null = null;
+  private userDetailsCache = new Map<string, UserDetails>();
 
   constructor(private http: HttpClient) {}
 
@@ -134,6 +135,15 @@ export class CozybotService {
   }
 
   getUserDetails(username: string): Observable<UserDetails> {
-    return this.http.get<UserDetails>(`${this.apiUrl}/user/${username}`);
+    const cached = this.userDetailsCache.get(username);
+    if (cached) {
+      return of(cached);
+    }
+    const encodedUsername = encodeURIComponent(username);
+    return this.http.get<UserDetails>(`${this.apiUrl}/user/${encodedUsername}`).pipe(
+      tap((details) => {
+        this.userDetailsCache.set(username, details);
+      })
+    );
   }
 }

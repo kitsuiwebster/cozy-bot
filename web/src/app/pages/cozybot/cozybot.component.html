@@ -20,12 +20,23 @@
 
   <div class="leaderboard-section">
     <div class="section-header">
-      <h2 *ngIf="selectedView === 'users'">🏆 Top CozyBot users by CozyPoints</h2>
-      <h2 *ngIf="selectedView === 'servers'">🏆 Top CozyBot servers by listening time</h2>
-      <h2 *ngIf="selectedView === 'sounds'">🏆 Top CozyBot sounds by listening time</h2>
-      <p *ngIf="selectedView === 'users'">Ranking based on Discord activity</p>
-      <p *ngIf="selectedView === 'servers'">Ranking based on total listening time</p>
-      <p *ngIf="selectedView === 'sounds'">Ranking based on total listening time</p>
+      <div class="section-header-top">
+        <div class="section-titles">
+          <h2 *ngIf="selectedView === 'users'">🏆 Top CozyBot users by CozyPoints</h2>
+          <h2 *ngIf="selectedView === 'servers'">🏆 Top CozyBot servers by listening time</h2>
+          <h2 *ngIf="selectedView === 'sounds'">🏆 Top CozyBot sounds by listening time</h2>
+          <p *ngIf="selectedView === 'users'">Ranking based on Discord activity</p>
+          <p *ngIf="selectedView === 'servers'">Ranking based on total listening time</p>
+          <p *ngIf="selectedView === 'sounds'">Ranking based on total listening time</p>
+        </div>
+        <button
+          class="refresh-button"
+          type="button"
+          (click)="manualRefreshCurrentView()"
+        >
+          Refresh
+        </button>
+      </div>
       <div *ngIf="selectedView === 'users'" class="total-points-display">
         <span class="points-number" [class.animating]="animatingPoints">{{ getTotalPoints() | number }}</span>
         <span class="points-label">Total CozyPoints earned by all users</span>
