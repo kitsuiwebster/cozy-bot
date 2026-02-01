@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyBot Status</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" href="styles.css" as="style">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <h1>CozyBot Status</h1>
+                <a class="leaderboard-btn" href="https://cozybot.online/?view=users" target="_blank" rel="noopener">
+                    Access leaderboard
+                </a>
+            </div>
+            <div class="header-meta">
+                <div class="header-meta-left">
+                    <button id="refresh-btn" class="refresh-btn" type="button" aria-label="Refresh status">
+                        ⟳ Refresh
+                    </button>
+                    <div class="header-update">
+                        <span class="update-label">Last updated:</span>
+                        <span id="last-update" class="update-time">Never</span>
+                        <span class="timezone-info">(Paris Time - CET/CEST)</span>
+                    </div>
+                </div>
+                <div id="overall-status" class="status-badge loading">
+                    <span class="status-icon">⏳</span>
+                    <span class="status-text">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <section id="maintenance-container" class="maintenance-container"></section>
+
+        <div class="legend-mini status-legend">
+            <span class="legend-dot operational"></span> Operational
+            <span class="legend-dot degraded"></span> Degraded
+            <span class="legend-dot maintenance"></span> Maintenance
+            <span class="legend-dot down"></span> Down
+        </div>
+
+        <main id="monitors-container">
+            <!-- Les monitors seront injectés ici par JavaScript -->
+        </main>
+
+        <section id="maintenance-history-container" class="maintenance-history-container"></section>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-main">
+                    <p class="developed-by">
+                        Developed with <span class="heart">❤️</span> by
+                        <a href="https://github.com/imenemedjaoui" target="_blank" class="dev-link">@BubbleXGum</a> &
+                        <a href="https://github.com/kitsuiwebster" target="_blank" class="dev-link">@kitsuiwebster</a>
+                    </p>
+                    <p class="version">v2.0.0</p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://discord.com/discovery/applications/1156917047284994178" target="_blank" class="footer-link">
+                        Add to Discord
+                    </a>
+                    <a href="https://github.com/kitsuiwebster/cozy-bot" target="_blank" class="footer-link">
+                        GitHub
+                    </a>
+                    <a href="https://discord.gg/Rxeh64Y73U" target="_blank" class="footer-link">
+                        Support Discord
+                    </a>
+                    <a href="https://kitsuiwebster.com/cozybot/credits" target="_blank" class="footer-link">
+                        Credits
+                    </a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

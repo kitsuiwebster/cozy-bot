@@ -1,0 +1,182 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: ${UPTIME_KUMA_CONTAINER_NAME}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ports:
+      - "${UPTIME_KUMA_PORT:-3001}:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+      - ./kuma-seed:/seed:ro
+    entrypoint: ["/bin/sh", "/seed/entrypoint.sh"]
+    # networks:
+    #   - bot-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001',res=>process.exit(res.statusCode<400?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  discord-bot:
+    build:
+      context: ../apps/bot
+      args:
+        MODE: ${BOT_MODE:-prod}
+    container_name: ${CONTAINER_NAME:-cozy-discord-bot}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    env_file:
+      - ./.env
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - API_KEY=${API_KEY}
+      - COUCHDB_DISABLED=${COUCHDB_DISABLED:-0}
+      - COUCHDB_WRITE_WORKER=1
+      - COZY_PERF_LOGS=${COZY_PERF_LOGS:-0}
+      - COZY_ENABLE_BOT_API=1
+      - BOT_API_PORT=${BOT_API_PORT:-8002}
+    ports:
+      - "${BOT_API_PORT:-8002}:8002"
+    volumes:
+      # Base volumes always mounted
+      - voice-data:/app/data
+      # Conditional volume for development
+      - ${DEV_CODE_MOUNT:-/tmp/empty}:/app:rw
+      # Specific environment file
+      - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
+      # SSL certificates from Let's Encrypt
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    # networks:
+    #   - bot-network
+    # Run bot only (voice stability)
+    command: python3 main.py
+    # Conditional health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/api/live/bot/health').read()"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: ${HEALTH_CHECK_START:-40s}
+      disable: ${HEALTH_CHECK_DISABLE:-false}
+    depends_on:
+      couchdb:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../apps/bot
+      args:
+        MODE: ${BOT_MODE:-prod}
+    container_name: ${API_CONTAINER_NAME:-cozy-api}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    env_file:
+      - ./.env
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - API_KEY=${API_KEY}
+      - COUCHDB_WRITE_WORKER=1
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Base volumes always mounted
+      - voice-data:/app/data
+      # Conditional volume for development
+      - ${DEV_CODE_MOUNT:-/tmp/empty}:/app:rw
+      # Specific environment file
+      - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
+      # SSL certificates from Let's Encrypt
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    # networks:
+    #   - bot-network
+    command: python3 -m uvicorn api.app:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/public/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      couchdb:
+        condition: service_healthy
+
+  couchdb:
+    image: couchdb:3
+    container_name: ${COUCHDB_CONTAINER_NAME}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ports:
+      - "${COUCHDB_PORT:-5984}:5984"
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER:-admin}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+    # networks:
+    #   - bot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  status-page:
+    image: nginx:alpine
+    container_name: ${STATUS_PAGE_CONTAINER_NAME:-cozy-status-page}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ports:
+      - "${STATUS_PAGE_PORT:-8080}:80"
+    volumes:
+      - ../apps/status-page:/usr/share/nginx/html:ro
+      - ../apps/status-page/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    # networks:
+    #   - bot-network
+    depends_on:
+      - uptime-kuma
+      - status-api
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /usr/share/nginx/html/index.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  status-api:
+    build:
+      context: ../apps/status-api
+    container_name: ${STATUS_API_CONTAINER_NAME:-cozy-status-api}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    environment:
+      - STATUS_DB_PATH=/data/status.db
+      - STATUS_HISTORY_INTERVAL_SECONDS=${STATUS_HISTORY_INTERVAL_SECONDS:-60}
+      - STATUS_HISTORY_RETENTION_DAYS=${STATUS_HISTORY_RETENTION_DAYS:-90}
+      - STATUS_PAGE_SLUG=${STATUS_PAGE_SLUG:-cozy}
+      - STATUS_PAGE_URL=${STATUS_PAGE_URL:-http://uptime-kuma:3001}
+      - STATUS_MONITOR_PUBLIC_URL=${STATUS_MONITOR_PUBLIC_URL:-http://cozy-public-api:8000/api/public/health}
+      - STATUS_MONITOR_LIVE_URL=${STATUS_MONITOR_LIVE_URL:-http://cozy-live-bot:8002/api/live/bot/health}
+      - STATUS_MONITOR_DB_URL=${STATUS_MONITOR_DB_URL:-http://cozy-couchdb:5984/_up}
+    ports:
+      - "${STATUS_API_PORT:-8010}:8010"
+    volumes:
+      - status-api-data:/data
+    depends_on:
+      uptime-kuma:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/api/status/monitors').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+volumes:
+  voice-data:
+    name: ${VOICE_DATA_VOLUME}
+  uptime-kuma-data:
+    name: ${UPTIME_KUMA_VOLUME}
+  couchdb-data:
+    name: ${COUCHDB_VOLUME}
+  status-api-data:
+    name: ${STATUS_API_VOLUME:-cozy-status-api-data}
+
+# networks:
+#   bot-network:
+#     name: ${NETWORK_NAME:-cozy-bot-network}
+#     driver: bridge

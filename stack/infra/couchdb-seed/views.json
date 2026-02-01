@@ -1,0 +1,23 @@
+{
+  "_id": "_design/views",
+  "views": {
+    "users": {
+      "map": "function(doc) { if(doc.type === 'user') { emit(doc._id, {total_points: doc.total_points, level: doc.level, listening_time: doc.listening_time}); } }"
+    },
+    "usernames": {
+      "map": "function(doc) { if(doc.type === 'username') { emit(doc._id, {username: doc.username, display_name: doc.display_name}); } }"
+    },
+    "servers": {
+      "map": "function(doc) { if(doc.type === 'server') { emit(doc._id, {name: doc.name, last_updated: doc.last_updated}); } }"
+    },
+    "voice_time": {
+      "map": "function(doc) { if(doc.type === 'voice_time') { var guild_id = doc._id.replace('voice_time:', ''); emit(guild_id, doc.data); } }"
+    },
+    "all_by_type": {
+      "map": "function(doc) { if(doc.type) { emit(doc.type, doc._id); } }"
+    },
+    "deployments": {
+      "map": "function(doc) { if(doc.type === 'deployment') { emit(doc._id, {version: doc.version, timestamp: doc.timestamp, status: doc.status}); } }"
+    }
+  }
+}

@@ -29,15 +29,15 @@ jobs:
           export TERM=xterm
 
           echo "🎯 Starting development deployment..."
-          cd ~/cozy-bot
+          cd ~/cozy-dev/cozy-bot
           git stash || true
           git checkout dev
           git fetch origin
           git reset --hard origin/dev
 
           echo "🚀 Running deployment script..."
-          chmod +x scripts/deploy-dev.sh
-          ./scripts/deploy-dev.sh
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh dev
 
           echo "✅ Development deployment completed!"
           EOF

@@ -1,45 +1,45 @@
-  name: Production Deploy
-  on:
-    push:
-      branches: [ main ]
+name: Production Deploy
+on:
+  push:
+    branches: [ main ]
 
-  jobs:
-    deploy:
-      runs-on: ubuntu-latest
-      environment: production
-      steps:
-        - name: 🚀 Setup SSH
-          uses: webfactory/ssh-agent@v0.9.0
-          with:
-            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: 🚀 Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-        - name: 🔑 Add SSH host key
-          run: |
-            mkdir -p ~/.ssh
-            ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
+      - name: 🔑 Add SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
 
 
-        - name: 🛡️ Deploy to Production
-          timeout-minutes: 6
-          run: |
-            ssh -T -o "ServerAliveInterval=5" -o "ServerAliveCountMax=1" -o "ExitOnForwardFailure=yes" -p 2248 kitsui@90.60.191.159 bash -s <<'EOF'
-            set -euo pipefail
-            export LC_ALL=C.UTF-8
-            export LANG=C.UTF-8
-            export TERM=xterm
+      - name: 🛡️ Deploy to Production
+        timeout-minutes: 6
+        run: |
+          ssh -T -o "ServerAliveInterval=5" -o "ServerAliveCountMax=1" -o "ExitOnForwardFailure=yes" -p 2248 kitsui@90.60.191.159 bash -s <<'EOF'
+          set -euo pipefail
+          export LC_ALL=C.UTF-8
+          export LANG=C.UTF-8
+          export TERM=xterm
 
-            echo "🎯 Starting production deployment..."
-            cd ~/cozy-bot
-            git stash || true
-            git checkout main
-            git fetch origin
-            git reset --hard origin/main
+          echo "🎯 Starting production deployment..."
+          cd ~/cozy-bot
+          git stash || true
+          git checkout main
+          git fetch origin
+          git reset --hard origin/main
 
-            echo "🚀 Running deployment script..."
-            chmod +x scripts/deploy-prod.sh
-            ./scripts/deploy-prod.sh
+          echo "🚀 Running deployment script..."
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh prod
 
-            echo "✅ Production deployment completed!"
-            EOF
+          echo "✅ Production deployment completed!"
+          EOF
 
             
