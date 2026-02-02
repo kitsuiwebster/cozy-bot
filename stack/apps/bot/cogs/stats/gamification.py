@@ -335,6 +335,9 @@ class CozyGamification:
 
         # Note: finalize_current_sound is now handled at the calling site to control timing
 
+        from cogs.audio.sound_mappings import normalize_sound_name
+        sound_name = normalize_sound_name(sound_name)
+
         # Start tracking new sound
         start_time = datetime.now().isoformat()
         user_stats['current_sound'] = {
@@ -393,7 +396,8 @@ class CozyGamification:
                 if duration > max_duration:
                     duration = max_duration
                 
-                sound_name = current_sound['name']
+                from cogs.audio.sound_mappings import normalize_sound_name
+                sound_name = normalize_sound_name(current_sound['name'])
                 if 'listening_time_by_sound' not in user_stats:
                     user_stats['listening_time_by_sound'] = {}
                 if sound_name not in user_stats['listening_time_by_sound']:

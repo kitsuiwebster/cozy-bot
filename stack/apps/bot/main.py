@@ -358,7 +358,9 @@ async def periodic_backup():
                         
                         start_time = datetime.fromisoformat(current_sound['start_time'])
                         session_duration = (datetime.now() - start_time).total_seconds()
-                        sound_name = current_sound['name']
+                        from cogs.audio.sound_mappings import normalize_sound_name
+                        sound_name = normalize_sound_name(current_sound['name'])
+                        current_sound['name'] = sound_name
 
                         # Cap session duration at 30 minutes to prevent corrupted data
                         max_session_duration = 30 * 60
@@ -532,7 +534,8 @@ def save_current_stats_for_api():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     active_listeners += 1
-                    sound_name = current_sound.get('name')
+                    from cogs.audio.sound_mappings import normalize_sound_name
+                    sound_name = normalize_sound_name(current_sound.get('name'))
                     if sound_name:
                         listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + 1
 

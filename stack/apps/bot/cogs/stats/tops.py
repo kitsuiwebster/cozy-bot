@@ -126,6 +126,8 @@ class TopsCog(commands.Cog):
                 listening_times = user_stats.get('listening_time_by_sound', {})
                 
                 for sound_name, sound_data in listening_times.items():
+                    from cogs.audio.sound_mappings import normalize_sound_name
+                    sound_name = normalize_sound_name(sound_name)
                     if sound_name not in sound_aggregates:
                         sound_aggregates[sound_name] = {
                             'total_time': 0.0,

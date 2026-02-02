@@ -325,18 +325,10 @@ export class CozybotComponent implements OnInit, OnDestroy {
   private loadSounds(): void {
     this.cozybotService.getTopSounds().subscribe({
       next: (response: SoundsResponse) => {
-        // Filtrer pour ne garder que les sons avec exactement 3 emojis ou noise01.mp3
+        // Filtrer pour ne garder que les sons avec exactement 3 emojis
         this.allSounds = response.sounds.filter(sound =>
-          this.hasThreeEmojis(sound.display_name) || sound.sound_name === 'noise01.mp3'
+          this.hasThreeEmojis(sound.display_name)
         );
-
-        // Remplacer le display_name de noise01.mp3 par les emojis
-        this.allSounds = this.allSounds.map(sound => {
-          if (sound.sound_name === 'noise01.mp3') {
-            return { ...sound, display_name: '📡🤍🌌' };
-          }
-          return sound;
-        });
 
         this.prepareSoundsChartData();
         this.updatePagination();
