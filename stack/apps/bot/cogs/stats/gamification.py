@@ -808,3 +808,4 @@ class CozyGamification:
 
 # Global instance
 cozy_gamification = CozyGamification()
+
