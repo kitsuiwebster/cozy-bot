@@ -176,6 +176,7 @@ async def _track_bot_join_async(guild_id, guild_name, channel, current_users):
             # Don't save immediately to avoid blocking the event loop
             result = cozy_gamification.join_session(user_id, user.name, force_bonus=True, save_immediately=False)
             cozy_gamification.update_username(user_id, user.name, user.global_name or user.name, save_immediately=False)
+            logging.info(f"")
             logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {channel.name} in {guild_name}")
 
         # Save once after processing all users
@@ -791,6 +792,7 @@ async def on_voice_state_update(member, before, after):
             'accumulated_time': 0.0
         }
 
+        logging.info(f"")
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
         # Track in background to avoid blocking Discord events

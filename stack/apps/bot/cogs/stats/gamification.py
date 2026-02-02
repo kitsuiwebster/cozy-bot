@@ -587,7 +587,10 @@ class CozyGamification:
                 days_diff = (current - last).days
 
                 if days_diff <= 1:
-                    return user_stats.get('daily_streak', 0)
+                    streak = user_stats.get('daily_streak', 0)
+                    if streak <= 0:
+                        return 1
+                    return streak
             except:
                 pass
 
