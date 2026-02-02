@@ -1099,7 +1099,9 @@ async def on_ready():
 
     logging.info('')
     logging.info('🏠 Connected servers:')
-    for guild in bot.guilds:
+    # Sort guilds by member count in descending order (most populated first)
+    sorted_guilds = sorted(bot.guilds, key=lambda guild: guild.member_count, reverse=True)
+    for guild in sorted_guilds:
         logging.info(f'   ╰┈➤ {guild.name} ({guild.member_count:,} members)')
 
 # Message handler to process commands
