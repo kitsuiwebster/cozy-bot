@@ -310,6 +310,21 @@ async def periodic_backup():
                         if session_duration > 0:
                             user_stats['listening_time'] += session_duration
 
+                            # Ensure daily streak updates even if join event was missed
+                            today = datetime.now().strftime('%Y-%m-%d')
+                            last_active = user_stats.get('last_active_date')
+                            if last_active != today:
+                                try:
+                                    from cogs.stats.gamification import cozy_gamification
+                                    if last_active and cozy_gamification.is_consecutive_day(last_active, today):
+                                        user_stats['daily_streak'] += 1
+                                    else:
+                                        user_stats['daily_streak'] = 1
+                                    user_stats['last_active_date'] = today
+                                except Exception:
+                                    user_stats['daily_streak'] = 1
+                                    user_stats['last_active_date'] = today
+
                             if 'listening_time_by_sound' not in user_stats:
                                 user_stats['listening_time_by_sound'] = {}
                             if sound_name not in user_stats['listening_time_by_sound']:
@@ -504,6 +519,8 @@ def save_current_stats_for_api():
 LIVE_STATS_FLUSH_SECONDS = int(os.getenv("COZY_LIVE_STATS_FLUSH_SECONDS", "5"))
 _live_stats_dirty = False
 _live_stats_task_started = False
+PLAYBACK_WATCHDOG_SECONDS = 10
+PLAYBACK_WATCHDOG_COOLDOWN_SECONDS = 30
 
 async def _live_stats_flush_loop():
     while True:
@@ -512,6 +529,43 @@ async def _live_stats_flush_loop():
         except Exception as e:
             logging.error(f'❌ Live stats flush failed: {e}')
         await asyncio.sleep(LIVE_STATS_FLUSH_SECONDS)
+
+async def _playback_watchdog_loop():
+    await bot.wait_until_ready()
+    last_restart_by_guild = {}
+
+    while not bot.is_closed():
+        try:
+            for guild in bot.guilds:
+                voice_client = guild.voice_client
+                if not voice_client or not voice_client.channel:
+                    continue
+
+                for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
+                    cog = bot.get_cog(cog_name)
+                    if not cog or not hasattr(cog, 'guild_states'):
+                        continue
+
+                    guild_state = cog.guild_states.get(guild.id)
+                    if not guild_state:
+                        continue
+
+                    if guild_state.get('current_sound') and guild_state.get('is_playing'):
+                        if not voice_client.is_playing():
+                            now = time.monotonic()
+                            last_restart = last_restart_by_guild.get(guild.id, 0.0)
+                            if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
+                                continue
+                            logging.warning(
+                                f"⚠️ Playback stalled in {guild.name} (sound={guild_state.get('current_sound')}). Restarting..."
+                            )
+                            bot.loop.create_task(cog.restart_audio_loop(guild.id))
+                            last_restart_by_guild[guild.id] = now
+                        break
+        except Exception as e:
+            logging.error(f'❌ Playback watchdog failed: {e}')
+
+        await asyncio.sleep(PLAYBACK_WATCHDOG_SECONDS)
 
 def schedule_live_stats_update():
     global _live_stats_dirty, _live_stats_task_started
@@ -849,6 +903,9 @@ async def on_ready():
         deployment_notifier = DeploymentNotifier(bot)
         bot.loop.create_task(deployment_notifier.start_monitoring())
         logging.info('📢 Started deployment notifier task')
+
+    bot.loop.create_task(_playback_watchdog_loop())
+    logging.info('🎧 Started playback watchdog task')
 
     if COZY_ENABLE_AUDIO_RESTORE:
         audio_monitor = AudioRestorationMonitor(bot)
