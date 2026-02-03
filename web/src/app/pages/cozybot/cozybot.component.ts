@@ -409,7 +409,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // Header stats with animation tracking
 
   getTotalPoints(): number {
-    return this.allUsers.reduce((total, user) => total + user.total_points, 0);
+    return this.allUsersRaw.reduce((total, user) => total + user.total_points, 0);
   }
 
   getTotalUsers(): number {
@@ -421,7 +421,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   getTotalTimeDays(): string {
-    const totalSeconds = this.allUsers.reduce((total, user) => total + user.listening_time_seconds, 0);
+    const totalSeconds = this.getTotalListeningTimeSeconds(this.allUsersRaw);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     return `${days}d ${hours}h`;
