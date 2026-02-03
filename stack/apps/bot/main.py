@@ -449,6 +449,7 @@ def save_current_stats_for_api():
         active_listeners = 0
         servers_with_bot = 0
         listeners_by_sound = {}
+        active_usernames = set()
 
         for guild in bot.guilds:
             voice_state = guild.voice_client
@@ -461,6 +462,9 @@ def save_current_stats_for_api():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     active_listeners += 1
+                    username = cozy_gamification.usernames.get(str(user_id), {}).get("username")
+                    if username:
+                        active_usernames.add(username)
                     from cogs.audio.sound_mappings import normalize_sound_name
                     sound_name = normalize_sound_name(current_sound.get('name'))
                     if sound_name:
@@ -475,6 +479,7 @@ def save_current_stats_for_api():
             'servers_with_bot': servers_with_bot,
             'total_servers': total_servers,
             'listeners_by_sound': listeners_by_sound,
+            'active_usernames': sorted(active_usernames),
             'last_updated': datetime.now().isoformat()
         }
 
