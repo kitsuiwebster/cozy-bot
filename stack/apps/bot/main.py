@@ -633,7 +633,8 @@ async def check_api_endpoints():
             "base": live_api_base,
             "get_endpoints": [
                 "/health",
-                "/api/live/bot/health"
+                "/api/live/bot/health",
+                "/api/live/bot/stats"
             ],
             "write_endpoints": [
                 ("POST", "/api/live/audio/save-state"),
@@ -655,16 +656,16 @@ async def check_api_endpoints():
                 try:
                     async with session.get(f"{api['base']}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status in [200, 401, 403, 422]:
-                            logging.info(f"✨ GET {endpoint} - healthy")
+                            logging.info(f"{api['emoji']} GET {endpoint} - healthy")
                         else:
-                            logging.error(f"🔥 GET {endpoint} - error (status: {response.status})")
+                            logging.error(f"{api['emoji']} GET {endpoint} - error (status: {response.status})")
                 except:
-                    logging.error(f"❌ GET {endpoint} - error")
+                    logging.error(f"{api['emoji']} GET {endpoint} - error")
 
             logging.info("")
-            logging.info(f"✨ Available write endpoints ({api['name']}): {len(api['write_endpoints'])}")
+            logging.info(f"{api['emoji']} Available write endpoints ({api['name']}): {len(api['write_endpoints'])}")
             for method, endpoint in api["write_endpoints"]:
-                logging.info(f"✨    ╰┈➤ {method} {endpoint}")
+                logging.info(f"{api['emoji']}    ╰┈➤ {method} {endpoint}")
             logging.info("")
     logging.info("")
 

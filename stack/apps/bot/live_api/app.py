@@ -28,6 +28,14 @@ class BotHealthResponse(BaseModel):
     guilds: int = 0
     latency_ms: float = 0.0
 
+class LiveStatsResponse(BaseModel):
+    current_listeners: int
+    servers_with_bot: int
+    total_servers: int
+    listeners_by_sound: dict
+    active_usernames: list[str]
+    last_updated: str
+
 class AudioStateResponse(BaseModel):
     success: bool
     sessions_saved: int
@@ -72,6 +80,52 @@ async def bot_health():
         "guilds": len(bot_instance.guilds),
         "latency_ms": latency_ms
     }
+
+@app.get("/api/live/bot/stats", response_model=LiveStatsResponse)
+async def bot_live_stats():
+    if bot_instance is None:
+        return LiveStatsResponse(
+            current_listeners=0,
+            servers_with_bot=0,
+            total_servers=0,
+            listeners_by_sound={},
+            active_usernames=[],
+            last_updated=datetime.now().isoformat()
+        )
+
+    current_listeners = 0
+    servers_with_bot = 0
+    listeners_by_sound = {}
+    active_usernames = []
+
+    from cogs.audio.base_sound import global_current_sounds
+    from cogs.audio.sound_mappings import normalize_sound_name
+
+    for guild in bot_instance.guilds:
+        voice_client = guild.voice_client
+        if voice_client and voice_client.channel:
+            servers_with_bot += 1
+            human_members = [m for m in voice_client.channel.members if not m.bot]
+            if human_members:
+                current_listeners += len(human_members)
+                for member in human_members:
+                    active_usernames.append(member.name)
+
+                sound_name = global_current_sounds.get(guild.id)
+                if sound_name:
+                    sound_name = normalize_sound_name(sound_name)
+                    listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + len(human_members)
+
+    total_servers = len(bot_instance.guilds)
+
+    return LiveStatsResponse(
+        current_listeners=current_listeners,
+        servers_with_bot=servers_with_bot,
+        total_servers=total_servers,
+        listeners_by_sound=listeners_by_sound,
+        active_usernames=sorted(set(active_usernames)),
+        last_updated=datetime.now().isoformat()
+    )
 
 @app.post("/api/live/audio/save-state", response_model=AudioStateResponse)
 async def save_audio_state():
