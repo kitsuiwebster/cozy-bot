@@ -197,10 +197,20 @@ periodic_backup_task = None
 # Dynamic bot presence updates
 async def change_status():
     await bot.wait_until_ready()
+    last_server_count = 0
 
     while not bot.is_closed():
         try:
-            server_count = len(bot.guilds)
+            try:
+                from utils.storage.couchdb_client import get_couchdb_client
+                db = get_couchdb_client()
+                server_count = len(db.load_servernames())
+            except Exception:
+                server_count = len(bot.guilds)
+            if server_count == 0 and last_server_count > 0:
+                server_count = last_server_count
+            else:
+                last_server_count = server_count
             total_member_count = sum(guild.member_count or 0 for guild in bot.guilds)
             statuses = [
                 discord.Game(name=f"in {server_count} servers"),
