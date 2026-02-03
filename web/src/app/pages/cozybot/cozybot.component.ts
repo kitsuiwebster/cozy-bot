@@ -48,6 +48,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   liveStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
   previousStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
   liveSoundCategories: { emoji: string; count: number }[] = [];
+  liveUsernames = new Set<string>();
   statsLoading = false;
   animatingListeners = false;
   animatingServers = false;
@@ -513,6 +514,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
       this.liveStats = cachedStats;
       this.previousStats = { ...cachedStats };
       this.liveSoundCategories = this.buildLiveSoundCategories(cachedStats);
+      this.liveUsernames = this.buildLiveUsernamesSet(cachedStats);
       this.statsLoading = false;
     }
 
@@ -544,6 +546,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
         
         this.liveStats = stats;
         this.liveSoundCategories = this.buildLiveSoundCategories(stats);
+        this.liveUsernames = this.buildLiveUsernamesSet(stats);
         this.statsLoading = false;
         
         // Animer Total Servers au premier chargement
@@ -592,6 +595,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
     return Object.entries(categories)
       .filter(([, count]) => count > 0)
       .map(([emoji, count]) => ({ emoji, count }));
+  }
+
+  private buildLiveUsernamesSet(stats: LiveStats): Set<string> {
+    const names = (stats.active_usernames || []).map((name) => name.toLowerCase());
+    return new Set(names);
   }
 
   getDisplayName(user: CozyUser): string {
@@ -864,7 +872,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
    */
   getRankColorClass(user: CozyUser): string {
     // Si le user écoute actuellement (current_sound peut être null, undefined, ou une chaîne vide)
-    if (user.current_sound !== null && user.current_sound !== undefined && user.current_sound !== '') {
+    if (this.liveUsernames.has((user.username || '').toLowerCase())) {
       return 'rank-live';
     }
 
