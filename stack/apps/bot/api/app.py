@@ -60,7 +60,7 @@ for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
 app = FastAPI(
     title="CozyBot API",
     description="REST API for CozyBot Discord bot statistics",
-    version="2.0.0"
+    version="2.0.1"
 )
 
 # Configure CORS for web access
@@ -90,7 +90,7 @@ app.include_router(audio_restore_router, prefix="/api/public", tags=["audio"])
 
 @app.get("/")
 async def root():
-    return {"message": "CozyBot Public API", "version": "2.0.0"}
+    return {"message": "CozyBot Public API", "version": "2.0.1"}
 
 @app.get("/health")
 async def health_check():

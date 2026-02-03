@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-02-03
+
+### Added
+
+- Live stats now expose `active_usernames` and per-sound category counts for the header.
+- User filter menu in the leaderboard header with “Streak only” toggle.
+
+
+### Fixed
+
+- noise01/white-noise01 normalization across stats aggregation and display.
+- Live stats refresh now runs continuously to reduce stale counts.
+- Streaks now update during periodic backups if join events were missed.
+- API streak calculation now uses fresh user stats to avoid stale in-memory values.
+- Top sounds charts now include hover percent/summary tooltips and label formatting updates.
+- Bot presence server count now matches CouchDB servernames (aligns with public stats).
+- Deployment notifier no longer shows commit hashes in user-facing messages.
+- Playback watchdog to restart stalled audio loops (10s interval, 30s cooldown).
+
 ## [2.0.0] - 2026-02-01
 
 ### Added

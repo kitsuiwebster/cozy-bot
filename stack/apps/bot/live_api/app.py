@@ -19,7 +19,7 @@ def set_bot_instance(bot):
 app = FastAPI(
     title="CozyBot Bot API",
     description="Bot-only control endpoints (live)",
-    version="2.0.0"
+    version="2.0.1"
 )
 
 class BotHealthResponse(BaseModel):
