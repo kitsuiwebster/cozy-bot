@@ -86,6 +86,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // Configuration du graphique des sons
   soundsChartData: { name: string; value: number }[] = [];
   soundsByCategoryChartData: { name: string; value: number }[] = [];
+  soundsChartTotalTime = 0;
+  soundsCategoryTotalTime = 0;
   colorScheme: Color = {
     name: 'soundsColors',
     selectable: true,
@@ -612,32 +614,22 @@ export class CozybotComponent implements OnInit, OnDestroy {
 
   /**
    * Prépare les données des sons pour le graphique en camembert
-   * Limite aux top 12 sons + catégorie "Autres" pour une meilleure visibilité
+   * Limite aux top 12 sons pour une meilleure visibilité
    */
   private prepareSoundsChartData(): void {
-    const topSoundsCount = 12;
-
+    const topSoundsCount = this.allSounds.length;
     // Trier les sons par temps d'écoute décroissant
     const sortedSounds = [...this.allSounds].sort((a, b) => b.total_time - a.total_time);
 
     // Prendre les top sons
     const topSounds = sortedSounds.slice(0, topSoundsCount);
-    const otherSounds = sortedSounds.slice(topSoundsCount);
-
     // Créer les données du graphique
     this.soundsChartData = topSounds.map(sound => ({
-      name: `${sound.display_name}\n${this.formatChartValue(sound.total_time)}`,
+      name: sound.display_name,
       value: sound.total_time
     }));
 
-    // Ajouter une catégorie "Autres" si il y a des sons restants
-    if (otherSounds.length > 0) {
-      const othersTotalTime = otherSounds.reduce((sum, sound) => sum + sound.total_time, 0);
-      this.soundsChartData.push({
-        name: `🎶 Autres\n${this.formatChartValue(othersTotalTime)}`,
-        value: othersTotalTime
-      });
-    }
+    this.soundsChartTotalTime = topSounds.reduce((sum, sound) => sum + sound.total_time, 0);
 
     // Préparer aussi les données par catégorie
     this.prepareSoundsByCategoryChartData();
@@ -668,6 +660,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
         value: time
       }))
       .sort((a, b) => b.value - a.value);
+
+    this.soundsCategoryTotalTime = this.soundsByCategoryChartData.reduce((sum, item) => sum + item.value, 0);
   }
 
   /**
@@ -678,6 +672,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     const match = text.match(emojiRegex);
     return match ? match[0] : '';
   }
+
 
   /**
    * Met à jour la taille du graphique en fonction de la taille de l'écran
@@ -707,6 +702,39 @@ export class CozybotComponent implements OnInit, OnDestroy {
   formatChartLabel = (label: string): string => {
     // Ne montrer que la première ligne (avant le \n) dans les labels du graphique
     return label.split('\n')[0];
+  }
+
+  formatSoundsChartLabel = (label: string): string => label || '';
+
+  formatSoundsTooltipText = (arc: { data?: { name?: string; value?: number } } | null): string => {
+    if (!arc || !arc.data) {
+      return '';
+    }
+    const label = arc.data.name || '';
+    const value = arc.data.value || 0;
+    return `${label} · ${this.formatChartValue(value)} · ${this.formatPercent(value, this.soundsChartTotalTime)}`;
+  }
+
+  formatCategoryTooltipText = (arc: { data?: { name?: string; value?: number } } | null): string => {
+    if (!arc || !arc.data) {
+      return '';
+    }
+    const rawLabel = arc.data.name || '';
+    const label = rawLabel.split('\n')[0];
+    const value = arc.data.value || 0;
+    return `${label} · ${this.formatChartValue(value)} · ${this.formatPercent(value, this.soundsCategoryTotalTime)}`;
+  }
+
+  formatCategoryChartLabel = (label: string): string => {
+    return label.split('\n')[0];
+  }
+
+  formatPercent = (value: number, total: number): string => {
+    if (!total || total <= 0) {
+      return '0%';
+    }
+    const percent = (value / total) * 100;
+    return `${percent.toFixed(1)}%`;
   }
 
   /**
