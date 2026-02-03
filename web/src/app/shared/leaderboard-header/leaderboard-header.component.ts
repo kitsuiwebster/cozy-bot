@@ -54,6 +54,7 @@ export class LeaderboardHeaderComponent {
   @Input() serversWithBot = 0;
   @Input() animatingListeners = false;
   @Input() animatingServers = false;
+  @Input() liveSoundCategories: { emoji: string; count: number }[] = [];
 
   @Input() ctaHref?: string;
   @Input() ctaText?: string;

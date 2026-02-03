@@ -32,6 +32,7 @@ export interface LiveStats {
   servers_with_bot: number;
   total_servers: number;
   total_sessions?: number;
+  listeners_by_sound?: Record<string, number>;
 }
 
 export interface CozyServer {

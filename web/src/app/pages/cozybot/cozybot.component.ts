@@ -47,6 +47,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // Live stats
   liveStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
   previousStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
+  liveSoundCategories: { emoji: string; count: number }[] = [];
   statsLoading = false;
   animatingListeners = false;
   animatingServers = false;
@@ -511,6 +512,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     if (cachedStats) {
       this.liveStats = cachedStats;
       this.previousStats = { ...cachedStats };
+      this.liveSoundCategories = this.buildLiveSoundCategories(cachedStats);
       this.statsLoading = false;
     }
 
@@ -541,6 +543,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
         }
         
         this.liveStats = stats;
+        this.liveSoundCategories = this.buildLiveSoundCategories(stats);
         this.statsLoading = false;
         
         // Animer Total Servers au premier chargement
@@ -557,6 +560,38 @@ export class CozybotComponent implements OnInit, OnDestroy {
         this.statsLoading = false;
       }
     });
+  }
+
+  private buildLiveSoundCategories(stats: LiveStats): { emoji: string; count: number }[] {
+    const listenersBySound = stats.listeners_by_sound || {};
+    const categories: Record<string, number> = {
+      '🌧️': 0,
+      '🌊': 0,
+      '✨': 0,
+      '🎶': 0,
+      '📡': 0,
+      '🎵': 0
+    };
+
+    Object.entries(listenersBySound).forEach(([soundName, count]) => {
+      let key = '🎵';
+      if (soundName.startsWith('rain')) {
+        key = '🌧️';
+      } else if (soundName.startsWith('sea')) {
+        key = '🌊';
+      } else if (soundName.startsWith('sparkles')) {
+        key = '✨';
+      } else if (soundName.startsWith('background-music')) {
+        key = '🎶';
+      } else if (soundName.startsWith('white-noise') || soundName.startsWith('noise')) {
+        key = '📡';
+      }
+      categories[key] += Number(count) || 0;
+    });
+
+    return Object.entries(categories)
+      .filter(([, count]) => count > 0)
+      .map(([emoji, count]) => ({ emoji, count }));
   }
 
   getDisplayName(user: CozyUser): string {
