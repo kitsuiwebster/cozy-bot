@@ -496,12 +496,9 @@ _live_stats_dirty = False
 _live_stats_task_started = False
 
 async def _live_stats_flush_loop():
-    global _live_stats_dirty
     while True:
         try:
-            if _live_stats_dirty:
-                _live_stats_dirty = False
-                await asyncio.to_thread(save_current_stats_for_api)
+            await asyncio.to_thread(save_current_stats_for_api)
         except Exception as e:
             logging.error(f'❌ Live stats flush failed: {e}')
         await asyncio.sleep(LIVE_STATS_FLUSH_SECONDS)
