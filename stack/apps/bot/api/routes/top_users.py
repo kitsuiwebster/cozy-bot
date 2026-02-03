@@ -114,7 +114,7 @@ class UserDetailedProfile(BaseModel):
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from cogs.audio.sound_mappings import get_sound_display_name
+from cogs.audio.sound_mappings import get_sound_display_name, normalize_sound_name
 
 # Response model for top sound statistics
 class TopSoundStats(BaseModel):
@@ -143,6 +143,7 @@ async def get_top_sounds(limit: int = None):
             listening_times = user_stats.get('listening_time_by_sound', {})
             
             for sound_name, sound_data in listening_times.items():
+                sound_name = normalize_sound_name(sound_name)
                 if sound_name not in sound_aggregates:
                     sound_aggregates[sound_name] = {
                         'total_time': 0.0,
@@ -182,6 +183,23 @@ async def get_top_sounds(limit: int = None):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
+
+# Compute streak from provided stats to avoid stale in-memory cache
+def get_current_streak_from_stats(user_stats: dict) -> int:
+    last_active = user_stats.get('last_active_date')
+    if not last_active:
+        return 0
+    try:
+        from datetime import datetime
+        last = datetime.strptime(last_active, '%Y-%m-%d')
+        today = datetime.now()
+        days_diff = (today - last).days
+        if days_diff <= 1:
+            streak = user_stats.get('daily_streak', 0)
+            return 1 if streak <= 0 else streak
+    except Exception:
+        return 0
+    return 0
 
 # Get top users by cozy points
 @router.get("/top-users", response_model=TopUsersResponse)
@@ -230,8 +248,8 @@ async def get_top_users(limit: int = None):
             original_stats = user_data_raw.get(user_data['user_id'], {})
             listening_time_seconds = original_stats.get('listening_time', 0.0)
             
-            # Get current valid streak (respects 24h rule)
-            current_streak = cozy_gamification.get_current_streak(user_data['user_id'])
+            # Get current valid streak from fresh user stats (respects 24h rule)
+            current_streak = get_current_streak_from_stats(original_stats)
             
             # Get favorite sound (most listened sound)
             favorite_sound_emoji = None
@@ -336,8 +354,8 @@ async def get_user_profile(username: str):
                 rank = i
                 break
 
-        # Get current valid streak
-        current_streak = cozy_gamification.get_current_streak(user_id)
+        # Get current valid streak from fresh user stats
+        current_streak = get_current_streak_from_stats(user_stats)
 
         # Calculate days since last activity
         days_since_last_activity = None
@@ -359,15 +377,26 @@ async def get_user_profile(username: str):
         # Get listening_by_sound details
         listening_by_sound = []
         listening_times = user_stats.get('listening_time_by_sound', {})
+        sound_rollup = {}
         for sound_name, sound_data in listening_times.items():
             if isinstance(sound_data, dict):
-                listening_by_sound.append(SoundStats(
-                    sound_name=sound_name,
-                    display_name=get_sound_display_name(sound_name),
-                    total_time=sound_data.get('total_time', 0.0),
-                    formatted_time=format_listening_time(sound_data.get('total_time', 0.0)),
-                    session_count=sound_data.get('session_count', 0)
-                ))
+                normalized_name = normalize_sound_name(sound_name)
+                if normalized_name not in sound_rollup:
+                    sound_rollup[normalized_name] = {
+                        'total_time': 0.0,
+                        'session_count': 0
+                    }
+                sound_rollup[normalized_name]['total_time'] += sound_data.get('total_time', 0.0)
+                sound_rollup[normalized_name]['session_count'] += sound_data.get('session_count', 0)
+
+        for sound_name, data in sound_rollup.items():
+            listening_by_sound.append(SoundStats(
+                sound_name=sound_name,
+                display_name=get_sound_display_name(sound_name),
+                total_time=data['total_time'],
+                formatted_time=format_listening_time(data['total_time']),
+                session_count=data['session_count']
+            ))
 
         # Sort by total time descending
         listening_by_sound.sort(key=lambda x: x.total_time, reverse=True)
@@ -384,9 +413,10 @@ async def get_user_profile(username: str):
             try:
                 start_time = datetime.fromisoformat(current_sound['start_time'])
                 duration = int((datetime.now() - start_time).total_seconds())
+                normalized_name = normalize_sound_name(current_sound['name'])
                 current_sound_obj = CurrentSound(
-                    name=current_sound['name'],
-                    display_name=get_sound_display_name(current_sound['name']),
+                    name=normalized_name,
+                    display_name=get_sound_display_name(normalized_name),
                     started_at=current_sound['start_time'],
                     duration_seconds=duration
                 )

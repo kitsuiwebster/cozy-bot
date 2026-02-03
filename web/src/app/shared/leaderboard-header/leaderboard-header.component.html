@@ -12,6 +12,13 @@
           <select [(ngModel)]="selectedView" (change)="onViewChange()" class="view-select">
             <option *ngFor="let option of viewOptions" [value]="option.value">{{ option.label }}</option>
           </select>
+          <details *ngIf="showUserFilters" class="filter-menu">
+            <summary>Filters</summary>
+            <label class="filter-option">
+              <input type="checkbox" [checked]="streakOnly" (change)="onStreakOnlyChange($event)" />
+              Streak only
+            </label>
+          </details>
           <button
             *ngIf="showRefreshButton"
             class="refresh-button"
@@ -61,6 +68,12 @@
         <span class="live-stat-word">{{ serversWithBot === 1 ? 'server' : 'servers' }}</span>
       </span>
       <span class="live-stat-label">🎧 listening now</span>
+      <span class="live-stat-categories" *ngIf="liveSoundCategories.length > 0">
+        <span class="live-stat-category" *ngFor="let item of liveSoundCategories">
+          <span class="emoji-only">{{ item.emoji }}</span>
+          <span class="live-stat-count">{{ item.count }}</span>
+        </span>
+      </span>
     </div>
   </div>
 </div>

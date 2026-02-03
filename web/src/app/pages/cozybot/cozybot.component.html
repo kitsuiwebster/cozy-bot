@@ -9,10 +9,14 @@
     (viewChange)="onViewChange()"
     [showRefreshButton]="true"
     (refresh)="manualRefreshCurrentView()"
+    [showUserFilters]="selectedView === 'users'"
+    [streakOnly]="showStreakOnly"
+    (streakOnlyChange)="setStreakOnly($event)"
     [stats]="getHeaderStats()"
     [statsLoading]="statsLoading"
     [currentListeners]="liveStats.current_listeners"
     [serversWithBot]="liveStats.servers_with_bot"
+    [liveSoundCategories]="liveSoundCategories"
     [animatingListeners]="animatingListeners"
     [animatingServers]="animatingServers"
     ctaHref="/cozypoints"
@@ -202,7 +206,9 @@
               [view]="chartView"
               [scheme]="colorScheme"
               [trimLabels]="false"
-              [labelFormatting]="formatChartLabel">
+              [labelFormatting]="formatCategoryChartLabel"
+              [tooltipDisabled]="false"
+              [tooltipText]="formatCategoryTooltipText">
             </ngx-charts-pie-chart>
           </div>
         </div>
@@ -220,7 +226,9 @@
               [view]="chartView"
               [scheme]="colorScheme"
               [trimLabels]="false"
-              [labelFormatting]="formatChartLabel">
+              [labelFormatting]="formatSoundsChartLabel"
+              [tooltipDisabled]="false"
+              [tooltipText]="formatSoundsTooltipText">
             </ngx-charts-pie-chart>
           </div>
         </div>

@@ -26,7 +26,7 @@ echo "║  ██║     ██║   ██║ ███╔╝    ╚██╔�
 echo "║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║"
 echo "║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║"
 echo "║                                                                 ║"
-echo "║                      Version 2.0.0                             ║"
+echo "║                      Version 2.0.0                              ║"
 echo "║            by @kitsuiwebster & @BubbleXGum                      ║"
 echo "║                                                                 ║"
 echo "╚═════════════════════════════════════════════════════════════════╝"
@@ -188,7 +188,6 @@ sudo chown -R $USER:$USER data/ 2>/dev/null || chown -R $USER:$USER data/
 echo ""
 echo "🏗️  Building and starting bot container only..."
 echo "👉 Building with configured mode"
-echo "ℹ️  Kuma and CouchDB will remain running"
 
 echo ""
 echo "🔍 Starting Docker build process..."

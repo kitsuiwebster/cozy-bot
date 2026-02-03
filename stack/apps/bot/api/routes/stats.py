@@ -14,6 +14,7 @@ class TotalStats(BaseModel):
     servers_with_bot: int
     total_servers: int
     listeners_by_sound: dict = {}
+    active_usernames: list[str] = []
 
 # Get cozy message based on current listener count
 def get_cozy_message(total_people: int) -> str:
@@ -44,6 +45,7 @@ async def get_total_stats():
         servers_with_bot = 0
         active_listeners = 0
         listeners_by_sound = {}
+        active_usernames = []
 
         # Try CouchDB for baseline totals (works even when bot is in another process)
         try:
@@ -55,6 +57,7 @@ async def get_total_stats():
                 active_listeners = int(live_stats.get('current_listeners', 0) or 0)
                 servers_with_bot = int(live_stats.get('servers_with_bot', 0) or 0)
                 listeners_by_sound = live_stats.get('listeners_by_sound', {}) or {}
+                active_usernames = live_stats.get('active_usernames', []) or []
         except Exception:
             total_servers = 0
 
@@ -85,7 +88,8 @@ async def get_total_stats():
             message=get_cozy_message(active_listeners),
             servers_with_bot=servers_with_bot,
             total_servers=total_servers,
-            listeners_by_sound=listeners_by_sound
+            listeners_by_sound=listeners_by_sound,
+            active_usernames=active_usernames
         )
 
     except Exception as e:

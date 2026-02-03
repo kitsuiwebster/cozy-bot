@@ -12,6 +12,7 @@ import threading
 import warnings
 from utils.deployment.deployment_notifier import DeploymentNotifier
 from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
+from utils.logging_utils import setup_logging
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -36,83 +37,8 @@ COZY_ENABLE_BOT_API = _env_enabled("COZY_ENABLE_BOT_API", True)
 BOT_API_PORT = int(os.getenv("BOT_API_PORT", "8002"))
 
 # Configure enhanced logging system with visual formatting
-import sys
-class FancyFormatter(logging.Formatter):
-    COLORS = {
-        'DEBUG': '\033[36m',
-        'INFO': '\033[32m',
-        'WARNING': '\033[33m',
-        'ERROR': '\033[31m',
-        'CRITICAL': '\033[35m',
-        'RESET': '\033[0m'
-    }
-
-    EMOJIS = {
-        'DEBUG': '⚙️',
-        'INFO': '✨',
-        'WARNING': '⚡',
-        'ERROR': '❌',
-        'CRITICAL': '💥'
-    }
-
-    def format(self, record):
-        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
-        emoji = self.EMOJIS.get(record.levelname, '📝')
-        reset = self.COLORS['RESET']
-        timestamp = self.formatTime(record, '%H:%M:%S')
-
-        # Pad emoji to consistent width for alignment
-        if len(emoji) == 1:
-            emoji_padded = f"{emoji}  "
-        else:
-            emoji_padded = f"{emoji} "
-        return f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
-
-# Initialize enhanced logging system
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-for handler in logger.handlers[:]:
-    logger.removeHandler(handler)
-
-discord_logger = logging.getLogger('discord')
-for handler in discord_logger.handlers[:]:
-    discord_logger.removeHandler(handler)
-
-# Configure logging to use custom formatter
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(FancyFormatter())
-logger.addHandler(handler)
-discord_logger.propagate = False
-discord_logger.addHandler(handler)
-
-# Suppress noisy Discord warning about missing message content intent
-class _LogFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        if "Privileged message content intent is missing" in msg:
-            return False
-        return True
-
-handler.addFilter(_LogFilter())
-# Allow overriding Discord log level for debugging (e.g. DEBUG/INFO)
-discord_log_level = os.getenv("DISCORD_LOG_LEVEL", "WARNING").upper()
-discord_log_level_value = getattr(logging, discord_log_level, logging.WARNING)
-discord_logger.setLevel(discord_log_level_value)
-
-# Enable full Discord logging (voice + gateway + HTTP + websocket)
-discord_logger_names = [
-    'discord',
-    'discord.client',
-    'discord.gateway',
-    'discord.http',
-    'discord.voice',
-    'discord.voice_client',
-    'discord.voice_state',
-    'discord.ws',
-]
-for logger_name in discord_logger_names:
-    logging.getLogger(logger_name).setLevel(discord_log_level_value)
+discord_log_level = os.getenv("DISCORD_LOG_LEVEL", "WARNING")
+setup_logging(discord_log_level)
 
 # Configure Discord bot intents
 intents = discord.Intents.default()
@@ -176,6 +102,7 @@ async def _track_bot_join_async(guild_id, guild_name, channel, current_users):
             # Don't save immediately to avoid blocking the event loop
             result = cozy_gamification.join_session(user_id, user.name, force_bonus=True, save_immediately=False)
             cozy_gamification.update_username(user_id, user.name, user.global_name or user.name, save_immediately=False)
+            logging.info(f"")
             logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {channel.name} in {guild_name}")
 
         # Save once after processing all users
@@ -358,7 +285,9 @@ async def periodic_backup():
                         
                         start_time = datetime.fromisoformat(current_sound['start_time'])
                         session_duration = (datetime.now() - start_time).total_seconds()
-                        sound_name = current_sound['name']
+                        from cogs.audio.sound_mappings import normalize_sound_name
+                        sound_name = normalize_sound_name(current_sound['name'])
+                        current_sound['name'] = sound_name
 
                         # Cap session duration at 30 minutes to prevent corrupted data
                         max_session_duration = 30 * 60
@@ -520,6 +449,7 @@ def save_current_stats_for_api():
         active_listeners = 0
         servers_with_bot = 0
         listeners_by_sound = {}
+        active_usernames = set()
 
         for guild in bot.guilds:
             voice_state = guild.voice_client
@@ -532,7 +462,11 @@ def save_current_stats_for_api():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
                     active_listeners += 1
-                    sound_name = current_sound.get('name')
+                    username = cozy_gamification.usernames.get(str(user_id), {}).get("username")
+                    if username:
+                        active_usernames.add(username)
+                    from cogs.audio.sound_mappings import normalize_sound_name
+                    sound_name = normalize_sound_name(current_sound.get('name'))
                     if sound_name:
                         listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + 1
 
@@ -545,6 +479,7 @@ def save_current_stats_for_api():
             'servers_with_bot': servers_with_bot,
             'total_servers': total_servers,
             'listeners_by_sound': listeners_by_sound,
+            'active_usernames': sorted(active_usernames),
             'last_updated': datetime.now().isoformat()
         }
 
@@ -561,12 +496,9 @@ _live_stats_dirty = False
 _live_stats_task_started = False
 
 async def _live_stats_flush_loop():
-    global _live_stats_dirty
     while True:
         try:
-            if _live_stats_dirty:
-                _live_stats_dirty = False
-                await asyncio.to_thread(save_current_stats_for_api)
+            await asyncio.to_thread(save_current_stats_for_api)
         except Exception as e:
             logging.error(f'❌ Live stats flush failed: {e}')
         await asyncio.sleep(LIVE_STATS_FLUSH_SECONDS)
@@ -788,6 +720,7 @@ async def on_voice_state_update(member, before, after):
             'accumulated_time': 0.0
         }
 
+        logging.info(f"")
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
         # Track in background to avoid blocking Discord events
@@ -823,155 +756,32 @@ async def on_voice_state_update(member, before, after):
 # Bot ready event handler
 @bot.event
 async def on_ready():
-    print("\n" + "="*60)
-    print("╔═════════════════════════════════════════════════════════════════╗")
-    print("║                                                                 ║")
-    print("║   ██████╗ ██████╗ ███████╗██╗   ██╗██████╗  ██████╗ ████████╗   ║")
-    print("║  ██╔════╝██╔═══██╗╚══███╔╝╚██╗ ██╔╝██╔══██╗██╔═══██╗╚══██╔══╝   ║")
-    print("║  ██║     ██║   ██║  ███╔╝  ╚████╔╝ ██████╔╝██║   ██║   ██║      ║")
-    print("║  ██║     ██║   ██║ ███╔╝    ╚██╔╝  ██╔══██╗██║   ██║   ██║      ║")
-    print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
-    print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
-    print("║                                                                 ║")
-    print("║                      Version 2.0.0                             ║")
-    print("║            by @kitsuiwebster & @BubbleXGum                      ║")
-    print("║                                                                 ║")
-    print("╚═════════════════════════════════════════════════════════════════╝")
-    print("="*60 + "\n")
+    from utils.logging_utils import print_ascii_banner
+    print_ascii_banner()
 
     # System information
-    import sys
-    import platform
-    try:
-        import discord
-        discord_version = discord.__version__
-    except:
-        discord_version = "unknown"
-
-    try:
-        import nacl
-        nacl_version = nacl.__version__
-    except:
-        nacl_version = "unknown"
-
-    try:
-        import aiohttp
-        aiohttp_version = aiohttp.__version__
-    except:
-        aiohttp_version = "unknown"
-    
-    logging.info("")
-    logging.info(f"🐍 Python version: {sys.version.split()[0]}")
-    logging.info(f"🐍 discord.py version: {discord_version}")
-    logging.info(f"🔐 PyNaCl version: {nacl_version}")
-    logging.info(f"🌐 aiohttp version: {aiohttp_version}")
-    logging.info(f"💻 Platform: {platform.system()} {platform.release()}")
-    logging.info(f"🏗️ Architecture: {platform.machine()}")
-    logging.info(f"🔧 Python implementation: {platform.python_implementation()}")
+    from utils.logging_utils import log_system_info
+    log_system_info()
 
     # Check FFmpeg availability
-    import subprocess
-    try:
-        result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True, timeout=2)
-        ffmpeg_first_line = result.stdout.split('\n')[0] if result.stdout else "unknown"
-        # Keep only version info to avoid long line
-        ffmpeg_short = ffmpeg_first_line.split("Copyright")[0].strip()
-        logging.info(f"🎵 FFmpeg: {ffmpeg_short}")
-    except Exception as e:
-        logging.warning(f"⚠️ FFmpeg check failed: {e}")
+    from utils.logging_utils import log_ffmpeg_info
+    log_ffmpeg_info()
 
     # Docker/Network information
-    # Container info
-    import socket
-    try:
-        hostname = socket.gethostname()
-        logging.info(f"📦 Container hostname: {hostname}")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not get hostname: {e}")
-
-    # Get container IP
-    try:
-        container_ip = socket.gethostbyname(socket.gethostname())
-        logging.info(f"🌐 Container IP: {container_ip}")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not get container IP: {e}")
-
-    # Get DNS servers
-    try:
-        with open('/etc/resolv.conf', 'r') as f:
-            dns_servers = [line.split()[1] for line in f if line.startswith('nameserver')]
-            if dns_servers:
-                logging.info(f"🔍 DNS servers: {', '.join(dns_servers)}")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not read DNS config: {e}")
-
-    # Get default gateway
-    try:
-        import subprocess
-        result = subprocess.run(['ip', 'route'], capture_output=True, text=True, timeout=2)
-        for line in result.stdout.split('\n'):
-            if line.startswith('default'):
-                gateway = line.split()[2]
-                logging.info(f"⛩️ Default gateway: {gateway}")
-                break
-    except Exception as e:
-        logging.debug(f"Could not get gateway: {e}")
+    from utils.logging_utils import log_network_info
+    log_network_info()
 
     # Discord Intents
-    intents = bot.intents
-    intent_list = []
-    if intents.guilds: intent_list.append("guilds")
-    if intents.members: intent_list.append("members")
-    if intents.message_content: intent_list.append("message_content")
-    if intents.voice_states: intent_list.append("voice_states")
-    if intents.presences: intent_list.append("presences")
-    if intents.typing: intent_list.append("typing")
+    from utils.logging_utils import log_discord_intents
+    log_discord_intents(bot.intents)
 
-    if intent_list:
-        logging.info(f"✅ Enabled intents: {', '.join(intent_list)}")
-    else:
-        logging.info("❌ No intents enabled")
+    # Check voice dependencies
+    from utils.logging_utils import log_voice_dependencies
+    log_voice_dependencies()
 
-    if not intents.voice_states:
-        logging.error("❌ CRITICAL: voice_states intent is NOT enabled! Voice will NOT work!")
-
-    logging.info("")
-
-    # Check libsodium (for voice encryption)
-    try:
-        import nacl.secret
-        import nacl.utils
-        logging.info("✅ libsodium (PyNaCl): Available")
-    except Exception as e:
-        logging.error(f"❌ libsodium check failed: {e}")
-
-    # Check voice client availability
-    try:
-        from discord.voice_client import VoiceClient
-        logging.info("✅ VoiceClient: Available")
-    except Exception as e:
-        logging.error(f"❌ VoiceClient import failed: {e}")
-
-    logging.info("")
-
-    # Timezone
-    import time
-    try:
-        import datetime
-        tz_name = time.tzname[time.daylight]
-        utc_offset = time.timezone if not time.daylight else time.altzone
-        offset_hours = -utc_offset // 3600
-        logging.info(f"🕐 Timezone: {tz_name} (UTC{offset_hours:+d})")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not get timezone: {e}")
-
-    # Locale
-    try:
-        import locale
-        current_locale = locale.getlocale()
-        logging.info(f"🌐 Locale: {current_locale[0] if current_locale[0] else 'C'}")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not get locale: {e}")
+    # Timezone and locale
+    from utils.logging_utils import log_locale_info
+    log_locale_info()
 
     try:
         from api.routes.stats import set_bot_instance
@@ -997,25 +807,9 @@ async def on_ready():
     logging.info(f'✨ {bot.user.name} is ready and connected!')
 
     # Bot Discord information
-    logging.info("")
-    logging.info(f"👤 Bot name: {bot.user.name}#{bot.user.discriminator}")
-    logging.info(f"🆔 Bot User ID: {bot.user.id}")
-
-    # Shard info
-    if bot.shard_id is not None:
-        logging.info(f"🔀 Shard ID: {bot.shard_id}/{bot.shard_count}")
-    else:
-        logging.info(f"🔀 Sharding: Not enabled (single process)")
-
-    # Application info
-    try:
-        app_info = await bot.application_info()
-        if app_info.bot_public:
-            logging.info(f"🌍 Bot visibility: Public")
-        else:
-            logging.info(f"🔒 Bot visibility: Private")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not fetch app info: {e}")
+    from utils.logging_utils import log_bot_info, log_application_info
+    log_bot_info(bot)
+    await log_application_info(bot)
 
     try:
         logging.info('👉 Syncing application commands...')
@@ -1024,7 +818,8 @@ async def on_ready():
     except Exception as e:
         logging.error(f'❌ Error syncing commands: {e}')
 
-    logging.info('🚀 Bot startup complete - All systems operational')
+    from utils.logging_utils import log_startup_complete
+    log_startup_complete()
 
     if COZY_ENABLE_API_CHECKS:
         await check_api_endpoints()
@@ -1051,51 +846,19 @@ async def on_ready():
         logging.info('🎵 Started audio restoration monitor task')
 
     # Python packages summary
-    try:
-        import pkg_resources
-        installed_packages = [(d.project_name, d.version) for d in pkg_resources.working_set]
-        installed_packages.sort(key=lambda x: x[0].lower())
-
-        logging.info('')
-        logging.info('📦 Python packages:')
-        for package_name, version in installed_packages:
-            logging.info(f'   ╰┈➤ {package_name} {version}')
-    except Exception as e:
-        logging.warning(f'⚠️ Could not list Python packages: {e}')
+    from utils.logging_utils import log_python_packages
+    log_python_packages()
 
     # CouchDB statistics summary
     if COZY_ENABLE_COUCHDB_SUMMARY:
         from cogs.stats.gamification import cozy_gamification
-        logging.info('')
-        logging.info('📂 CouchDB storage:')
-        logging.info(f'   ╰┈➤ 📂 {len(cozy_gamification.user_data)} user records')
-        logging.info(f'   ╰┈➤ 📂 {len(cozy_gamification.usernames)} username cache entries')
-        logging.info(f'   ╰┈➤ 📂 {len(cozy_gamification.servernames)} server cache entries')
-        logging.info(f'   ╰┈➤ 📂 {len(guild_voice_time)} voice time tracking records')
+        from utils.logging_utils import log_couchdb_summary
+        log_couchdb_summary(cozy_gamification, guild_voice_time)
 
-    server_count = len(bot.guilds)
-    total_member_count = sum(guild.member_count for guild in bot.guilds)
-
-    # Calculate global statistics
-    total_cozy_points = sum(user.get('total_points', 0) for user in cozy_gamification.user_data.values())
-    total_sessions = sum(user.get('sessions_joined', 0) for user in cozy_gamification.user_data.values())
-    total_listening_seconds = sum(user.get('listening_time', 0) for user in cozy_gamification.user_data.values())
-
-    # Format total time
-    total_hours = total_listening_seconds // 3600
-    total_minutes = (total_listening_seconds % 3600) // 60
-
-    logging.info('')
-    logging.info(f'   ╰┈➤ 👥 {total_member_count:,} server members')
-    logging.info(f'   ╰┈➤ 🏠 {server_count} servers')
-    logging.info(f'   ╰┈➤ ⭐ {total_cozy_points:,} total cozy points')
-    logging.info(f'   ╰┈➤ 🎵 {total_sessions:,} total sound sessions')
-    logging.info(f'   ╰┈➤ ⏱️  {total_hours:,}h {total_minutes}m total time spent')
-
-    logging.info('')
-    logging.info('🏠 Connected servers:')
-    for guild in bot.guilds:
-        logging.info(f'   ╰┈➤ {guild.name} ({guild.member_count:,} members)')
+    # Global statistics and connected servers
+    from utils.logging_utils import log_global_statistics, log_connected_servers
+    log_global_statistics(bot, cozy_gamification)
+    log_connected_servers(bot)
 
 # Message handler to process commands
 @bot.event

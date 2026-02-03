@@ -57,6 +57,7 @@
           align-items: center;
           gap: 12px;
           justify-content: center;
+          flex-wrap: wrap;
 
           .view-select {
             background: rgba(168, 85, 247, 0.1);
@@ -112,6 +113,56 @@
               box-shadow: 0 4px 16px rgba(168, 85, 247, 0.2);
               transform: translateY(-1px);
             }
+          }
+
+          .filter-menu {
+            position: relative;
+          }
+
+          .filter-menu summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            background: rgba(30, 41, 59, 0.4);
+            color: #94a3b8;
+            font-size: 0.85rem;
+            font-weight: 500;
+            user-select: none;
+            transition: all 0.2s ease;
+          }
+
+          .filter-menu summary::-webkit-details-marker {
+            display: none;
+          }
+
+          .filter-menu[open] summary,
+          .filter-menu summary:hover {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(168, 85, 247, 0.4);
+            color: #a855f7;
+          }
+
+          .filter-option {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            z-index: 5;
+            white-space: nowrap;
+          }
+
+          .filter-option input {
+            accent-color: #f59e0b;
           }
 
           .add-to-server-btn {
@@ -255,6 +306,31 @@
         color: #94a3b8;
         font-weight: 500;
         display: block;
+      }
+
+      .live-stat-categories {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        margin-top: 10px;
+      }
+
+      .live-stat-category {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: #e2e8f0;
+        font-weight: 600;
+      }
+
+      .live-stat-count {
+        font-size: 0.8rem;
+        color: #f8fafc;
       }
     }
   }

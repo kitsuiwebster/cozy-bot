@@ -42,7 +42,13 @@ SOUND_LABELS = {
     "white-noise04.mp3": "📡⏳🔜",
 }
 
+SOUND_ALIASES = {
+    "noise01.mp3": "white-noise01.mp3",
+}
+
+def normalize_sound_name(sound_filename: str) -> str:
+    return SOUND_ALIASES.get(sound_filename, sound_filename)
+
 def get_sound_display_name(sound_filename: str) -> str:
     # Get emoji display name for a sound filename
     return SOUND_LABELS.get(sound_filename, sound_filename)
-
