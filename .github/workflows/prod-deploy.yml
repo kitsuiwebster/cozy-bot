@@ -1,4 +1,5 @@
 name: Production Deploy
+
 on:
   push:
     branches: [ main ]
@@ -7,6 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+
     steps:
       - name: 🚀 Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -16,19 +18,19 @@ jobs:
       - name: 🔑 Add SSH host key
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p 2248 90.60.191.159 >> ~/.ssh/known_hosts
-
+          ssh-keyscan -p 22 77.37.87.26 >> ~/.ssh/known_hosts
 
       - name: 🛡️ Deploy to Production
         timeout-minutes: 6
         run: |
-          ${{ secrets.SSH_COMMAND_PROD }} bash -s <<'EOF'
+          ssh -p 22 -o StrictHostKeyChecking=no kitsui@77.37.87.26 bash -s <<'EOF'
           set -euo pipefail
           export LC_ALL=C.UTF-8
           export LANG=C.UTF-8
           export TERM=xterm
 
           echo "🎯 Starting production deployment..."
+
           cd ~/cozy-bot
           git stash || true
           git checkout main
@@ -41,4 +43,3 @@ jobs:
 
           echo "✅ Production deployment completed!"
           EOF
-
