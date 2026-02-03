@@ -984,7 +984,7 @@ async def run_bot():
 # Main entry point for bot execution
 if __name__ == "__main__":
     # Welcome message
-    print("✨ Welcome to CozyBot CLI v2.0.0 by @kitsuiwebster\n")
+    print("✨ Welcome to CozyBot CLI v2.0.1 by @kitsuiwebster\n")
 
     loop = asyncio.get_event_loop()
     if COZY_ENABLE_BOT_API:
