@@ -12,6 +12,13 @@
           <select [(ngModel)]="selectedView" (change)="onViewChange()" class="view-select">
             <option *ngFor="let option of viewOptions" [value]="option.value">{{ option.label }}</option>
           </select>
+          <details *ngIf="showUserFilters" class="filter-menu">
+            <summary>Filters</summary>
+            <label class="filter-option">
+              <input type="checkbox" [checked]="streakOnly" (change)="onStreakOnlyChange($event)" />
+              Streak only
+            </label>
+          </details>
           <button
             *ngIf="showRefreshButton"
             class="refresh-button"

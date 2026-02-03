@@ -21,6 +21,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   
   // Données complètes récupérées de l'API
   allUsers: CozyUser[] = [];
+  allUsersRaw: CozyUser[] = [];
   allServers: CozyServer[] = [];
   allSounds: CozySound[] = [];
   
@@ -31,6 +32,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   loading = true;
   error = '';
   selectedView: 'users' | 'servers' | 'sounds' = 'users';
+  showStreakOnly = false;
   
   // Pagination
   currentPage = 1;
@@ -283,10 +285,10 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.loading = this.selectedView === 'users';
     this.cozybotService.getTopUsers().subscribe({
       next: (response: LeaderboardResponse) => {
-        this.allUsers = response.users;
-        this.totalUsersCount = response.total_count;
+        this.allUsersRaw = response.users;
         this.headerTotalUsersCount = response.total_count;
         this.headerTotalTimeSeconds = this.getTotalListeningTimeSeconds(response.users);
+        this.applyUserFilters();
 
         if (this.selectedView === 'users') {
           this.updatePagination();
@@ -306,6 +308,24 @@ export class CozybotComponent implements OnInit, OnDestroy {
         this.loading = false;
       }
     });
+  }
+
+  setStreakOnly(value: boolean): void {
+    this.showStreakOnly = value;
+    this.applyUserFilters();
+    this.currentPage = 1;
+    if (this.selectedView === 'users') {
+      this.updatePagination();
+    }
+  }
+
+  private applyUserFilters(): void {
+    const filteredUsers = this.showStreakOnly
+      ? this.allUsersRaw.filter(user => (user.daily_streak || 0) > 0)
+      : this.allUsersRaw;
+
+    this.allUsers = filteredUsers;
+    this.totalUsersCount = filteredUsers.length;
   }
 
 
