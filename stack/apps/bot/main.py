@@ -480,20 +480,27 @@ def save_current_stats_for_api():
             voice_state = guild.voice_client
             if voice_state and voice_state.channel:
                 servers_with_bot += 1
+                human_members = [m for m in voice_state.channel.members if not m.bot]
+                if human_members:
+                    active_listeners += len(human_members)
+                    for member in human_members:
+                        active_usernames.add(member.name)
+                    try:
+                        from cogs.audio.base_sound import global_current_sounds
+                        from cogs.audio.sound_mappings import normalize_sound_name
+                        sound_name = global_current_sounds.get(guild.id)
+                        if sound_name:
+                            sound_name = normalize_sound_name(sound_name)
+                            listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + len(human_members)
+                    except Exception:
+                        pass
 
         from cogs.stats.gamification import cozy_gamification
         if hasattr(cozy_gamification, 'user_data'):
             for user_id, user_stats in cozy_gamification.user_data.items():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
-                    active_listeners += 1
-                    username = cozy_gamification.usernames.get(str(user_id), {}).get("username")
-                    if username:
-                        active_usernames.add(username)
-                    from cogs.audio.sound_mappings import normalize_sound_name
-                    sound_name = normalize_sound_name(current_sound.get('name'))
-                    if sound_name:
-                        listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + 1
+                    pass
 
         total_servers = 0
         if hasattr(cozy_gamification, 'servernames'):
