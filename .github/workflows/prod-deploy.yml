@@ -17,8 +17,11 @@ jobs:
 
       - name: 🔑 Add SSH host key
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p 22 77.37.87.26 >> ~/.ssh/known_hosts
+          echo "HOME is: $HOME"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          ssh-keyscan -p 22 77.37.87.26 >> "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
 
       - name: 🛡️ Deploy to Production
         timeout-minutes: 6
