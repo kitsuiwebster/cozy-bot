@@ -184,6 +184,23 @@ async def get_top_sounds(limit: int = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
 
+# Compute streak from provided stats to avoid stale in-memory cache
+def get_current_streak_from_stats(user_stats: dict) -> int:
+    last_active = user_stats.get('last_active_date')
+    if not last_active:
+        return 0
+    try:
+        from datetime import datetime
+        last = datetime.strptime(last_active, '%Y-%m-%d')
+        today = datetime.now()
+        days_diff = (today - last).days
+        if days_diff <= 1:
+            streak = user_stats.get('daily_streak', 0)
+            return 1 if streak <= 0 else streak
+    except Exception:
+        return 0
+    return 0
+
 # Get top users by cozy points
 @router.get("/top-users", response_model=TopUsersResponse)
 async def get_top_users(limit: int = None):
@@ -231,8 +248,8 @@ async def get_top_users(limit: int = None):
             original_stats = user_data_raw.get(user_data['user_id'], {})
             listening_time_seconds = original_stats.get('listening_time', 0.0)
             
-            # Get current valid streak (respects 24h rule)
-            current_streak = cozy_gamification.get_current_streak(user_data['user_id'])
+            # Get current valid streak from fresh user stats (respects 24h rule)
+            current_streak = get_current_streak_from_stats(original_stats)
             
             # Get favorite sound (most listened sound)
             favorite_sound_emoji = None
@@ -337,8 +354,8 @@ async def get_user_profile(username: str):
                 rank = i
                 break
 
-        # Get current valid streak
-        current_streak = cozy_gamification.get_current_streak(user_id)
+        # Get current valid streak from fresh user stats
+        current_streak = get_current_streak_from_stats(user_stats)
 
         # Calculate days since last activity
         days_since_last_activity = None
