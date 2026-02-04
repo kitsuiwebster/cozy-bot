@@ -201,12 +201,7 @@ async def change_status():
 
     while not bot.is_closed():
         try:
-            try:
-                from utils.storage.couchdb_client import get_couchdb_client
-                db = get_couchdb_client()
-                server_count = len(db.load_servernames())
-            except Exception:
-                server_count = len(bot.guilds)
+            server_count = len(bot.guilds)
             if server_count == 0 and last_server_count > 0:
                 server_count = last_server_count
             else:
@@ -480,20 +475,27 @@ def save_current_stats_for_api():
             voice_state = guild.voice_client
             if voice_state and voice_state.channel:
                 servers_with_bot += 1
+                human_members = [m for m in voice_state.channel.members if not m.bot]
+                if human_members:
+                    active_listeners += len(human_members)
+                    for member in human_members:
+                        active_usernames.add(member.name)
+                    try:
+                        from cogs.audio.base_sound import global_current_sounds
+                        from cogs.audio.sound_mappings import normalize_sound_name
+                        sound_name = global_current_sounds.get(guild.id)
+                        if sound_name:
+                            sound_name = normalize_sound_name(sound_name)
+                            listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + len(human_members)
+                    except Exception:
+                        pass
 
         from cogs.stats.gamification import cozy_gamification
         if hasattr(cozy_gamification, 'user_data'):
             for user_id, user_stats in cozy_gamification.user_data.items():
                 current_sound = user_stats.get('current_sound')
                 if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
-                    active_listeners += 1
-                    username = cozy_gamification.usernames.get(str(user_id), {}).get("username")
-                    if username:
-                        active_usernames.add(username)
-                    from cogs.audio.sound_mappings import normalize_sound_name
-                    sound_name = normalize_sound_name(current_sound.get('name'))
-                    if sound_name:
-                        listeners_by_sound[sound_name] = listeners_by_sound.get(sound_name, 0) + 1
+                    pass
 
         total_servers = 0
         if hasattr(cozy_gamification, 'servernames'):
@@ -626,7 +628,8 @@ async def check_api_endpoints():
             "base": live_api_base,
             "get_endpoints": [
                 "/health",
-                "/api/live/bot/health"
+                "/api/live/bot/health",
+                "/api/live/bot/stats"
             ],
             "write_endpoints": [
                 ("POST", "/api/live/audio/save-state"),
@@ -648,16 +651,16 @@ async def check_api_endpoints():
                 try:
                     async with session.get(f"{api['base']}{endpoint}", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status in [200, 401, 403, 422]:
-                            logging.info(f"✨ GET {endpoint} - healthy")
+                            logging.info(f"{api['emoji']} GET {endpoint} - healthy")
                         else:
-                            logging.error(f"🔥 GET {endpoint} - error (status: {response.status})")
+                            logging.error(f"{api['emoji']} GET {endpoint} - error (status: {response.status})")
                 except:
-                    logging.error(f"❌ GET {endpoint} - error")
+                    logging.error(f"{api['emoji']} GET {endpoint} - error")
 
             logging.info("")
-            logging.info(f"✨ Available write endpoints ({api['name']}): {len(api['write_endpoints'])}")
+            logging.info(f"{api['emoji']} Available write endpoints ({api['name']}): {len(api['write_endpoints'])}")
             for method, endpoint in api["write_endpoints"]:
-                logging.info(f"✨    ╰┈➤ {method} {endpoint}")
+                logging.info(f"{api['emoji']}    ╰┈➤ {method} {endpoint}")
             logging.info("")
     logging.info("")
 

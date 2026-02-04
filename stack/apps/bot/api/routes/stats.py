@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import sys
 import os
+import json
+import asyncio
+import urllib.request
 from utils.storage.couchdb_client import get_couchdb_client
 
 # Initialize FastAPI router for stats endpoints
@@ -42,6 +45,18 @@ def set_bot_instance(bot):
 @router.get("/total", response_model=TotalStats)
 async def get_total_stats():
     try:
+        live_api_url = os.getenv("COZY_LIVE_API_URL", "http://cozy-live-bot:8002")
+        live_stats = None
+
+        try:
+            def _fetch_live():
+                with urllib.request.urlopen(f"{live_api_url}/api/live/bot/stats", timeout=2) as resp:
+                    return json.loads(resp.read().decode())
+
+            live_stats = await asyncio.to_thread(_fetch_live)
+        except Exception:
+            live_stats = None
+
         total_servers = 0
         servers_with_bot = 0
         active_listeners = 0
@@ -54,15 +69,21 @@ async def get_total_stats():
             db = get_couchdb_client()
             servernames = db.load_servernames()
             total_servers = len(servernames)
-            live_stats = db.load_live_stats() or {}
-            if live_stats:
-                active_listeners = int(live_stats.get('current_listeners', 0) or 0)
-                servers_with_bot = int(live_stats.get('servers_with_bot', 0) or 0)
-                listeners_by_sound = live_stats.get('listeners_by_sound', {}) or {}
-                active_usernames = live_stats.get('active_usernames', []) or []
-                last_updated = live_stats.get('last_updated')
+            if not live_stats:
+                live_stats = db.load_live_stats() or {}
         except Exception:
             total_servers = 0
+            if not live_stats:
+                live_stats = {}
+
+        if live_stats:
+            active_listeners = int(live_stats.get('current_listeners', 0) or 0)
+            servers_with_bot = int(live_stats.get('servers_with_bot', 0) or 0)
+            listeners_by_sound = live_stats.get('listeners_by_sound', {}) or {}
+            active_usernames = live_stats.get('active_usernames', []) or []
+            last_updated = live_stats.get('last_updated')
+            if live_stats.get('total_servers') is not None:
+                total_servers = int(live_stats.get('total_servers') or 0)
 
         # Count only users with active sound sessions (actually listening)
         if bot_instance is not None:
