@@ -201,12 +201,7 @@ async def change_status():
 
     while not bot.is_closed():
         try:
-            try:
-                from utils.storage.couchdb_client import get_couchdb_client
-                db = get_couchdb_client()
-                server_count = len(db.load_servernames())
-            except Exception:
-                server_count = len(bot.guilds)
+            server_count = len(bot.guilds)
             if server_count == 0 and last_server_count > 0:
                 server_count = last_server_count
             else:

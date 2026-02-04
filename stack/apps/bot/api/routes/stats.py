@@ -82,6 +82,8 @@ async def get_total_stats():
             listeners_by_sound = live_stats.get('listeners_by_sound', {}) or {}
             active_usernames = live_stats.get('active_usernames', []) or []
             last_updated = live_stats.get('last_updated')
+            if live_stats.get('total_servers') is not None:
+                total_servers = int(live_stats.get('total_servers') or 0)
 
         # Count only users with active sound sessions (actually listening)
         if bot_instance is not None:
