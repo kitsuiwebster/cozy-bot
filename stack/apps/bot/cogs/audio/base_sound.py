@@ -388,10 +388,18 @@ class BaseSoundCog(commands.Cog):
                 if not voice_client.channel:
                     break
                 
-                # Check if there are real users (not bots) in the channel
+                # Determine if there are non-bot users in the channel.
+                # Use voice_states (more reliable than members cache) and fall back to members.
+                voice_states = getattr(voice_client.channel, "voice_states", {}) or {}
+                non_bot_voice_ids = [uid for uid in voice_states.keys() if uid != self.bot.user.id]
                 human_members = [m for m in voice_client.channel.members if not m.bot]
-                
-                if not human_members:
+
+                logging.info(
+                    f"🔍 AUTO-DISCONNECT CHECK: guild={guild.name} "
+                    f"voice_states={len(non_bot_voice_ids)} members={len(human_members)}"
+                )
+
+                if not non_bot_voice_ids and not human_members:
                     # Channel is empty, disconnect
                     guild_state = self.get_guild_state(guild_id)
                     

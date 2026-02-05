@@ -559,6 +559,20 @@ async def _playback_watchdog_loop():
                             last_restart = last_restart_by_guild.get(guild.id, 0.0)
                             if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
                                 continue
+                            is_paused = voice_client.is_paused() if hasattr(voice_client, "is_paused") else None
+                            source = getattr(voice_client, "source", None)
+                            source_type = type(source).__name__ if source else None
+                            logging.info(
+                                "🔍 WATCHDOG CHECK: guild=%s channel=%s cog=%s "
+                                "sound=%s is_playing=%s is_paused=%s source=%s",
+                                guild.name,
+                                voice_client.channel.name if voice_client.channel else "unknown",
+                                cog_name,
+                                guild_state.get('current_sound'),
+                                voice_client.is_playing(),
+                                is_paused,
+                                source_type,
+                            )
                             logging.warning(
                                 f"⚠️ Playback stalled in {guild.name} (sound={guild_state.get('current_sound')}). Restarting..."
                             )
