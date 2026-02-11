@@ -86,17 +86,17 @@ class ProfileCog(commands.Cog):
                     total_seconds = int(favorite_data[1]['total_time'])
                     hours = total_seconds // 3600
                     minutes = (total_seconds % 3600) // 60
-                    
+
                     if hours > 0:
                         time_str = f"{hours}h {minutes}m"
                     elif minutes > 0:
                         time_str = f"{minutes}m"
                     else:
                         time_str = f"{total_seconds}s"
-                    
+
                     embed.add_field(
-                        name="🎶 Favorite Sound", 
-                        value=f"**{favorite_sound_display}**", 
+                        name="🎶 Favorite Sound",
+                        value=f"**{favorite_sound_display}** ({time_str})",
                         inline=False
                     )
         else:

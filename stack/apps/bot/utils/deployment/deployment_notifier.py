@@ -4,11 +4,14 @@ import os
 import logging
 from datetime import datetime
 
+# Deployment notification file path
+DEPLOYMENT_NOTIFICATION_FILE = 'data/deployment_notification.json'
+
 # Monitor and handle deployment notifications for active users
 class DeploymentNotifier:
     def __init__(self, bot):
         self.bot = bot
-        self.check_interval = 2  # Check every 2 seconds
+        self.check_interval = 2 
 
     def _load_notification(self):
         try:
@@ -20,7 +23,7 @@ class DeploymentNotifier:
             return doc
         except Exception:
             try:
-                with open('data/deployment_notification.json', 'r') as f:
+                with open(DEPLOYMENT_NOTIFICATION_FILE, 'r') as f:
                     return json.load(f)
             except Exception:
                 return None
@@ -37,7 +40,7 @@ class DeploymentNotifier:
             pass
         try:
             os.makedirs('data', exist_ok=True)
-            with open('data/deployment_notification.json', 'w') as f:
+            with open(DEPLOYMENT_NOTIFICATION_FILE, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception:
             pass
@@ -70,7 +73,6 @@ class DeploymentNotifier:
             version = data.get("version", "unknown")
             delay_seconds = data.get("delay_seconds", 30)
             active_guilds = data.get("active_guilds", [])
-            total_users = data.get("total_users", 0)
             
             logging.info(f"📢 Processing deployment notification for version {version}")
             
@@ -120,7 +122,7 @@ class DeploymentNotifier:
                                 if voice_channel.permissions_for(guild.me).send_messages:
                                     target_channel = voice_channel
                                     logging.info(f"🔗 Using voice channel with integrated text: #{voice_channel.name}")
-                            except:
+                            except Exception:
                                 pass
                         
                         # Method 1: If voice channel is in a category, look for text channels in same category
@@ -181,12 +183,12 @@ class DeploymentNotifier:
             data["completed_at"] = datetime.now().isoformat()
             self._save_notification(data)
             
-            logging.info(f"✅ Deployment notification period completed")
+            logging.info("✅ Deployment notification period completed")
             
         except Exception as e:
             logging.error(f"❌ Error handling deployment notification: {e}")
             # Best-effort clean up fallback file on error
             try:
-                os.remove('data/deployment_notification.json')
+                os.remove(DEPLOYMENT_NOTIFICATION_FILE)
             except Exception:
                 pass

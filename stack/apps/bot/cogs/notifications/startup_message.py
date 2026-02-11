@@ -41,7 +41,7 @@ class StartupMessageCog(commands.Cog):
             if message_type is None or message_type == "null":
                 return False
             return config.get("enabled", True)
-        except:
+        except Exception:
             return False
 
     # Load startup message configuration from JSON file

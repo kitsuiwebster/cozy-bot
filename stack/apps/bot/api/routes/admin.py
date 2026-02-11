@@ -68,18 +68,25 @@ def get_user_id_by_username(username: str) -> Optional[str]:
     except Exception:
         return None
 
+# Validate and get user_id from username, raising HTTPException if not found
+def validate_and_get_user_id(username: str) -> str:
+    user_id = get_user_id_by_username(username)
+    if not user_id:
+        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
+    return user_id
+
 # Validate API key from header
-async def validate_api_key(x_api_key: Optional[str] = Header(None)):
+def validate_api_key(x_api_key: Optional[str] = Header(None)):
     expected_api_key = os.getenv("API_KEY")
     if not expected_api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
-    
+
     if not x_api_key:
         raise HTTPException(status_code=401, detail="API key required")
-    
+
     if x_api_key != expected_api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
-    
+
     return True
 
 # Request model for points modification
@@ -154,13 +161,10 @@ class ServerTimeResponse(BaseModel):
 async def modify_user_points(request: PointsRequest):
     try:
         # Convert username to user_id
-        user_id = get_user_id_by_username(request.username)
-        if not user_id:
-            raise HTTPException(status_code=404, detail=f"User '{request.username}' not found")
-        
+        user_id = validate_and_get_user_id(request.username)
+
         # Get current user stats
         user_stats = cozy_gamification.get_user_stats(user_id)
-        current_points = user_stats.get('total_points', 0)
         
         # Add points (can be negative to remove)
         cozy_gamification.add_points(user_id, request.points, "Admin adjustment")
@@ -186,10 +190,8 @@ async def modify_user_points(request: PointsRequest):
 async def modify_user_time(request: TimeRequest):
     try:
         # Convert username to user_id
-        user_id = get_user_id_by_username(request.username)
-        if not user_id:
-            raise HTTPException(status_code=404, detail=f"User '{request.username}' not found")
-        
+        user_id = validate_and_get_user_id(request.username)
+
         # Get current user stats
         user_stats = cozy_gamification.get_user_stats(user_id)
         if user_stats is None:
@@ -274,10 +276,8 @@ async def get_all_raw_data(api_key: str = Depends(validate_api_key)):
 async def add_user_sound(request: AddSoundRequest):
     try:
         # Convert username to user_id
-        user_id = get_user_id_by_username(request.username)
-        if not user_id:
-            raise HTTPException(status_code=404, detail=f"User '{request.username}' not found")
-        
+        user_id = validate_and_get_user_id(request.username)
+
         # Get user stats
         user_stats = cozy_gamification.get_user_stats(user_id)
         if user_stats is None:

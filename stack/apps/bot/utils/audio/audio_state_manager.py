@@ -1,5 +1,3 @@
-import json
-import os
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -84,7 +82,7 @@ class AudioStateManager:
                         continue
                     
                     # Check if any of the original users are still there
-                    current_users = set(str(member.id) for member in channel.members if not member.bot)
+                    current_users = {str(member.id) for member in channel.members if not member.bot}
                     common_users = expected_users.intersection(current_users)
                     
                     if not common_users:
@@ -105,7 +103,7 @@ class AudioStateManager:
             try:
                 self.db.delete_audio_state()
                 logging.info("🧹 Audio state cleaned up from CouchDB")
-            except:
+            except Exception:
                 pass
             
             return restored_count

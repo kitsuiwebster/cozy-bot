@@ -184,7 +184,7 @@ echo "🔧 Setting up data directory permissions..."
 mkdir -p data
 sudo chown -R $USER:$USER data/ 2>/dev/null || chown -R $USER:$USER data/
 
-# Build and start only bot container (don't touch other services)
+# Build and start only bot container
 echo ""
 echo "🏗️  Building and starting bot container only..."
 echo "👉 Building with configured mode"
@@ -221,10 +221,10 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     # Restore user sessions after deployment
     echo ""
     echo "👉 Restoring user sessions..."
-    sleep 2  # Give the bot a moment to fully initialize
-    set +e  # Don't exit on curl error
+    sleep 2 
+    set +e 
     SESSION_RESTORE_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/audio/restore-sessions" 2>/dev/null || echo '{}')
-    set -e  # Re-enable exit on error
+    set -e
     if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
         SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
         echo "👉 Restored ${SESSIONS_RESTORED} user sessions"

@@ -5,7 +5,7 @@ import urllib.request
 import json
 import threading
 import queue
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Union
 from datetime import datetime
 import urllib.parse
 
@@ -125,7 +125,7 @@ class CouchDBClient:
             logging.error(f"❌ Failed to delete document {doc_id}: {e}")
             return False
 
-    def get_all_documents(self, db) -> Dict:
+    def get_all_documents(self) -> Dict:
         """Get all documents from a database (excluding design docs)"""
         try:
             result = {}
@@ -431,7 +431,7 @@ class CouchDBClient:
 # Global instance
 _couchdb_client = None
 
-def get_couchdb_client() -> CouchDBClient:
+def get_couchdb_client() -> Union[CouchDBClient, "_NullCouchDBClient"]:
     """Get or create the global CouchDB client instance"""
     global _couchdb_client
     if os.getenv("COUCHDB_DISABLED", "0") == "1":
@@ -481,7 +481,7 @@ class _NullCouchDBClient:
     def save_document(self, db, doc_id: str, data: Dict) -> bool:
         return True
 
-    def get_all_documents(self, db) -> Dict:
+    def get_all_documents(self) -> Dict:
         return {}
 
     def get_documents_by_prefix(self, prefix: str) -> Dict:

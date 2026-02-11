@@ -59,9 +59,9 @@ export class CozypointsComponent implements OnInit, OnDestroy {
   }
 
   constructor(
-    private cozybotService: CozybotService,
-    private titleService: Title,
-    private metaService: Meta
+    private readonly cozybotService: CozybotService,
+    private readonly titleService: Title,
+    private readonly metaService: Meta
   ) {}
 
   ngOnInit(): void {

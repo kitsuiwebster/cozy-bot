@@ -36,9 +36,9 @@ export class CreditsComponent implements OnInit, OnDestroy {
   private headerStatsSubscription: Subscription | null = null;
 
   constructor(
-    private cozybotService: CozybotService,
-    private titleService: Title,
-    private metaService: Meta
+    private readonly cozybotService: CozybotService,
+    private readonly titleService: Title,
+    private readonly metaService: Meta
   ) {}
 
   ngOnInit(): void {

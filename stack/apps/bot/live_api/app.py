@@ -299,9 +299,15 @@ async def simple_deployment_notify(request: DeploymentRequest):
         doc["type"] = "deployment_notification"
         db.save_document(db.db, "deployment_notification", doc)
     except Exception:
-        os.makedirs('data', exist_ok=True)
-        with open('data/deployment_notification.json', 'w') as f:
-            json.dump(notification_data, f, indent=2)
+        import asyncio
+        loop = asyncio.get_event_loop()
+
+        def write_notification_file():
+            os.makedirs('data', exist_ok=True)
+            with open('data/deployment_notification.json', 'w') as f:
+                json.dump(notification_data, f, indent=2)
+
+        await loop.run_in_executor(None, write_notification_file)
 
     logging.info(f"📢 Deployment notification created for {total_users} users")
     return {

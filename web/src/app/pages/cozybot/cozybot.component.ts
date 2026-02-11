@@ -1,3 +1,7 @@
+// =============================================================================
+// IMPORTS
+// =============================================================================
+
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +11,10 @@ import { interval, Subscription } from 'rxjs';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
 import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
+// =============================================================================
+// COMPONENT DEFINITION
+// =============================================================================
+
 @Component({
   selector: 'app-cozybot',
   standalone: true,
@@ -15,16 +23,20 @@ import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/
   styleUrls: ['./cozybot.component.scss']
 })
 export class CozybotComponent implements OnInit, OnDestroy {
+
+  // ===========================================================================
+  // PROPERTIES - Leaderboard Data
+  // ===========================================================================
+
   leaderboard: CozyUser[] = [];
   servers: CozyServer[] = [];
   sounds: CozySound[] = [];
-  
-  // Données complètes récupérées de l'API
+
   allUsers: CozyUser[] = [];
   allUsersRaw: CozyUser[] = [];
   allServers: CozyServer[] = [];
   allSounds: CozySound[] = [];
-  
+
   totalCount = 0;
   totalUsersCount = 0;
   headerTotalUsersCount = 0;
@@ -33,8 +45,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
   error = '';
   selectedView: 'users' | 'servers' | 'sounds' = 'users';
   showStreakOnly = false;
-  
-  // Pagination
+
+  // ===========================================================================
+  // PROPERTIES - Pagination
+  // ===========================================================================
+
   currentPage = 1;
   pageSize = 30;
   hasNextPage = false;
@@ -43,8 +58,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
   private readonly pageSizeUsers = 30;
   private readonly pageSizeServers = 50;
   private readonly pageSizeSounds = 30;
-  
-  // Live stats
+
+  // ===========================================================================
+  // PROPERTIES - Live Stats
+  // ===========================================================================
+
   liveStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
   previousStats: LiveStats = { current_listeners: 0, message: '', servers_with_bot: 0, total_servers: 0 };
   liveSoundCategories: { emoji: string; count: number }[] = [];
@@ -52,20 +70,127 @@ export class CozybotComponent implements OnInit, OnDestroy {
   statsLoading = false;
   animatingListeners = false;
   animatingServers = false;
-  
-  // Header stats animations
+
+  // ===========================================================================
+  // PROPERTIES - Header Stats Animations
+  // ===========================================================================
+
   animatingUsers = false;
   animatingTotalServers = false;
   animatingPoints = false;
   animatingTime = false;
   animatingSessions = false;
   animatingTitle = false;
-  
-  // Track previous values for animations
+
   previousTotalServers = 0;
-  
+
   private statsSubscription: Subscription | null = null;
   private headerStatsSubscription: Subscription | null = null;
+
+  // ===========================================================================
+  // PROPERTIES - Chart Configuration
+  // ===========================================================================
+
+  soundsChartData: { name: string; value: number }[] = [];
+  soundsByCategoryChartData: { name: string; value: number }[] = [];
+  soundsChartTotalTime = 0;
+  soundsCategoryTotalTime = 0;
+  colorScheme: Color = {
+    name: 'soundsColors',
+    selectable: true,
+    group: ScaleType.Ordinal,
+    domain: [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+      '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84',
+      '#96CEB4', '#FFEAA7', '#DFE6E9', '#74B9FF', '#A29BFE',
+      '#FD79A8', '#FDCB6E', '#6C5CE7', '#00B894', '#E17055'
+    ]
+  };
+  chartView: [number, number] = [550, 450];
+  showChartLegend = true;
+
+  // ===========================================================================
+  // PROPERTIES - User Details Modal
+  // ===========================================================================
+
+  showUserModal = false;
+  selectedUserDetails: UserDetails | null = null;
+  loadingUserDetails = false;
+
+  // ===========================================================================
+  // LIFECYCLE METHODS
+  // ===========================================================================
+
+  constructor(
+    private readonly cozybotService: CozybotService,
+    private readonly titleService: Title,
+    private readonly metaService: Meta
+  ) {}
+
+  ngOnInit(): void {
+    this.titleService.setTitle('CozyBot - Discord Bot Leaderboard');
+    this.setFavicon('assets/images/cozybot/cozybot-logo3.png');
+    this.metaService.updateTag({ name: 'description', content: 'CozyBot Discord Bot leaderboard with real-time stats and CozyPoints system.' });
+
+    this.updateChartSize();
+
+    const urlParams = new URLSearchParams(globalThis.location.search);
+    const viewParam = urlParams.get('view');
+    if (viewParam && ['users', 'servers', 'sounds'].includes(viewParam)) {
+      this.selectedView = viewParam as 'users' | 'servers' | 'sounds';
+    }
+
+    const cachedUsers = this.cozybotService.getTopUsersCache();
+    if (cachedUsers) {
+      this.leaderboard = cachedUsers.users;
+      this.totalUsersCount = cachedUsers.total_count;
+      this.headerTotalUsersCount = cachedUsers.total_count;
+      this.headerTotalTimeSeconds = this.getTotalListeningTimeSeconds(cachedUsers.users);
+    }
+    this.loadUsers();
+    this.loadSounds();
+
+    if (this.selectedView !== 'users' && this.selectedView !== 'sounds') {
+      this.loadData();
+    }
+    this.updatePageSize();
+    this.startLiveStats();
+    this.startHeaderStatsRefresh();
+  }
+
+  ngOnDestroy(): void {
+    if (this.statsSubscription) {
+      this.statsSubscription.unsubscribe();
+    }
+    if (this.headerStatsSubscription) {
+      this.headerStatsSubscription.unsubscribe();
+    }
+  }
+
+  // ===========================================================================
+  // VIEW AND NAVIGATION METHODS
+  // ===========================================================================
+
+  onViewChange(): void {
+    const currentUrl = globalThis.location.pathname;
+    const newUrl = `${currentUrl}?view=${this.selectedView}`;
+    globalThis.history.replaceState({}, '', newUrl);
+    this.currentPage = 1;
+    this.updatePageSize();
+    this.loadData();
+  }
+
+  onSelectedViewChange(view: string): void {
+    if (view === 'users' || view === 'servers' || view === 'sounds') {
+      this.selectedView = view;
+    }
+  }
+
+  manualRefreshCurrentView(): void {
+    this.currentPage = 1;
+    this.updatePageSize();
+    this.loadData();
+  }
 
   getHeaderStats(): LeaderboardHeaderStat[] {
     return [
@@ -87,107 +212,25 @@ export class CozybotComponent implements OnInit, OnDestroy {
     ];
   }
 
-  // Configuration du graphique des sons
-  soundsChartData: { name: string; value: number }[] = [];
-  soundsByCategoryChartData: { name: string; value: number }[] = [];
-  soundsChartTotalTime = 0;
-  soundsCategoryTotalTime = 0;
-  colorScheme: Color = {
-    name: 'soundsColors',
-    selectable: true,
-    group: ScaleType.Ordinal,
-    domain: [
-      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-      '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84',
-      '#96CEB4', '#FFEAA7', '#DFE6E9', '#74B9FF', '#A29BFE',
-      '#FD79A8', '#FDCB6E', '#6C5CE7', '#00B894', '#E17055'
-    ]
-  };
-  chartView: [number, number] = [550, 450];
-  showChartLegend = true;
+  // ===========================================================================
+  // PAGINATION METHODS
+  // ===========================================================================
 
-  // Modal pour les détails de l'utilisateur
-  showUserModal = false;
-  selectedUserDetails: UserDetails | null = null;
-  loadingUserDetails = false;
-
-  constructor(
-    private cozybotService: CozybotService,
-    private titleService: Title,
-    private metaService: Meta
-  ) {}
-
-  ngOnInit(): void {
-    // Set page title and favicon
-    this.titleService.setTitle('CozyBot - Discord Bot Leaderboard');
-    this.setFavicon('assets/images/cozybot/cozybot-logo3.png');
-    this.metaService.updateTag({ name: 'description', content: 'CozyBot Discord Bot leaderboard with real-time stats and CozyPoints system.' });
-
-    // Initialize chart size
-    this.updateChartSize();
-
-    // Check URL parameter for view
-    const urlParams = new URLSearchParams(window.location.search);
-    const viewParam = urlParams.get('view');
-    if (viewParam && ['users', 'servers', 'sounds'].includes(viewParam)) {
-      this.selectedView = viewParam as 'users' | 'servers' | 'sounds';
-    }
-
-    // Always load users data for header stats
-    const cachedUsers = this.cozybotService.getTopUsersCache();
-    if (cachedUsers) {
-      this.leaderboard = cachedUsers.users;
-      this.totalUsersCount = cachedUsers.total_count;
-      this.headerTotalUsersCount = cachedUsers.total_count;
-      this.headerTotalTimeSeconds = this.getTotalListeningTimeSeconds(cachedUsers.users);
-    }
-    this.loadUsers();
-    // Always load sounds data for sessions stats
-    this.loadSounds();
-    // Then load selected view data
-    if (this.selectedView !== 'users' && this.selectedView !== 'sounds') {
-      this.loadData();
-    }
-    this.updatePageSize();
-    this.startLiveStats();
-    this.startHeaderStatsRefresh();
-  }
-
-  onViewChange(): void {
-    // Update URL parameter without navigation
-    const currentUrl = window.location.pathname;
-    const newUrl = `${currentUrl}?view=${this.selectedView}`;
-    window.history.replaceState({}, '', newUrl);
-    this.currentPage = 1; // Reset to first page when changing view
-    this.updatePageSize();
-    this.loadData();
-  }
-
-  onSelectedViewChange(view: string): void {
-    if (view === 'users' || view === 'servers' || view === 'sounds') {
-      this.selectedView = view;
-    }
-  }
-
-  manualRefreshCurrentView(): void {
-    this.currentPage = 1;
-    this.updatePageSize();
-    this.loadData();
-  }
-
-  // Pagination methods
   updatePagination(): void {
-    // Calcul simple basé sur les données complètes
-    const totalElements = this.selectedView === 'users' ? this.allUsers.length : 
-                         this.selectedView === 'servers' ? this.allServers.length : 
-                         this.allSounds.length;
-    
+    let totalElements: number;
+    if (this.selectedView === 'users') {
+      totalElements = this.allUsers.length;
+    } else if (this.selectedView === 'servers') {
+      totalElements = this.allServers.length;
+    } else {
+      totalElements = this.allSounds.length;
+    }
+
     this.totalCount = totalElements;
     this.totalPages = Math.ceil(totalElements / this.pageSize);
     this.hasNextPage = this.currentPage < this.totalPages;
     this.hasPreviousPage = this.currentPage > 1;
-    
-    // Mettre à jour les données affichées pour la page courante
+
     this.updateDisplayedData();
   }
 
@@ -237,33 +280,27 @@ export class CozybotComponent implements OnInit, OnDestroy {
     const maxPages = 5;
     let startPage = Math.max(1, this.currentPage - Math.floor(maxPages / 2));
     let endPage = Math.min(this.totalPages, startPage + maxPages - 1);
-    
+
     if (endPage - startPage + 1 < maxPages) {
       startPage = Math.max(1, endPage - maxPages + 1);
     }
-    
+
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
     return pages;
   }
 
-
-  ngOnDestroy(): void {
-    if (this.statsSubscription) {
-      this.statsSubscription.unsubscribe();
-    }
-    if (this.headerStatsSubscription) {
-      this.headerStatsSubscription.unsubscribe();
-    }
-  }
+  // ===========================================================================
+  // DATA LOADING METHODS
+  // ===========================================================================
 
   loadData(): void {
     this.loading = true;
     this.error = '';
 
     this.updatePageSize();
-    
+
     if (this.selectedView === 'users') {
       this.loadUsers();
     } else if (this.selectedView === 'servers') {
@@ -297,7 +334,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
         }
         this.loading = false;
 
-        // Animer les stats du header au premier chargement
         if (this.allUsers.length > 0) {
           this.triggerInitialAnimations();
         }
@@ -330,7 +366,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.totalUsersCount = filteredUsers.length;
   }
 
-
   private loadServers(): void {
     this.cozybotService.getTopServers().subscribe({
       next: (response: ServersResponse) => {
@@ -349,7 +384,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
   private loadSounds(): void {
     this.cozybotService.getTopSounds().subscribe({
       next: (response: SoundsResponse) => {
-        // Filtrer pour ne garder que les sons avec exactement 3 emojis
         this.allSounds = response.sounds.filter(sound =>
           this.hasThreeEmojis(sound.display_name)
         );
@@ -366,26 +400,28 @@ export class CozybotComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ===========================================================================
+  // ANIMATION METHODS
+  // ===========================================================================
+
   private triggerInitialAnimations(): void {
-    // Délai pour laisser le DOM se mettre à jour
     setTimeout(() => {
-      // Animer le titre en premier
       this.animatingTitle = true;
       setTimeout(() => this.animatingTitle = false, 800);
-      
+
       this.animatingUsers = true;
       setTimeout(() => this.animatingUsers = false, 500);
-      
+
       setTimeout(() => {
         this.animatingPoints = true;
         setTimeout(() => this.animatingPoints = false, 500);
       }, 200);
-      
+
       setTimeout(() => {
         this.animatingTime = true;
         setTimeout(() => this.animatingTime = false, 500);
       }, 400);
-      
+
       setTimeout(() => {
         this.animatingSessions = true;
         setTimeout(() => this.animatingSessions = false, 500);
@@ -393,20 +429,9 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }, 100);
   }
 
-  formatPoints(points: number): string {
-    return points.toLocaleString();
-  }
-
-  getRankEmoji(rank: number): string {
-    switch (rank) {
-      case 1: return '🥇';
-      case 2: return '🥈';
-      case 3: return '🥉';
-      default: return `${rank}.`;
-    }
-  }
-
-  // Header stats with animation tracking
+  // ===========================================================================
+  // STATS CALCULATION METHODS
+  // ===========================================================================
 
   getTotalPoints(): number {
     return this.allUsersRaw.reduce((total, user) => total + user.total_points, 0);
@@ -439,12 +464,10 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   getTotalSessions(): number {
-    // Calculer le total des sessions à partir des données des sons
     return this.allSounds.reduce((total, sound) => total + sound.total_sessions, 0);
   }
 
   private startHeaderStatsRefresh(): void {
-    // Refresh header totals only every 60 seconds
     this.headerStatsSubscription = interval(60000).subscribe(() => {
       this.refreshTitleAnimation();
       this.refreshHeaderTotals();
@@ -486,27 +509,9 @@ export class CozybotComponent implements OnInit, OnDestroy {
     });
   }
 
-  getListeningTimeDays(seconds: number): string {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    if (days > 0) {
-      return `${days}d ${hours}h`;
-    }
-    if (hours === 0) {
-      return '<1h';
-    }
-    return `${hours}h`;
-  }
-
-  getTopThree(): CozyUser[] {
-    // Toujours retourner les 3 premiers du classement général (pas de la page courante)
-    return this.allUsers.slice(0, 3);
-  }
-
-  getRemainingUsers(): CozyUser[] {
-    // Toujours afficher tous les utilisateurs en liste (pas de podium)
-    return this.leaderboard;
-  }
+  // ===========================================================================
+  // LIVE STATS METHODS
+  // ===========================================================================
 
   startLiveStats(): void {
     const cachedStats = this.cozybotService.getLiveStatsCache();
@@ -518,10 +523,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
       this.statsLoading = false;
     }
 
-    // Charger une première fois immédiatement
     this.loadLiveStats();
-    
-    // Puis toutes les 5 secondes - uniquement les stats live
+
     this.statsSubscription = interval(5000).subscribe(() => {
       this.loadLiveStats();
     });
@@ -531,10 +534,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.statsLoading = true;
     this.cozybotService.getLiveStats().subscribe({
       next: (stats: LiveStats) => {
-        // Sauvegarder les anciennes stats pour détecter les changements
         this.previousStats = { ...this.liveStats };
-        
-        // Animer si les valeurs ont changé
+
         if (this.liveStats.current_listeners !== stats.current_listeners) {
           this.animatingListeners = true;
           setTimeout(() => this.animatingListeners = false, 500);
@@ -543,13 +544,12 @@ export class CozybotComponent implements OnInit, OnDestroy {
           this.animatingServers = true;
           setTimeout(() => this.animatingServers = false, 500);
         }
-        
+
         this.liveStats = stats;
         this.liveSoundCategories = this.buildLiveSoundCategories(stats);
         this.liveUsernames = this.buildLiveUsernamesSet(stats);
         this.statsLoading = false;
-        
-        // Animer Total Servers au premier chargement
+
         if (this.previousTotalServers === 0) {
           this.previousTotalServers = stats.total_servers;
           setTimeout(() => {
@@ -602,6 +602,10 @@ export class CozybotComponent implements OnInit, OnDestroy {
     return new Set(names);
   }
 
+  // ===========================================================================
+  // HELPER AND UTILITY METHODS
+  // ===========================================================================
+
   getDisplayName(user: CozyUser): string {
     return user.display_name || user.username;
   }
@@ -622,7 +626,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (days > 0) {
       return `${days}d ${hours}h`;
     } else if (hours > 0) {
@@ -632,16 +636,47 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }
   }
 
+  formatPoints(points: number): string {
+    return points.toLocaleString();
+  }
+
+  getRankEmoji(rank: number): string {
+    switch (rank) {
+      case 1: return '🥇';
+      case 2: return '🥈';
+      case 3: return '🥉';
+      default: return `${rank}.`;
+    }
+  }
+
+  getListeningTimeDays(seconds: number): string {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    if (days > 0) {
+      return `${days}d ${hours}h`;
+    }
+    if (hours === 0) {
+      return '<1h';
+    }
+    return `${hours}h`;
+  }
+
+  getTopThree(): CozyUser[] {
+    return this.allUsers.slice(0, 3);
+  }
+
+  getRemainingUsers(): CozyUser[] {
+    return this.leaderboard;
+  }
+
   getFavoriteSound(user: CozyUser): string {
     return user.favorite_sound || '🌧️🏠🔥';
   }
 
   getFavoriteSoundEmoji(user: CozyUser | UserDetails): string {
     const favoriteSound = user.favorite_sound || '🌧️🏠🔥';
-
-    // Extraire le premier emoji avec une regex améliorée
     const emojiRegex = /(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\u200D(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/u;
-    const match = favoriteSound.match(emojiRegex);
+    const match = emojiRegex.exec(favoriteSound);
     return match ? match[0] : '🌧';
   }
 
@@ -657,36 +692,63 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Compte le nombre d'emojis dans une chaîne de caractères
-   */
+  // Returns the CSS class for the rank number based on user activity
+  // Green: currently listening
+  // Yellow: recently active (less than a week)
+  // Orange: inactive for more than a week
+  // Red: inactive for more than a month
+  getRankColorClass(user: CozyUser): string {
+    if (this.liveUsernames.has((user.username || '').toLowerCase())) {
+      return 'rank-live';
+    }
+
+    const daysSinceActivity = user.days_since_last_activity ?? 0;
+
+    if (daysSinceActivity > 30) {
+      return 'rank-inactive-month';
+    }
+
+    if (daysSinceActivity > 7) {
+      return 'rank-inactive-week';
+    }
+
+    return 'rank-active';
+  }
+
+  // ===========================================================================
+  // EMOJI DETECTION METHODS
+  // ===========================================================================
+
+  // Counts the number of emojis in a string
   private countEmojis(text: string): number {
-    // Regex améliorée pour détecter les emojis Unicode, incluant ceux avec ZWJ et modificateurs de peau
-    // Cette regex gère les emojis simples, composés (avec ZWJ), et ceux avec modificateurs de peau/variation
     const emojiRegex = /(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\u200D(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/gu;
     const matches = text.match(emojiRegex);
     return matches ? matches.length : 0;
   }
 
-  /**
-   * Vérifie si un nom de son contient exactement 3 emojis
-   */
+  // Checks if a sound name contains exactly 3 emojis
   private hasThreeEmojis(displayName: string): boolean {
     return this.countEmojis(displayName) === 3;
   }
 
-  /**
-   * Prépare les données des sons pour le graphique en camembert
-   * Limite aux top 12 sons pour une meilleure visibilité
-   */
+  // Extracts the first emoji from a string
+  private getFirstEmoji(text: string): string {
+    const emojiRegex = /(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\u200D(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/u;
+    const match = emojiRegex.exec(text);
+    return match ? match[0] : '';
+  }
+
+  // ===========================================================================
+  // CHART DATA PREPARATION METHODS
+  // ===========================================================================
+
+  // Prepares sound data for the pie chart
+  // Limited to top sounds for better visibility
   private prepareSoundsChartData(): void {
     const topSoundsCount = this.allSounds.length;
-    // Trier les sons par temps d'écoute décroissant
     const sortedSounds = [...this.allSounds].sort((a, b) => b.total_time - a.total_time);
 
-    // Prendre les top sons
     const topSounds = sortedSounds.slice(0, topSoundsCount);
-    // Créer les données du graphique
     this.soundsChartData = topSounds.map(sound => ({
       name: sound.display_name,
       value: sound.total_time
@@ -694,19 +756,14 @@ export class CozybotComponent implements OnInit, OnDestroy {
 
     this.soundsChartTotalTime = topSounds.reduce((sum, sound) => sum + sound.total_time, 0);
 
-    // Préparer aussi les données par catégorie
     this.prepareSoundsByCategoryChartData();
   }
 
-  /**
-   * Prépare les données des sons regroupés par catégorie (1er emoji)
-   */
+  // Prepares sound data grouped by category (first emoji)
   private prepareSoundsByCategoryChartData(): void {
-    // Regrouper par premier emoji
     const categoriesMap: { [key: string]: number } = {};
 
     this.allSounds.forEach(sound => {
-      // Extraire le premier emoji
       const firstEmoji = this.getFirstEmoji(sound.display_name);
       if (firstEmoji) {
         if (!categoriesMap[firstEmoji]) {
@@ -716,7 +773,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Convertir en tableau et trier par temps décroissant
     this.soundsByCategoryChartData = Object.entries(categoriesMap)
       .map(([emoji, time]) => ({
         name: `${emoji}\n${this.formatChartValue(time)}`,
@@ -727,19 +783,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.soundsCategoryTotalTime = this.soundsByCategoryChartData.reduce((sum, item) => sum + item.value, 0);
   }
 
-  /**
-   * Extrait le premier emoji d'une chaîne de caractères
-   */
-  private getFirstEmoji(text: string): string {
-    const emojiRegex = /(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\u200D(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/u;
-    const match = text.match(emojiRegex);
-    return match ? match[0] : '';
-  }
+  // ===========================================================================
+  // CHART CONFIGURATION AND FORMATTING METHODS
+  // ===========================================================================
 
-
-  /**
-   * Met à jour la taille du graphique en fonction de la taille de l'écran
-   */
+  // Updates chart size based on screen size
   @HostListener('window:resize')
   onResize() {
     this.updateChartSize();
@@ -759,18 +807,15 @@ export class CozybotComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Formate les labels du graphique pour afficher seulement les emojis (sans le temps)
-   */
+  // Formats chart labels to display only emojis (without time)
   formatChartLabel = (label: string): string => {
-    // Ne montrer que la première ligne (avant le \n) dans les labels du graphique
     return label.split('\n')[0];
   }
 
   formatSoundsChartLabel = (label: string): string => label || '';
 
   formatSoundsTooltipText = (arc: { data?: { name?: string; value?: number } } | null): string => {
-    if (!arc || !arc.data) {
+    if (!arc?.data) {
       return '';
     }
     const label = arc.data.name || '';
@@ -779,7 +824,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   formatCategoryTooltipText = (arc: { data?: { name?: string; value?: number } } | null): string => {
-    if (!arc || !arc.data) {
+    if (!arc?.data) {
       return '';
     }
     const rawLabel = arc.data.name || '';
@@ -800,9 +845,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     return `${percent.toFixed(1)}%`;
   }
 
-  /**
-   * Formate la valeur du temps en jours, heures, minutes
-   */
+  // Formats time value in days, hours, minutes
   formatChartValue = (value: number): string => {
     const seconds = Math.floor(value);
     const days = Math.floor(seconds / 86400);
@@ -817,9 +860,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
     return parts.length > 0 ? parts.join(' ') : '0m';
   }
 
-  /**
-   * Ouvre la modal avec les détails de l'utilisateur
-   */
+  // ===========================================================================
+  // USER DETAILS MODAL METHODS
+  // ===========================================================================
+
+  // Opens the modal with user details
   openUserModal(username: string): void {
     this.showUserModal = true;
     this.loadingUserDetails = true;
@@ -838,17 +883,13 @@ export class CozybotComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Ferme la modal des détails de l'utilisateur
-   */
+  // Closes the user details modal
   closeUserModal(): void {
     this.showUserModal = false;
     this.selectedUserDetails = null;
   }
 
-  /**
-   * Formate le temps d'écoute en jours quand plus de 24h
-   */
+  // Formats listening time in days when more than 24h
   formatListeningTimeDays(seconds: number): string {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
@@ -861,34 +902,5 @@ export class CozybotComponent implements OnInit, OnDestroy {
     } else {
       return `${minutes}m`;
     }
-  }
-
-  /**
-   * Retourne la classe CSS pour le numéro de rang en fonction de l'activité de l'utilisateur
-   * Vert: écoute actuellement
-   * Jaune: actif récemment (moins d'une semaine)
-   * Orange: inactif depuis plus d'une semaine
-   * Rouge: inactif depuis plus d'un mois
-   */
-  getRankColorClass(user: CozyUser): string {
-    // Si le user écoute actuellement (current_sound peut être null, undefined, ou une chaîne vide)
-    if (this.liveUsernames.has((user.username || '').toLowerCase())) {
-      return 'rank-live';
-    }
-
-    const daysSinceActivity = user.days_since_last_activity ?? 0;
-
-    // Plus d'un mois (30 jours)
-    if (daysSinceActivity > 30) {
-      return 'rank-inactive-month';
-    }
-
-    // Plus d'une semaine (7 jours)
-    if (daysSinceActivity > 7) {
-      return 'rank-inactive-week';
-    }
-
-    // Actif récemment
-    return 'rank-active';
   }
 }

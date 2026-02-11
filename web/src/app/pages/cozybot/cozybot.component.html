@@ -1,4 +1,9 @@
+<!-- ========================================================================= -->
+<!-- COZYBOT LEADERBOARD PAGE                                                 -->
+<!-- ========================================================================= -->
+
 <div class="container">
+  <!-- Leaderboard Header Component -->
   <app-leaderboard-header
     title="CozyBot"
     subtitle="Discord Bot • Leaderboard"
@@ -24,7 +29,12 @@
     ctaVariant="points"
   ></app-leaderboard-header>
 
+  <!-- ======================================================================= -->
+  <!-- LEADERBOARD SECTION                                                     -->
+  <!-- ======================================================================= -->
+
   <div class="leaderboard-section">
+    <!-- Section Header with Title and Stats -->
     <div class="section-header">
       <div class="section-header-top">
         <div class="section-titles">
@@ -59,14 +69,17 @@
       <p>{{ error }}</p>
     </div>
 
-    <!-- Users Leaderboard -->
+    <!-- ================================================================== -->
+    <!-- USERS LEADERBOARD VIEW                                             -->
+    <!-- ================================================================== -->
+
     <div *ngIf="!loading && !error && selectedView === 'users'" class="leaderboard">
       <!-- Leaderboard list -->
       <div class="leaderboard-list users-list">
-        <div *ngFor="let user of getRemainingUsers(); trackBy: trackByUserId"
-             class="leaderboard-item"
-             (click)="openUserModal(user.username)"
-             style="cursor: pointer;">
+        <button *ngFor="let user of getRemainingUsers(); trackBy: trackByUserId"
+                class="leaderboard-item"
+                (click)="openUserModal(user.username)"
+                type="button">
           <div class="rank-number" [ngClass]="getRankColorClass(user)">{{ user.rank }}</div>
           <div class="user-info">
             <div class="user-avatar-small"><span class="emoji-only">{{ getFavoriteSoundEmoji(user) }}</span></div>
@@ -88,7 +101,7 @@
           <div class="streak-section">
             <span class="streak" *ngIf="user.daily_streak && user.daily_streak > 0"><span class="emoji-only">🔥</span><small>{{ user.daily_streak }}</small></span>
           </div>
-        </div>
+        </button>
       </div>
 
       <!-- Pagination for Users -->
@@ -110,7 +123,10 @@
       </div>
     </div>
 
-    <!-- Servers Leaderboard -->
+    <!-- ================================================================== -->
+    <!-- SERVERS LEADERBOARD VIEW                                           -->
+    <!-- ================================================================== -->
+
     <div *ngIf="!loading && !error && selectedView === 'servers'" class="leaderboard">
       <div class="leaderboard-list">
         <div *ngFor="let server of servers; trackBy: trackByServerId" 
@@ -149,7 +165,10 @@
       </div>
     </div>
 
-    <!-- Sounds Leaderboard -->
+    <!-- ================================================================== -->
+    <!-- SOUNDS LEADERBOARD VIEW                                            -->
+    <!-- ================================================================== -->
+
     <div *ngIf="!loading && !error && selectedView === 'sounds'" class="leaderboard">
       <div class="leaderboard-list">
         <div *ngFor="let sound of sounds; let i = index; trackBy: trackBySoundName" 
@@ -191,9 +210,9 @@
         </button>
       </div>
 
-      <!-- Camemberts des sons -->
+      <!-- Sounds Analytics Charts -->
       <div class="sounds-charts-wrapper" *ngIf="soundsChartData.length > 0">
-        <!-- Camembert par catégorie -->
+        <!-- Pie Chart by Category -->
         <div class="sounds-chart-section">
           <div class="sounds-chart-container">
             <ngx-charts-pie-chart
@@ -213,7 +232,7 @@
           </div>
         </div>
 
-        <!-- Camembert par son -->
+        <!-- Pie Chart by Sound -->
         <div class="sounds-chart-section">
           <div class="sounds-chart-container">
             <ngx-charts-pie-chart
@@ -237,10 +256,23 @@
   </div>
 </div>
 
-<!-- Modal des détails de l'utilisateur -->
-<div *ngIf="showUserModal" class="user-modal-overlay" (click)="closeUserModal()">
-  <div class="user-modal-content" (click)="$event.stopPropagation()">
-    <button class="modal-close-btn" (click)="closeUserModal()">✕</button>
+<!-- ========================================================================= -->
+<!-- USER DETAILS MODAL                                                        -->
+<!-- ========================================================================= -->
+
+<div *ngIf="showUserModal"
+     class="user-modal-overlay"
+     (click)="closeUserModal()"
+     (keydown.escape)="closeUserModal()"
+     tabindex="-1">
+  <div class="user-modal-content"
+       (click)="$event.stopPropagation()"
+       (keydown.escape)="$event.stopPropagation()"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="user-modal-title"
+       tabindex="-1">
+    <button class="modal-close-btn" (click)="closeUserModal()" aria-label="Close">✕</button>
 
     <div *ngIf="loadingUserDetails" class="modal-loading">
       <div class="spinner"></div>
@@ -248,20 +280,20 @@
     </div>
 
     <div *ngIf="!loadingUserDetails && selectedUserDetails" class="user-details-container">
-      <!-- Header avec avatar et nom -->
+      <!-- User Header: Avatar and Display Name -->
       <div class="user-header">
         <div class="user-avatar-large">
           <span class="emoji-only">{{ getFavoriteSoundEmoji(selectedUserDetails) }}</span>
         </div>
         <div class="user-header-info">
-          <h2 class="user-display-name">
+          <h2 class="user-display-name" id="user-modal-title">
             {{ selectedUserDetails.display_name }}
             <span *ngIf="selectedUserDetails.current_sound" class="live-indicator" title="Currently listening"></span>
           </h2>
         </div>
       </div>
 
-      <!-- Stats principales -->
+      <!-- Main Statistics: Points, Rank, Level, Streak -->
       <div class="user-main-stats">
         <div class="stat-box">
           <div class="stat-value">{{ formatPoints(selectedUserDetails.total_points) }}</div>
@@ -281,7 +313,7 @@
         </div>
       </div>
 
-      <!-- Progress bar du level -->
+      <!-- Level Progress Bar -->
       <div class="level-progress">
         <div class="progress-label">Level Progress: {{ selectedUserDetails.level_progress }}%</div>
         <div class="progress-bar">
@@ -289,7 +321,7 @@
         </div>
       </div>
 
-      <!-- Listening stats -->
+      <!-- Listening Statistics: Time, Sessions, Last Activity -->
       <div class="listening-stats">
         <div class="stat-item">
           <span class="stat-icon">⏱️</span>
@@ -308,7 +340,7 @@
         </div>
       </div>
 
-      <!-- Achievements -->
+      <!-- User Achievements -->
       <div *ngIf="selectedUserDetails.achievements && selectedUserDetails.achievements.length > 0" class="achievements-section">
         <h3>🏆 Achievements</h3>
         <div class="achievements-grid">
@@ -318,7 +350,7 @@
         </div>
       </div>
 
-      <!-- Top Sounds -->
+      <!-- Top 5 Most Listened Sounds -->
       <div *ngIf="selectedUserDetails.listening_by_sound && selectedUserDetails.listening_by_sound.length > 0" class="top-sounds-section">
         <h3>🎵 Top Listened Sounds</h3>
         <div class="sounds-list">
