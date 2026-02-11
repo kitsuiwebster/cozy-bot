@@ -56,6 +56,9 @@ for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
     uv_logger.propagate = False
     uv_logger.addHandler(handler)
 
+# API prefix constant
+API_PREFIX = "/api/public"
+
 # Initialize FastAPI application
 app = FastAPI(
     title="CozyBot API",
@@ -80,13 +83,13 @@ app.add_middleware(
 )
 
 # Include routers (Public API)
-app.include_router(health_router, prefix="/api/public", tags=["health"])
-app.include_router(top_users.router, prefix="/api/public", tags=["users"])
-app.include_router(top_servers.router, prefix="/api/public", tags=["servers"])
-app.include_router(stats_router, prefix="/api/public", tags=["stats"])
-app.include_router(admin.router, prefix="/api/public/admin", tags=["admin"])
-app.include_router(simple_deployment_router, prefix="/api/public", tags=["simple-deployment"])
-app.include_router(audio_restore_router, prefix="/api/public", tags=["audio"])
+app.include_router(health_router, prefix=API_PREFIX, tags=["health"])
+app.include_router(top_users.router, prefix=API_PREFIX, tags=["users"])
+app.include_router(top_servers.router, prefix=API_PREFIX, tags=["servers"])
+app.include_router(stats_router, prefix=API_PREFIX, tags=["stats"])
+app.include_router(admin.router, prefix=f"{API_PREFIX}/admin", tags=["admin"])
+app.include_router(simple_deployment_router, prefix=API_PREFIX, tags=["simple-deployment"])
+app.include_router(audio_restore_router, prefix=API_PREFIX, tags=["audio"])
 
 @app.get("/")
 async def root():

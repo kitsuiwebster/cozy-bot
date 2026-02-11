@@ -2,7 +2,7 @@
 // Use Nginx proxy to avoid CORS issues
 const STATUS_API_URL = '/api/status';
 
-// Périodes d'uptime à afficher
+// Uptime periods to display
 const UPTIME_PERIODS = [
     { label: '90d', days: 90 },
     { label: '30d', days: 30 },
@@ -11,7 +11,7 @@ const UPTIME_PERIODS = [
     { label: '1h', hours: 1 }
 ];
 
-// Récupérer les monitors depuis l'API Kuma
+// Fetch monitors from the API
 async function fetchMonitors() {
     try {
         const cacheBuster = Date.now();
@@ -35,7 +35,7 @@ async function fetchMonitors() {
     }
 }
 
-// Récupérer les heartbeats depuis l'API Kuma
+// Fetch heartbeats from the API
 async function fetchHeartbeats() {
     try {
         const cacheBuster = Date.now();
@@ -90,49 +90,54 @@ function toTimeMs(value) {
     return new Date(value).getTime();
 }
 
-// Calculer l'uptime pour une période donnée
+// Calculate uptime for a given period
 function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
     if (!heartbeats || heartbeats.length === 0) {
         return { uptime: 0, segments: [], hasData: false };
     }
 
-    // Définir le nombre de segments et leur durée selon la période
+    // Define the number of segments and their duration based on the period
     let periodMs;
     let segmentDuration;
     let totalSegments;
 
     if (period.hours === 1) {
-        // 1 heure = 30 segments de 2 minutes
+        // 1 hour = 30 segments of 2 minutes
         periodMs = 60 * 60 * 1000;
-        segmentDuration = 2 * 60 * 1000; // 2 minutes
+        // 2 minutes
+        segmentDuration = 2 * 60 * 1000;
         totalSegments = 30;
     } else if (period.hours === 24) {
-        // 24 heures = 48 segments de 30 minutes
+        // 24 hours = 48 segments of 30 minutes
         periodMs = 24 * 60 * 60 * 1000;
-        segmentDuration = 30 * 60 * 1000; // 30 minutes
+        // 30 minutes
+        segmentDuration = 30 * 60 * 1000;
         totalSegments = 48;
     } else if (period.days === 7) {
-        // 7 jours = 28 segments de 6 heures
+        // 7 days = 28 segments of 6 hours
         periodMs = 7 * 24 * 60 * 60 * 1000;
-        segmentDuration = 6 * 60 * 60 * 1000; // 6 heures
+        // 6 hours
+        segmentDuration = 6 * 60 * 60 * 1000;
         totalSegments = 28;
     } else if (period.days === 30) {
-        // 30 jours = 30 segments de 1 jour
+        // 30 days = 30 segments of 1 day
         periodMs = 30 * 24 * 60 * 60 * 1000;
-        segmentDuration = 24 * 60 * 60 * 1000; // 1 jour
+        // 1 day
+        segmentDuration = 24 * 60 * 60 * 1000;
         totalSegments = 30;
     } else if (period.days === 90) {
-        // 90 jours = 90 segments de 1 jour
+        // 90 days = 90 segments of 1 day
         periodMs = 90 * 24 * 60 * 60 * 1000;
-        segmentDuration = 24 * 60 * 60 * 1000; // 1 jour
+        // 1 day
+        segmentDuration = 24 * 60 * 60 * 1000;
         totalSegments = 90;
     }
 
-    // Utiliser Date.now() pour avoir une vraie fenêtre temporelle
+    // Use Date.now() for a real time window
     const now = Date.now();
     const cutoffTime = now - periodMs;
 
-    // Filtrer les heartbeats dans la période
+    // Filter heartbeats within the period
     const relevantHeartbeats = heartbeats.filter(hb => {
         const time = toTimeMs(hb.time);
         return time >= cutoffTime && time <= now;
@@ -155,7 +160,7 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
         return { uptime: 0, segments, hasData: false };
     }
 
-    // Calculer la couverture de données
+    // Calculate data coverage
     relevantHeartbeats.sort((a, b) => toTimeMs(a.time) - toTimeMs(b.time));
     const oldestHeartbeat = toTimeMs(relevantHeartbeats[0].time);
     const newestHeartbeat = toTimeMs(relevantHeartbeats[relevantHeartbeats.length - 1].time);
@@ -163,15 +168,15 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
     const dataCoverage = actualDataSpan / periodMs * 100;
     const hasEnoughData = dataCoverage >= 10;
 
-    // Créer des segments de TEMPS FIXES
+    // Create fixed time segments
     const segments = [];
 
     for (let i = 0; i < totalSegments; i++) {
-        // Calculer les bornes temporelles du segment (du plus récent au plus ancien)
+        // Calculate segment time boundaries (from most recent to oldest)
         const segmentEnd = now - (i * segmentDuration);
         const segmentStart = segmentEnd - segmentDuration;
 
-        // Trouver tous les heartbeats dans ce segment
+        // Find all heartbeats in this segment
         const segmentHeartbeats = relevantHeartbeats.filter(hb => {
             const time = toTimeMs(hb.time);
             return time >= segmentStart && time < segmentEnd;
@@ -185,28 +190,31 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
 
         if (maintenanceOverlap) {
             status = 'maintenance';
-            segmentUptime = 0;
         } else if (segmentHeartbeats.length === 0) {
             status = 'unknown';
         } else {
-            // Calculer l'uptime du segment
+            // Calculate segment uptime
             const upInSegment = segmentHeartbeats.filter(hb => hb.status === 1).length;
             segmentUptime = (upInSegment / segmentHeartbeats.length) * 100;
 
-            // Déterminer le statut
+            // Determine status
             if (segmentUptime >= 100) {
-                status = 'up'; // Vert: 100%
+                // Green: 100%
+                status = 'up';
             } else if (segmentUptime >= 50) {
-                status = 'degraded'; // Jaune: 50-99%
+                // Yellow: 50-99%
+                status = 'degraded';
             } else {
-                status = 'down'; // Rouge: <50%
+                // Red: <50%
+                status = 'down';
             }
         }
 
         const startTime = new Date(segmentStart);
         const endTime = new Date(segmentEnd);
 
-        segments.unshift({ // Plus récent à gauche, plus ancien à droite
+        // Most recent on left, oldest on right
+        segments.unshift({
             status,
             width: 100 / totalSegments,
             startTime,
@@ -216,7 +224,7 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
         });
     }
 
-    // Calculer l'uptime global (maintenance compte comme up)
+    // Calculate overall uptime (maintenance counts as up)
     let uptime = 0;
     let consideredSegments = 0;
     segments.forEach(seg => {
@@ -224,7 +232,7 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
             return;
         }
         consideredSegments += 1;
-        uptime += parseFloat(seg.uptime);
+        uptime += Number.parseFloat(seg.uptime);
     });
 
     const uptimeValue = consideredSegments > 0 ? (uptime / consideredSegments) : 0;
@@ -232,7 +240,7 @@ function calculateUptimeForPeriod(heartbeats, period, maintenanceRanges) {
     return { uptime: uptimeValue.toFixed(2), segments, hasData: hasEnoughData };
 }
 
-// Déterminer le statut global
+// Determine overall status
 function determineOverallStatus(monitors) {
     if (!monitors || monitors.length === 0) {
         return { status: 'loading', text: 'Loading...', icon: '⏳' };
@@ -251,30 +259,49 @@ function determineOverallStatus(monitors) {
     }
 }
 
-// Créer l'HTML pour un monitor
+// Create HTML for a monitor
 function createMonitorCard(monitor, maintenanceActive, maintenanceRanges) {
     const card = document.createElement('div');
     card.className = 'monitor-card';
 
-    const statusClass = maintenanceActive ? 'maintenance' : (monitor.active ? 'up' : 'down');
-    const statusText = maintenanceActive
-        ? 'Maintenance in progress'
-        : (monitor.active ? 'Currently Operational' : 'Currently Down');
+    let statusClass;
+    let statusText;
 
-    // Afficher toujours toutes les périodes, même sans données
-    var periodsToShow = UPTIME_PERIODS;
+    if (maintenanceActive) {
+        statusClass = 'maintenance';
+        statusText = 'Maintenance in progress';
+    } else if (monitor.active) {
+        statusClass = 'up';
+        statusText = 'Currently Operational';
+    } else {
+        statusClass = 'down';
+        statusText = 'Currently Down';
+    }
+
+    // Always display all periods, even without data
+    const periodsToShow = UPTIME_PERIODS;
 
     let timelinesHTML = '';
 
     periodsToShow.forEach(period => {
         const { uptime, segments, hasData } = calculateUptimeForPeriod(monitor.heartbeats, period, maintenanceRanges);
 
-        // Vert si 100%, jaune si >= 90%, rouge si < 90%
-        const uptimeClass = hasData ? (uptime >= 99.9 ? 'high' : uptime >= 90 ? 'medium' : 'low') : 'muted';
+        // Green if 100%, yellow if >= 90%, red if < 90%
+        let uptimeClass;
+        if (!hasData) {
+            uptimeClass = 'muted';
+        } else if (uptime >= 99.9) {
+            uptimeClass = 'high';
+        } else if (uptime >= 90) {
+            uptimeClass = 'medium';
+        } else {
+            uptimeClass = 'low';
+        }
+
         const uptimeText = hasData ? `${uptime}%` : '—';
 
         const segmentsHTML = segments.map(seg => {
-            // Formater les dates pour le tooltip (heure de Paris)
+            // Format dates for tooltip (Paris time)
             const startStr = seg.startTime.toLocaleString('fr-FR', {
                 timeZone: 'Europe/Paris',
                 day: '2-digit',
@@ -334,9 +361,8 @@ function renderMaintenance(maintenanceData) {
         return { hasActive: false };
     }
 
-    const maintenanceItems = (maintenanceData.active || []).concat(maintenanceData.history || []).filter(item => item);
-    const activeItems = (maintenanceData.active || []).filter(item => item);
-    const inactiveItems = (maintenanceData.history || []).filter(item => item);
+    const activeItems = (maintenanceData.active || []).filter(Boolean);
+    const inactiveItems = (maintenanceData.history || []).filter(Boolean);
 
     if (activeItems.length > 0) {
         activeItems.forEach(item => {
@@ -350,7 +376,7 @@ function renderMaintenance(maintenanceData) {
             card.innerHTML = `
                 <div class="maintenance-header">⚠️ Maintenance in progress</div>
                 <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
-                ${startedAt ? `<div class=\"maintenance-meta\">Started ${startedAt} (Paris)</div>` : ''}
+                ${startedAt ? `<div class="maintenance-meta">Started ${startedAt} (Paris)</div>` : ''}
                 <div class="maintenance-description">${item.description || ''}</div>
             `;
             activeContainer.appendChild(card);
@@ -366,7 +392,7 @@ function renderMaintenance(maintenanceData) {
         inactiveItems.forEach(item => {
             const card = document.createElement('div');
             card.className = 'maintenance-card history';
-            const statusText = item.status ? item.status.replace(/-/g, ' ') : 'completed';
+            const statusText = item.status ? item.status.replaceAll('-', ' ') : 'completed';
             const startedAt = item.started_at ? new Date(item.started_at).toLocaleString('en-GB', {
                 timeZone: 'Europe/Paris',
                 dateStyle: 'medium',
@@ -377,15 +403,22 @@ function renderMaintenance(maintenanceData) {
                 dateStyle: 'medium',
                 timeStyle: 'short'
             }) : null;
-            const rangeText = startedAt || endedAt
-                ? `${startedAt ? `Started ${startedAt}` : ''}${startedAt && endedAt ? ' • ' : ''}${endedAt ? `Ended ${endedAt}` : ''} (Paris)`
-                : '';
+
+            let rangeText = '';
+            if (startedAt && endedAt) {
+                rangeText = `Started ${startedAt} • Ended ${endedAt} (Paris)`;
+            } else if (startedAt) {
+                rangeText = `Started ${startedAt} (Paris)`;
+            } else if (endedAt) {
+                rangeText = `Ended ${endedAt} (Paris)`;
+            }
+
             card.innerHTML = `
                 <div class="maintenance-row">
                     <div class="maintenance-title">${item.title || 'Scheduled maintenance'}</div>
                     <div class="maintenance-status">${statusText}</div>
                 </div>
-                ${rangeText ? `<div class=\"maintenance-meta\">${rangeText}</div>` : ''}
+                ${rangeText ? `<div class="maintenance-meta">${rangeText}</div>` : ''}
                 <div class="maintenance-description">${item.description || ''}</div>
             `;
             historyContainer.appendChild(card);
@@ -395,9 +428,9 @@ function renderMaintenance(maintenanceData) {
     return { hasActive: activeItems.length > 0 };
 }
 
-// Mettre à jour la page
+// Update the page
 async function updateStatus() {
-    // Récupérer les monitors et les heartbeats en parallèle
+    // Fetch monitors and heartbeats in parallel
     const [monitorsData, heartbeatsData, maintenanceData] = await Promise.all([
         fetchMonitors(),
         fetchHeartbeats(),
@@ -452,11 +485,11 @@ async function updateStatus() {
         });
     });
 
-    // Ajouter les heartbeats à chaque monitor
+    // Add heartbeats to each monitor
     monitors.forEach(monitor => {
         monitor.heartbeats = heartbeatsByMonitor[monitor.id] || [];
 
-        // Déterminer le statut actuel basé sur le dernier heartbeat
+        // Determine current status based on last heartbeat
         if (monitor.heartbeats.length > 0) {
             const lastHeartbeat = monitor.heartbeats[monitor.heartbeats.length - 1];
             monitor.active = lastHeartbeat.status === 1;
@@ -465,7 +498,7 @@ async function updateStatus() {
         }
     });
 
-    // Mettre à jour le statut global
+    // Update overall status
     const overallStatus = determineOverallStatus(monitors);
     const statusBadge = document.getElementById('overall-status');
     if (maintenanceState.hasActive) {
@@ -491,7 +524,7 @@ async function updateStatus() {
         return a.name.localeCompare(b.name);
     });
 
-    // Afficher les monitors
+    // Display monitors
     const container = document.getElementById('monitors-container');
     container.innerHTML = '';
 
@@ -505,7 +538,7 @@ async function updateStatus() {
         container.appendChild(card);
     });
 
-    // Mettre à jour le timestamp (heure de Paris)
+    // Update timestamp (Paris time)
     const lastUpdate = document.getElementById('last-update');
     lastUpdate.textContent = new Date().toLocaleString('fr-FR', {
         timeZone: 'Europe/Paris',
@@ -514,7 +547,7 @@ async function updateStatus() {
     });
 }
 
-// Initialisation
+// Initialization
 document.addEventListener('DOMContentLoaded', () => {
     const refreshBtn = document.getElementById('refresh-btn');
     if (refreshBtn) {
@@ -523,9 +556,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Charger les données immédiatement
+    // Load data immediately
     updateStatus();
 
-    // Rafraîchir toutes les 10 secondes
+    // Refresh every 10 seconds
     setInterval(updateStatus, 10000);
 });

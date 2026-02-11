@@ -134,9 +134,9 @@ class CozyGamification:
                 save_type = "PERIODIC SAVE" if force_detailed_log else "EVENT SAVE"
                 logging.info(f"✅️ {save_type} - Changes since last save:")
 
-                for user_id in set(list(self.changes_since_save['user_listening_time'].keys()) +
-                                 list(self.changes_since_save['user_sound_time'].keys()) +
-                                 list(self.changes_since_save['user_points'].keys())):
+                for user_id in (set(self.changes_since_save['user_listening_time'].keys()) |
+                                set(self.changes_since_save['user_sound_time'].keys()) |
+                                set(self.changes_since_save['user_points'].keys())):
 
                     username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
 
@@ -174,7 +174,7 @@ class CozyGamification:
                     'user_points_breakdown': {}
                 }
             else:
-                logging.debug(f"🚫 EVENT SAVE - No changes since last save")
+                logging.debug("🚫 EVENT SAVE - No changes since last save")
 
         except Exception as e:
             logging.error(f'❌ Failed to save gamification data to CouchDB: {e}\n{traceback.format_exc()}')
@@ -490,8 +490,8 @@ class CozyGamification:
     def get_sound_display_name(self, sound_filename: str) -> str:
         from cogs.audio.sound_mappings import get_sound_display_name
         return get_sound_display_name(sound_filename)
-    
-    def get_user_favorite_sound(self, user_id: str) -> str:
+
+    def get_user_favorite_sound(self, user_id: str) -> Optional[str]:
 
         user_stats = self.get_user_stats(user_id)
         listening_times = user_stats.get('listening_time_by_sound', {})
@@ -571,7 +571,7 @@ class CozyGamification:
             last = datetime.strptime(last_date, '%Y-%m-%d')
             current = datetime.strptime(current_date, '%Y-%m-%d')
             return (current - last).days == 1
-        except:
+        except Exception:
             return False
     
     def get_current_streak(self, user_id: str) -> int:
@@ -591,7 +591,7 @@ class CozyGamification:
                     if streak <= 0:
                         return 1
                     return streak
-            except:
+            except Exception:
                 pass
 
         return 0
@@ -633,14 +633,21 @@ class CozyGamification:
     def clean_corrupted_data(self):
 
         cleaned_count = 0
-        
-        # Clean user_data
-        for user_id, stats in list(self.user_data.items()):
-            if not isinstance(stats, dict):
-                logging.warning(f"⚠️ Removing corrupted user data for {user_id} (type: {type(stats)})")
-                del self.user_data[user_id]
-                cleaned_count += 1
-                continue
+
+        # Clean user_data - collect IDs to delete first
+        corrupted_user_ids = [
+            user_id for user_id, stats in self.user_data.items()
+            if not isinstance(stats, dict)
+        ]
+
+        for user_id in corrupted_user_ids:
+            stats = self.user_data[user_id]
+            logging.warning(f"⚠️ Removing corrupted user data for {user_id} (type: {type(stats)})")
+            del self.user_data[user_id]
+            cleaned_count += 1
+
+        # Clean existing user data
+        for user_id, stats in self.user_data.items():
                 
             # Clean current_sound field
             if 'current_sound' in stats and stats['current_sound'] is not None:
@@ -790,8 +797,8 @@ class CozyGamification:
         # Sort by points descending
         users.sort(key=lambda x: x['total_points'], reverse=True)
         return users[:limit]
-    
-    def get_user_rank(self, user_id: str) -> Dict:
+
+    def get_user_rank(self, user_id: str) -> Optional[Dict]:
 
         leaderboard = self.get_leaderboard(1000)  # Get all users
         user_id = str(user_id)

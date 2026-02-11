@@ -127,19 +127,19 @@ def log_system_info():
     try:
         import discord
         discord_version = discord.__version__
-    except:
+    except Exception:
         discord_version = "unknown"
 
     try:
         import nacl
         nacl_version = nacl.__version__
-    except:
+    except Exception:
         nacl_version = "unknown"
 
     try:
         import aiohttp
         aiohttp_version = aiohttp.__version__
-    except:
+    except Exception:
         aiohttp_version = "unknown"
 
     logging.info("")
@@ -231,8 +231,6 @@ def log_voice_dependencies():
 
     # Check libsodium (for voice encryption)
     try:
-        import nacl.secret
-        import nacl.utils
         logging.info("✅ libsodium (PyNaCl): Available")
     except Exception as e:
         logging.error(f"❌ libsodium check failed: {e}")
@@ -281,7 +279,7 @@ def log_bot_info(bot):
     if bot.shard_id is not None:
         logging.info(f"🔀 Shard ID: {bot.shard_id}/{bot.shard_count}")
     else:
-        logging.info(f"🔀 Sharding: Not enabled (single process)")
+        logging.info("🔀 Sharding: Not enabled (single process)")
 
 
 async def log_application_info(bot):
@@ -294,9 +292,9 @@ async def log_application_info(bot):
     try:
         app_info = await bot.application_info()
         if app_info.bot_public:
-            logging.info(f"🌍 Bot visibility: Public")
+            logging.info("🌍 Bot visibility: Public")
         else:
-            logging.info(f"🔒 Bot visibility: Private")
+            logging.info("🔒 Bot visibility: Private")
     except Exception as e:
         logging.warning(f"⚠️ Could not fetch app info: {e}")
 

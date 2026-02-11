@@ -15,14 +15,14 @@ class TopsCog(commands.Cog):
     def load_voice_time_data(self):
         try:
             return self.db.load_voice_time_data()
-        except Exception as e:
+        except Exception:
             return {}
 
     # Load server names cache from CouchDB
     def load_servernames_data(self):
         try:
             return self.db.load_servernames()
-        except Exception as e:
+        except Exception:
             return {}
 
     @app_commands.command(name="top-servers", description="Display the top servers")
@@ -93,11 +93,11 @@ class TopsCog(commands.Cog):
                 try:
                     user = await self.bot.fetch_user(int(user_id))
                     display_name = user.global_name or user.name if user else f"User {user_id[:8]}"
-                except:
+                except Exception:
                     try:
                         user = self.bot.get_user(int(user_id))
                         display_name = user.global_name or user.name if user else f"User {user_id[:8]}"
-                    except:
+                    except Exception:
                         display_name = f"User {user_id[:8]}"
             
             user_info = f"{user_data['total_points']:,} points"

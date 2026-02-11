@@ -5,6 +5,7 @@ from discord.ui import Button, View
 import os
 import asyncio
 import logging
+import subprocess
 from ..stats.gamification import cozy_gamification
 
 # Global state tracking which cog is playing in each guild and current sounds (survives reconnections)
@@ -90,7 +91,7 @@ class BaseSoundCog(commands.Cog):
                 if cog.guild_states[guild_id].get('loop_task'):
                     try:
                         cog.guild_states[guild_id]['loop_task'].cancel()
-                    except:
+                    except Exception:
                         pass
                     cog.guild_states[guild_id]['loop_task'] = None
         global_playing_states[guild_id] = self.__class__.__name__
@@ -186,14 +187,14 @@ class BaseSoundCog(commands.Cog):
 
         # Check if voice_client is actually connected, not just exists (fixes ghost connection bug)
         if voice_client and not voice_client.channel:
-            logging.warning(f"⚠️ Ghost voice_client detected (exists but not in channel). Cleaning up...")
+            logging.warning("⚠️ Ghost voice_client detected (exists but not in channel). Cleaning up...")
             try:
                 await voice_client.disconnect()
-            except:
+            except Exception:
                 pass
             voice_client = None
             await asyncio.sleep(0.5)
-            logging.info(f"🔍 DEBUG: After cleanup, voice_client is now None")
+            logging.info("🔍 DEBUG: After cleanup, voice_client is now None")
 
         # Refresh voice_client reference
         voice_client = interaction.guild.voice_client
@@ -245,7 +246,7 @@ class BaseSoundCog(commands.Cog):
                                 logging.info(f"⏱️ PERF click->moved: {int((time.monotonic() - t0) * 1000)}ms")
                             break
                         else:
-                            logging.warning(f"⚠️ move_to() completed but bot not in target channel")
+                            logging.warning("⚠️ move_to() completed but bot not in target channel")
                             if move_attempt == max_move_retries - 1:
                                 await interaction.followup.send("❌ Failed to move to voice channel. Please try again.", ephemeral=True)
                                 return
@@ -256,7 +257,7 @@ class BaseSoundCog(commands.Cog):
                         # Check if move succeeded anyway
                         await asyncio.sleep(1)
                         if voice_client.channel == user_channel:
-                            logging.info(f"✅ Move succeeded despite timeout")
+                            logging.info("✅ Move succeeded despite timeout")
                             break
 
                         if move_attempt == max_move_retries - 1:
@@ -270,9 +271,6 @@ class BaseSoundCog(commands.Cog):
                             await interaction.followup.send(f"❌ Failed to move to voice channel: {str(e)}", ephemeral=True)
                             return
                         await asyncio.sleep(1)
-
-            elif user_channel:
-                pass
 
         self.clear_other_cog_states(interaction.guild.id)
 
@@ -346,7 +344,8 @@ class BaseSoundCog(commands.Cog):
                 global_current_sounds[interaction.guild.id] = sound_filename
 
                 # Track sound in background - don't block audio playback
-                asyncio.create_task(self._track_sound_async(interaction.guild.id, sound_filename, voice_client.channel))
+                tracking_task = asyncio.create_task(self._track_sound_async(interaction.guild.id, sound_filename, voice_client.channel))
+                guild_state['tracking_task'] = tracking_task
 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
                 await interaction.followup.send(f"🎵 Now playing: {sound_label}")
@@ -388,10 +387,18 @@ class BaseSoundCog(commands.Cog):
                 if not voice_client.channel:
                     break
                 
-                # Check if there are real users (not bots) in the channel
+                # Determine if there are non-bot users in the channel.
+                # Use voice_states (more reliable than members cache) and fall back to members.
+                voice_states = getattr(voice_client.channel, "voice_states", {}) or {}
+                non_bot_voice_ids = [uid for uid in voice_states.keys() if uid != self.bot.user.id]
                 human_members = [m for m in voice_client.channel.members if not m.bot]
-                
-                if not human_members:
+
+                logging.info(
+                    f"🔍 AUTO-DISCONNECT CHECK: guild={guild.name} "
+                    f"voice_states={len(non_bot_voice_ids)} members={len(human_members)}"
+                )
+
+                if not non_bot_voice_ids and not human_members:
                     # Channel is empty, disconnect
                     guild_state = self.get_guild_state(guild_id)
                     
@@ -410,7 +417,7 @@ class BaseSoundCog(commands.Cog):
                     
         except asyncio.CancelledError:
             # Timer was cancelled (normal when new user joins or manual stop)
-            pass
+            raise
         except Exception as e:
             logging.error(f"❌ Error in disconnect timer: {e}")
 
@@ -508,7 +515,7 @@ class BaseSoundCog(commands.Cog):
             # Restart audio if file exists and voice client is ready
             # NOTE: Using voice_client.channel check instead of is_connected() due to discord.py 2.3.2 bug
             if os.path.exists(sound_path) and voice_client.channel and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=open(os.devnull, 'w'))
+                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=subprocess.DEVNULL)
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             
         except Exception as e:

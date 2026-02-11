@@ -1,4 +1,5 @@
 services:
+  # Uptime monitoring service
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: ${UPTIME_KUMA_CONTAINER_NAME}
@@ -9,14 +10,13 @@ services:
       - uptime-kuma-data:/app/data
       - ./kuma-seed:/seed:ro
     entrypoint: ["/bin/sh", "/seed/entrypoint.sh"]
-    # networks:
-    #   - bot-network
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001',res=>process.exit(res.statusCode<400?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # Discord bot service (live voice processing)
   discord-bot:
     build:
       context: ../apps/bot
@@ -38,19 +38,11 @@ services:
     ports:
       - "${BOT_API_PORT:-8002}:8002"
     volumes:
-      # Base volumes always mounted
       - voice-data:/app/data
-      # Conditional volume for development
       - ${DEV_CODE_MOUNT:-/tmp/empty}:/app:rw
-      # Specific environment file
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
-      # SSL certificates from Let's Encrypt
       - /etc/letsencrypt:/etc/letsencrypt:ro
-    # networks:
-    #   - bot-network
-    # Run bot only (voice stability)
     command: python3 main.py
-    # Conditional health check
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/api/live/bot/health').read()"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
@@ -62,6 +54,7 @@ services:
       couchdb:
         condition: service_healthy
 
+  # Public API service
   api:
     build:
       context: ../apps/bot
@@ -79,16 +72,10 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
-      # Base volumes always mounted
       - voice-data:/app/data
-      # Conditional volume for development
       - ${DEV_CODE_MOUNT:-/tmp/empty}:/app:rw
-      # Specific environment file
       - ${ENV_FILE_PATH:-/tmp/empty}:/app/.env.local:ro
-      # SSL certificates from Let's Encrypt
       - /etc/letsencrypt:/etc/letsencrypt:ro
-    # networks:
-    #   - bot-network
     command: python3 -m uvicorn api.app:app --host 0.0.0.0 --port 8000
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/public/health').read()"]
@@ -99,6 +86,7 @@ services:
       couchdb:
         condition: service_healthy
 
+  # Database service
   couchdb:
     image: couchdb:3
     container_name: ${COUCHDB_CONTAINER_NAME}
@@ -110,14 +98,13 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
     volumes:
       - couchdb-data:/opt/couchdb/data
-    # networks:
-    #   - bot-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # Status page web interface
   status-page:
     image: nginx:alpine
     container_name: ${STATUS_PAGE_CONTAINER_NAME:-cozy-status-page}
@@ -127,8 +114,6 @@ services:
     volumes:
       - ../apps/status-page:/usr/share/nginx/html:ro
       - ../apps/status-page/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    # networks:
-    #   - bot-network
     depends_on:
       - uptime-kuma
       - status-api
@@ -138,6 +123,7 @@ services:
       timeout: 10s
       retries: 3
 
+  # Status API service (monitoring data aggregation)
   status-api:
     build:
       context: ../apps/status-api
@@ -165,7 +151,7 @@ services:
       timeout: 10s
       retries: 3
 
-
+# Persistent volumes
 volumes:
   voice-data:
     name: ${VOICE_DATA_VOLUME}
@@ -175,8 +161,3 @@ volumes:
     name: ${COUCHDB_VOLUME}
   status-api-data:
     name: ${STATUS_API_VOLUME:-cozy-status-api-data}
-
-# networks:
-#   bot-network:
-#     name: ${NETWORK_NAME:-cozy-bot-network}
-#     driver: bridge

@@ -2,7 +2,7 @@ import discord
 import logging
 from dotenv import load_dotenv
 import os
-from discord.ext import commands
+from discord.ext import commands, tasks
 from datetime import datetime
 import json
 import asyncio
@@ -54,12 +54,11 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 logging.debug(f"⚔️ Bot guilds: {bot.guilds}")
 
 # Track user join in background to avoid blocking Discord events
-async def _track_user_join_async(user_id, member, guild_id):
+def _track_user_join_sync(user_id, member, guild_id):
     try:
         from cogs.stats.gamification import cozy_gamification
 
         # Don't save immediately for user tracking
-        result = cozy_gamification.join_session(user_id, member.name, save_immediately=False)
         cozy_gamification.update_username(user_id, member.name, member.global_name or member.name, save_immediately=False)
 
         # Find currently playing sound to track for new user
@@ -90,7 +89,7 @@ async def _track_user_join_async(user_id, member, guild_id):
         logging.error(f"❌ Error tracking user join: {e}")
 
 # Track bot join in background to avoid blocking Discord connection
-async def _track_bot_join_async(guild_id, guild_name, channel, current_users):
+def _track_bot_join_sync(guild_id, guild_name, channel, current_users):
     try:
         from cogs.stats.gamification import cozy_gamification
 
@@ -101,9 +100,8 @@ async def _track_bot_join_async(guild_id, guild_name, channel, current_users):
                 'accumulated_time': 0.0
             }
             # Don't save immediately to avoid blocking the event loop
-            result = cozy_gamification.join_session(user_id, user.name, force_bonus=True, save_immediately=False)
             cozy_gamification.update_username(user_id, user.name, user.global_name or user.name, save_immediately=False)
-            logging.info(f"")
+            logging.info("")
             logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {channel.name} in {guild_name}")
 
         # Save once after processing all users
@@ -165,11 +163,8 @@ def save_voice_time_data(silent=False):
         # Merge: keep active sessions from memory, preserve CouchDB data for inactive sessions
         merged_data = file_data.copy()
         for guild_id, guild_data in guild_voice_time.items():
-            # If there's an active session (start_time is not None), use memory data
-            if isinstance(guild_data, list) and len(guild_data) >= 1 and guild_data[0] is not None:
-                merged_data[guild_id] = guild_data
-            # Otherwise, only update if guild not in file or memory has more recent data
-            elif guild_id not in file_data:
+            # Use memory data if: active session (start_time is not None) OR guild not in file
+            if (isinstance(guild_data, list) and len(guild_data) >= 1 and guild_data[0] is not None) or guild_id not in file_data:
                 merged_data[guild_id] = guild_data
 
         db.save_voice_time_data(merged_data)
@@ -194,275 +189,286 @@ guild_voice_time = load_voice_time_data()
 guild_voice_time_changes = {}
 user_voice_sessions = {}
 periodic_backup_task = None
+background_tasks = set()  # Keep references to prevent garbage collection
+
+# Create background task and keep reference to prevent garbage collection
+def create_background_task(coro):
+    task = asyncio.create_task(coro)
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
+    return task
 
 # Dynamic bot presence updates
+@tasks.loop(seconds=10)
 async def change_status():
+    try:
+        server_count = len(bot.guilds)
+        if server_count == 0 and hasattr(change_status, '_last_count'):
+            server_count = change_status._last_count
+        else:
+            change_status._last_count = server_count
+
+        # Cycle through statuses
+        if not hasattr(change_status, '_status_index'):
+            change_status._status_index = 0
+
+        statuses = [
+            discord.Game(name=f"in {server_count} servers"),
+            discord.Game(name="/menu"),
+        ]
+
+        status = statuses[change_status._status_index]
+        await bot.change_presence(activity=status)
+        change_status._status_index = (change_status._status_index + 1) % len(statuses)
+
+    except (OSError, discord.ConnectionClosed):
+        pass
+    except Exception as e:
+        logging.error(f"❌ Error updating bot status: {e}")
+
+@change_status.before_loop
+async def before_change_status():
     await bot.wait_until_ready()
-    last_server_count = 0
-
-    while not bot.is_closed():
-        try:
-            server_count = len(bot.guilds)
-            if server_count == 0 and last_server_count > 0:
-                server_count = last_server_count
-            else:
-                last_server_count = server_count
-            total_member_count = sum(guild.member_count or 0 for guild in bot.guilds)
-            statuses = [
-                discord.Game(name=f"in {server_count} servers"),
-                discord.Game(name="/menu"),
-            ]
-
-            for status in statuses:
-                if bot.is_closed():
-                    return
-                await bot.change_presence(activity=status)
-                await asyncio.sleep(10)
-        except (ConnectionResetError, OSError, discord.ConnectionClosed):
-            await asyncio.sleep(30)
-        except Exception as e:
-            logging.error(f"❌ Error updating bot status: {e}")
-            await asyncio.sleep(60)
 
 # Periodic data backup task
+@tasks.loop(seconds=600)
 async def periodic_backup():
-    await bot.wait_until_ready()
+    try:
+        from cogs.stats.gamification import cozy_gamification
 
-    while not bot.is_closed():
-        await asyncio.sleep(600)
+        logging.info("")
+        logging.info("")
+        logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
 
-        try:
-            from cogs.stats.gamification import cozy_gamification
+        active_session_updates = {}
+        active_user_updates = {}
+        
+        # Process active server sessions
+        for idx, (guild_id, guild_data) in enumerate(guild_voice_time.items()):
+            if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
+                guild = bot.get_guild(int(guild_id))
+                if not guild or not guild.voice_client or not guild.voice_client.channel:
+                    guild_voice_time[guild_id] = [None, guild_data[1]]
+                    continue
 
-            logging.info("")
-            logging.info("")
-            logging.info("🕐 PERIODIC BACKUP: Starting complete data backup...")
+                start_time = datetime.fromisoformat(guild_data[0])
+                accumulated_time = guild_data[1]
+                current_session_time = (datetime.now() - start_time).total_seconds()
 
-            active_session_updates = {}
-            active_user_updates = {}
-            
-            # Process active server sessions
-            for idx, (guild_id, guild_data) in enumerate(guild_voice_time.items()):
-                if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
-                    guild = bot.get_guild(int(guild_id))
-                    if not guild or not guild.voice_client or not guild.voice_client.channel:
-                        guild_voice_time[guild_id] = [None, guild_data[1]]
+                # Cap session duration at 30 minutes to prevent corrupted data
+                max_session_duration = 30 * 60
+                if current_session_time > max_session_duration:
+                    logging.warning(f"⚠️ Suspicious server session duration for guild {guild_id}: {current_session_time/60:.1f}min - capping to 30min")
+                    current_session_time = max_session_duration
+
+                new_total = accumulated_time + current_session_time
+                guild_voice_time[guild_id] = [datetime.now().isoformat(), new_total]
+                active_session_updates[guild_id] = current_session_time
+            if idx % 50 == 0:
+                await asyncio.sleep(0)
+        
+        # Track users currently in voice with bot
+        users_in_voice_with_bot = set()
+        for idx, guild in enumerate(bot.guilds):
+            if guild.voice_client and guild.voice_client.channel:
+                for member in guild.voice_client.channel.members:
+                    if not member.bot:
+                        users_in_voice_with_bot.add(str(member.id))
+            if idx % 50 == 0:
+                await asyncio.sleep(0)
+        
+        # Process active user listening sessions
+        for idx, (user_id, user_stats) in enumerate(cozy_gamification.user_data.items()):
+            current_sound = user_stats.get('current_sound')
+            if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                try:
+                    if str(user_id) not in users_in_voice_with_bot:
+                        username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                        logging.warning(f"⚠️ Removing session for {username}: not in voice with bot")
+
+                        # Finalize the current sound before removing session to award remaining points
+                        cozy_gamification.finalize_current_sound(user_id)
+                        logging.info(f"👉 PERIODIC CLEANUP: Finalized session for {username}")
                         continue
-
-                    start_time = datetime.fromisoformat(guild_data[0])
-                    accumulated_time = guild_data[1]
-                    current_session_time = (datetime.now() - start_time).total_seconds()
+                    
+                    start_time = datetime.fromisoformat(current_sound['start_time'])
+                    session_duration = (datetime.now() - start_time).total_seconds()
+                    from cogs.audio.sound_mappings import normalize_sound_name
+                    sound_name = normalize_sound_name(current_sound['name'])
+                    current_sound['name'] = sound_name
 
                     # Cap session duration at 30 minutes to prevent corrupted data
                     max_session_duration = 30 * 60
-                    if current_session_time > max_session_duration:
-                        logging.warning(f"⚠️ Suspicious server session duration for guild {guild_id}: {current_session_time/60:.1f}min - capping to 30min")
-                        current_session_time = max_session_duration
+                    if session_duration > max_session_duration:
+                        username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                        logging.warning(f"⚠️ Removing old session for {username}: {session_duration/60:.1f}min old")
+                        user_stats['current_sound'] = None
+                        continue
 
-                    new_total = accumulated_time + current_session_time
-                    guild_voice_time[guild_id] = [datetime.now().isoformat(), new_total]
-                    active_session_updates[guild_id] = current_session_time
-                if idx % 50 == 0:
-                    await asyncio.sleep(0)
-            
-            # Track users currently in voice with bot
-            users_in_voice_with_bot = set()
+                    if session_duration > 0:
+                        user_stats['listening_time'] += session_duration
+
+                        # Ensure daily streak updates even if join event was missed
+                        today = datetime.now().strftime('%Y-%m-%d')
+                        last_active = user_stats.get('last_active_date')
+                        if last_active != today:
+                            try:
+                                from cogs.stats.gamification import cozy_gamification
+                                if last_active and cozy_gamification.is_consecutive_day(last_active, today):
+                                    user_stats['daily_streak'] += 1
+                                else:
+                                    user_stats['daily_streak'] = 1
+                                user_stats['last_active_date'] = today
+                            except Exception:
+                                user_stats['daily_streak'] = 1
+                                user_stats['last_active_date'] = today
+
+                        if 'listening_time_by_sound' not in user_stats:
+                            user_stats['listening_time_by_sound'] = {}
+                        if sound_name not in user_stats['listening_time_by_sound']:
+                            user_stats['listening_time_by_sound'][sound_name] = {
+                                'total_time': 0.0,
+                                'session_count': 0,
+                                'consecutive_time': 0.0
+                            }
+                        user_stats['listening_time_by_sound'][sound_name]['total_time'] += session_duration
+                        if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
+                            user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
+                        user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += session_duration
+
+                        if user_id not in cozy_gamification.changes_since_save['user_listening_time']:
+                            cozy_gamification.changes_since_save['user_listening_time'][user_id] = 0
+                        cozy_gamification.changes_since_save['user_listening_time'][user_id] += session_duration
+
+                        if user_id not in cozy_gamification.changes_since_save['user_sound_time']:
+                            cozy_gamification.changes_since_save['user_sound_time'][user_id] = {}
+                        if sound_name not in cozy_gamification.changes_since_save['user_sound_time'][user_id]:
+                            cozy_gamification.changes_since_save['user_sound_time'][user_id][sound_name] = 0
+                        cozy_gamification.changes_since_save['user_sound_time'][user_id][sound_name] += session_duration
+
+                        # Award points: 1 point per minute
+                        points_to_add = int(session_duration / 60)
+                        if points_to_add > 0:
+                            user_stats['total_points'] += points_to_add
+                            if user_id not in cozy_gamification.changes_since_save['user_points_breakdown']:
+                                cozy_gamification.changes_since_save['user_points_breakdown'][user_id] = []
+                            cozy_gamification.changes_since_save['user_points_breakdown'][user_id].append({
+                                'reason': f"Periodic save: listening to {sound_name}",
+                                'points': points_to_add
+                            })
+
+                        # Award streak bonus
+                        streak_bonus = cozy_gamification.calculate_streak_bonus(user_id, session_duration / 60)
+                        if streak_bonus > 0:
+                            user_stats['total_points'] += streak_bonus
+                            current_streak = cozy_gamification.get_current_streak(user_id)
+                            if user_id not in cozy_gamification.changes_since_save['user_points_breakdown']:
+                                cozy_gamification.changes_since_save['user_points_breakdown'][user_id] = []
+                            cozy_gamification.changes_since_save['user_points_breakdown'][user_id].append({
+                                'reason': f"Streak bonus: {current_streak}-day streak",
+                                'points': streak_bonus
+                            })
+
+                        current_sound['start_time'] = datetime.now().isoformat()
+
+                        for guild_id, session_data in user_voice_sessions.items():
+                            if user_id in session_data.get('users', {}):
+                                session_data['users'][user_id]['accumulated_time'] += session_duration
+                                session_data['users'][user_id]['join_time'] = datetime.now()
+                                break
+
+                        total_points_awarded = points_to_add + streak_bonus
+                        active_user_updates[user_id] = {
+                            'time': session_duration,
+                            'sound': sound_name,
+                            'points': total_points_awarded
+                        }
+                except Exception as e:
+                    logging.warning(f"⚠️ Error processing active session for user {user_id}: {e}")
+            if idx % 200 == 0:
+                await asyncio.sleep(0)
+        
+        # Restart tracking for users who lost sessions after reconnection
+        from cogs.stats.gamification import cozy_gamification
+        users_with_active_sessions = set()
+        for idx, (user_id, user_stats) in enumerate(cozy_gamification.user_data.items()):
+            current_sound = user_stats.get('current_sound')
+            if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
+                users_with_active_sessions.add(str(user_id))
+            if idx % 200 == 0:
+                await asyncio.sleep(0)
+
+        users_missing_sessions = users_in_voice_with_bot - users_with_active_sessions
+        if users_missing_sessions:
             for idx, guild in enumerate(bot.guilds):
                 if guild.voice_client and guild.voice_client.channel:
-                    for member in guild.voice_client.channel.members:
-                        if not member.bot:
-                            users_in_voice_with_bot.add(str(member.id))
+                    guild_id = str(guild.id)
+                    from cogs.audio.base_sound import global_current_sounds
+                    current_guild_sound = global_current_sounds.get(guild.id)
+
+                    if current_guild_sound:
+                        users_to_restore = []
+                        for member in guild.voice_client.channel.members:
+                            if not member.bot and str(member.id) in users_missing_sessions:
+                                users_to_restore.append(member)
+                                users_missing_sessions.remove(str(member.id))
+
+                        # Batch save to avoid multiple CouchDB writes
+                        for member in users_to_restore:
+                            cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name, save_immediately=False)
+                            cozy_gamification.track_sound_start(str(member.id), current_guild_sound, save_immediately=False)
+                            logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking \033[36m{current_guild_sound}\033[0m")
+
+                        if users_to_restore:
+                            await asyncio.to_thread(cozy_gamification.save_user_data)
+                            await asyncio.to_thread(cozy_gamification.save_usernames)
                 if idx % 50 == 0:
                     await asyncio.sleep(0)
-            
-            # Process active user listening sessions
-            for idx, (user_id, user_stats) in enumerate(cozy_gamification.user_data.items()):
-                current_sound = user_stats.get('current_sound')
-                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
-                    try:
-                        if str(user_id) not in users_in_voice_with_bot:
-                            username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
-                            logging.warning(f"⚠️ Removing session for {username}: not in voice with bot")
-
-                            # Finalize the current sound before removing session to award remaining points
-                            cozy_gamification.finalize_current_sound(user_id)
-                            logging.info(f"👉 PERIODIC CLEANUP: Finalized session for {username}")
-                            continue
-                        
-                        start_time = datetime.fromisoformat(current_sound['start_time'])
-                        session_duration = (datetime.now() - start_time).total_seconds()
-                        from cogs.audio.sound_mappings import normalize_sound_name
-                        sound_name = normalize_sound_name(current_sound['name'])
-                        current_sound['name'] = sound_name
-
-                        # Cap session duration at 30 minutes to prevent corrupted data
-                        max_session_duration = 30 * 60
-                        if session_duration > max_session_duration:
-                            username = cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
-                            logging.warning(f"⚠️ Removing old session for {username}: {session_duration/60:.1f}min old")
-                            user_stats['current_sound'] = None
-                            continue
-
-                        if session_duration > 0:
-                            user_stats['listening_time'] += session_duration
-
-                            # Ensure daily streak updates even if join event was missed
-                            today = datetime.now().strftime('%Y-%m-%d')
-                            last_active = user_stats.get('last_active_date')
-                            if last_active != today:
-                                try:
-                                    from cogs.stats.gamification import cozy_gamification
-                                    if last_active and cozy_gamification.is_consecutive_day(last_active, today):
-                                        user_stats['daily_streak'] += 1
-                                    else:
-                                        user_stats['daily_streak'] = 1
-                                    user_stats['last_active_date'] = today
-                                except Exception:
-                                    user_stats['daily_streak'] = 1
-                                    user_stats['last_active_date'] = today
-
-                            if 'listening_time_by_sound' not in user_stats:
-                                user_stats['listening_time_by_sound'] = {}
-                            if sound_name not in user_stats['listening_time_by_sound']:
-                                user_stats['listening_time_by_sound'][sound_name] = {
-                                    'total_time': 0.0,
-                                    'session_count': 0,
-                                    'consecutive_time': 0.0
-                                }
-                            user_stats['listening_time_by_sound'][sound_name]['total_time'] += session_duration
-                            if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
-                                user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
-                            user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += session_duration
-
-                            if user_id not in cozy_gamification.changes_since_save['user_listening_time']:
-                                cozy_gamification.changes_since_save['user_listening_time'][user_id] = 0
-                            cozy_gamification.changes_since_save['user_listening_time'][user_id] += session_duration
-
-                            if user_id not in cozy_gamification.changes_since_save['user_sound_time']:
-                                cozy_gamification.changes_since_save['user_sound_time'][user_id] = {}
-                            if sound_name not in cozy_gamification.changes_since_save['user_sound_time'][user_id]:
-                                cozy_gamification.changes_since_save['user_sound_time'][user_id][sound_name] = 0
-                            cozy_gamification.changes_since_save['user_sound_time'][user_id][sound_name] += session_duration
-
-                            # Award points: 1 point per minute
-                            points_to_add = int(session_duration / 60)
-                            if points_to_add > 0:
-                                user_stats['total_points'] += points_to_add
-                                if user_id not in cozy_gamification.changes_since_save['user_points_breakdown']:
-                                    cozy_gamification.changes_since_save['user_points_breakdown'][user_id] = []
-                                cozy_gamification.changes_since_save['user_points_breakdown'][user_id].append({
-                                    'reason': f"Periodic save: listening to {sound_name}",
-                                    'points': points_to_add
-                                })
-
-                            # Award streak bonus
-                            streak_bonus = cozy_gamification.calculate_streak_bonus(user_id, session_duration / 60)
-                            if streak_bonus > 0:
-                                user_stats['total_points'] += streak_bonus
-                                current_streak = cozy_gamification.get_current_streak(user_id)
-                                if user_id not in cozy_gamification.changes_since_save['user_points_breakdown']:
-                                    cozy_gamification.changes_since_save['user_points_breakdown'][user_id] = []
-                                cozy_gamification.changes_since_save['user_points_breakdown'][user_id].append({
-                                    'reason': f"Streak bonus: {current_streak}-day streak",
-                                    'points': streak_bonus
-                                })
-
-                            current_sound['start_time'] = datetime.now().isoformat()
-
-                            for guild_id, session_data in user_voice_sessions.items():
-                                if user_id in session_data.get('users', {}):
-                                    session_data['users'][user_id]['accumulated_time'] += session_duration
-                                    session_data['users'][user_id]['join_time'] = datetime.now()
-                                    break
-
-                            total_points_awarded = points_to_add + streak_bonus
-                            active_user_updates[user_id] = {
-                                'time': session_duration,
-                                'sound': sound_name,
-                                'points': total_points_awarded
-                            }
-                    except Exception as e:
-                        logging.warning(f"⚠️ Error processing active session for user {user_id}: {e}")
-                if idx % 200 == 0:
-                    await asyncio.sleep(0)
-            
-            # Restart tracking for users who lost sessions after reconnection
+        
+        # Log voice time changes since last save
+        if guild_voice_time_changes or active_session_updates:
             from cogs.stats.gamification import cozy_gamification
-            users_with_active_sessions = set()
-            for idx, (user_id, user_stats) in enumerate(cozy_gamification.user_data.items()):
-                current_sound = user_stats.get('current_sound')
-                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
-                    users_with_active_sessions.add(str(user_id))
-                if idx % 200 == 0:
-                    await asyncio.sleep(0)
 
-            users_missing_sessions = users_in_voice_with_bot - users_with_active_sessions
-            if users_missing_sessions:
-                for idx, guild in enumerate(bot.guilds):
-                    if guild.voice_client and guild.voice_client.channel:
-                        guild_id = str(guild.id)
-                        from cogs.audio.base_sound import global_current_sounds
-                        current_guild_sound = global_current_sounds.get(guild.id)
+            for guild_id, added_time in guild_voice_time_changes.items():
+                if added_time > 0:
+                    server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
+                    logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name}")
 
-                        if current_guild_sound:
-                            users_to_restore = []
-                            for member in guild.voice_client.channel.members:
-                                if not member.bot and str(member.id) in users_missing_sessions:
-                                    users_to_restore.append(member)
-                                    users_missing_sessions.remove(str(member.id))
+            for guild_id, added_time in active_session_updates.items():
+                if added_time > 0:
+                    guild = bot.get_guild(int(guild_id))
+                    has_users = False
+                    if guild and guild.voice_client and guild.voice_client.channel:
+                        human_members = [m for m in guild.voice_client.channel.members if not m.bot]
+                        has_users = len(human_members) > 0
 
-                            # Batch save to avoid multiple CouchDB writes
-                            for member in users_to_restore:
-                                cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name, save_immediately=False)
-                                cozy_gamification.track_sound_start(str(member.id), current_guild_sound, save_immediately=False)
-                                logging.info(f"👉 RECONNECT FIX: Restarted session for \033[35m{member.name}\033[0m tracking \033[36m{current_guild_sound}\033[0m")
-
-                            if users_to_restore:
-                                await asyncio.to_thread(cozy_gamification.save_user_data)
-                                await asyncio.to_thread(cozy_gamification.save_usernames)
-                    if idx % 50 == 0:
-                        await asyncio.sleep(0)
-            
-            # Log voice time changes since last save
-            if guild_voice_time_changes or active_session_updates:
-                from cogs.stats.gamification import cozy_gamification
-
-                for guild_id, added_time in guild_voice_time_changes.items():
-                    if added_time > 0:
+                    if has_users:
                         server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                        logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name}")
+                        logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
 
-                for guild_id, added_time in active_session_updates.items():
-                    if added_time > 0:
-                        guild = bot.get_guild(int(guild_id))
-                        has_users = False
-                        if guild and guild.voice_client and guild.voice_client.channel:
-                            human_members = [m for m in guild.voice_client.channel.members if not m.bot]
-                            has_users = len(human_members) > 0
+            guild_voice_time_changes.clear()
+        
+        if active_user_updates:
+            for user_id, update_info in active_user_updates.items():
+                username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
+                time_str = f'\033[94m+{format_duration(update_info["time"])}\033[0m'
+                points_str = f' (\033[32m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
+                logging.info(f"  👉 {time_str} for {username} (\033[36m{update_info['sound']}\033[0m active session){points_str}")
 
-                        if has_users:
-                            server_name = cozy_gamification.servernames.get(str(guild_id), {}).get('name', f'Server {str(guild_id)[:8]}')
-                            logging.info(f"  🏠 \033[94m+{format_duration(added_time)}\033[0m for {server_name} (active session)")
+        if guild_voice_time:
+            await asyncio.to_thread(save_voice_time_data, silent=True)
 
-                guild_voice_time_changes.clear()
-            
-            if active_user_updates:
-                for user_id, update_info in active_user_updates.items():
-                    username = f'\033[35m{cozy_gamification.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
-                    time_str = f'\033[94m+{format_duration(update_info["time"])}\033[0m'
-                    points_str = f' (\033[32m+{update_info["points"]} points\033[0m)' if update_info["points"] > 0 else ''
-                    logging.info(f"  👉 {time_str} for {username} (\033[36m{update_info['sound']}\033[0m active session){points_str}")
+        await asyncio.to_thread(cozy_gamification.save_user_data, force_detailed_log=True)
+        logging.info("✅ PERIODIC BACKUP: Complete backup finished")
 
-            if guild_voice_time:
-                await asyncio.to_thread(save_voice_time_data, silent=True)
+    except Exception as e:
+        logging.error(f"❌ PERIODIC BACKUP FAILED: {e}")
 
-            await asyncio.to_thread(cozy_gamification.save_user_data, force_detailed_log=True)
-            logging.info("✅ PERIODIC BACKUP: Complete backup finished")
+    save_current_stats_for_api()
 
-        except Exception as e:
-            logging.error(f"❌ PERIODIC BACKUP FAILED: {e}")
-
-        save_current_stats_for_api()
+@periodic_backup.before_loop
+async def before_periodic_backup():
+    await bot.wait_until_ready()
 
 # Save current bot stats for API access
 def save_current_stats_for_api():
@@ -492,12 +498,6 @@ def save_current_stats_for_api():
                         pass
 
         from cogs.stats.gamification import cozy_gamification
-        if hasattr(cozy_gamification, 'user_data'):
-            for user_id, user_stats in cozy_gamification.user_data.items():
-                current_sound = user_stats.get('current_sound')
-                if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
-                    pass
-
         total_servers = 0
         if hasattr(cozy_gamification, 'servernames'):
             total_servers = len(cozy_gamification.servernames)
@@ -533,42 +533,60 @@ async def _live_stats_flush_loop():
             logging.error(f'❌ Live stats flush failed: {e}')
         await asyncio.sleep(LIVE_STATS_FLUSH_SECONDS)
 
+@tasks.loop(seconds=PLAYBACK_WATCHDOG_SECONDS)
 async def _playback_watchdog_loop():
-    await bot.wait_until_ready()
-    last_restart_by_guild = {}
+    if not hasattr(_playback_watchdog_loop, 'last_restart_by_guild'):
+        _playback_watchdog_loop.last_restart_by_guild = {}
 
-    while not bot.is_closed():
-        try:
-            for guild in bot.guilds:
-                voice_client = guild.voice_client
-                if not voice_client or not voice_client.channel:
+    try:
+        for guild in bot.guilds:
+            voice_client = guild.voice_client
+            if not voice_client or not voice_client.channel:
+                continue
+
+            for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
+                cog = bot.get_cog(cog_name)
+                if not cog or not hasattr(cog, 'guild_states'):
                     continue
 
-                for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
-                    cog = bot.get_cog(cog_name)
-                    if not cog or not hasattr(cog, 'guild_states'):
-                        continue
+                guild_state = cog.guild_states.get(guild.id)
+                if not guild_state:
+                    continue
 
-                    guild_state = cog.guild_states.get(guild.id)
-                    if not guild_state:
-                        continue
+                if guild_state.get('current_sound') and guild_state.get('is_playing'):
+                    if not voice_client.is_playing():
+                        now = time.monotonic()
+                        last_restart = _playback_watchdog_loop.last_restart_by_guild.get(guild.id, 0.0)
+                        if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
+                            continue
+                        is_paused = voice_client.is_paused() if hasattr(voice_client, "is_paused") else None
+                        source = getattr(voice_client, "source", None)
+                        source_type = type(source).__name__ if source else None
+                        logging.info(
+                            "🔍 WATCHDOG CHECK: guild=%s channel=%s cog=%s "
+                            "sound=%s is_playing=%s is_paused=%s source=%s",
+                            guild.name,
+                            voice_client.channel.name if voice_client.channel else "unknown",
+                            cog_name,
+                            guild_state.get('current_sound'),
+                            voice_client.is_playing(),
+                            is_paused,
+                            source_type,
+                        )
+                        logging.warning(
+                            f"⚠️ Playback stalled in {guild.name} (sound={guild_state.get('current_sound')}). Restarting..."
+                        )
+                        task = bot.loop.create_task(cog.restart_audio_loop(guild.id))
+                        background_tasks.add(task)
+                        task.add_done_callback(background_tasks.discard)
+                        _playback_watchdog_loop.last_restart_by_guild[guild.id] = now
+                    break
+    except Exception as e:
+        logging.error(f'❌ Playback watchdog failed: {e}')
 
-                    if guild_state.get('current_sound') and guild_state.get('is_playing'):
-                        if not voice_client.is_playing():
-                            now = time.monotonic()
-                            last_restart = last_restart_by_guild.get(guild.id, 0.0)
-                            if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
-                                continue
-                            logging.warning(
-                                f"⚠️ Playback stalled in {guild.name} (sound={guild_state.get('current_sound')}). Restarting..."
-                            )
-                            bot.loop.create_task(cog.restart_audio_loop(guild.id))
-                            last_restart_by_guild[guild.id] = now
-                        break
-        except Exception as e:
-            logging.error(f'❌ Playback watchdog failed: {e}')
-
-        await asyncio.sleep(PLAYBACK_WATCHDOG_SECONDS)
+@_playback_watchdog_loop.before_loop
+async def before_playback_watchdog():
+    await bot.wait_until_ready()
 
 def schedule_live_stats_update():
     global _live_stats_dirty, _live_stats_task_started
@@ -580,7 +598,9 @@ def schedule_live_stats_update():
             loop = None
         if loop and loop.is_running() and not _live_stats_task_started:
             _live_stats_task_started = True
-            loop.create_task(_live_stats_flush_loop())
+            task = loop.create_task(_live_stats_flush_loop())
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
     except Exception as e:
         logging.error(f'❌ Failed to schedule live stats update: {e}')
 
@@ -655,7 +675,7 @@ async def check_api_endpoints():
                             logging.info(f"{api['emoji']} GET {endpoint} - healthy")
                         else:
                             logging.error(f"{api['emoji']} GET {endpoint} - error (status: {response.status})")
-                except:
+                except Exception:
                     logging.error(f"{api['emoji']} GET {endpoint} - error")
 
             logging.info("")
@@ -703,7 +723,7 @@ async def on_voice_state_update(member, before, after):
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
 
             # Track in background to not block Discord connection
-            asyncio.create_task(_track_bot_join_async(guild_id, member.guild.name, after.channel, current_users))
+            create_background_task(asyncio.to_thread(_track_bot_join_sync, guild_id, member.guild.name, after.channel, current_users))
             schedule_live_stats_update()
 
         # Bot left voice channel
@@ -732,7 +752,7 @@ async def on_voice_state_update(member, before, after):
                 logging.info("")
                 logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
                 logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
-                asyncio.create_task(asyncio.to_thread(save_voice_time_data))
+                create_background_task(asyncio.to_thread(save_voice_time_data))
                 schedule_live_stats_update()
 
             if guild_id in user_voice_sessions:
@@ -788,11 +808,11 @@ async def on_voice_state_update(member, before, after):
             'accumulated_time': 0.0
         }
 
-        logging.info(f"")
+        logging.info("")
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
         # Track in background to avoid blocking Discord events
-        asyncio.create_task(_track_user_join_async(user_id, member, guild_id))
+        create_background_task(asyncio.to_thread(_track_user_join_sync, user_id, member, guild_id))
         schedule_live_stats_update()
 
     # User left bot's channel
@@ -893,27 +913,32 @@ async def on_ready():
         await check_api_endpoints()
 
     bot.heartbeat_interval = 360
-    bot.loop.create_task(change_status())
+    change_status.start()
 
     if COZY_ENABLE_BACKUPS:
         global periodic_backup_task
-        if periodic_backup_task is None or periodic_backup_task.done():
-            periodic_backup_task = bot.loop.create_task(periodic_backup())
+        if not periodic_backup.is_running():
+            periodic_backup.start()
+            periodic_backup_task = periodic_backup
             logging.info('🕐 Started periodic backup task')
         else:
             logging.info('🕐 Periodic backup task already running')
 
     if COZY_ENABLE_DEPLOY_NOTIFIER:
         deployment_notifier = DeploymentNotifier(bot)
-        bot.loop.create_task(deployment_notifier.start_monitoring())
+        task = bot.loop.create_task(deployment_notifier.start_monitoring())
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
         logging.info('📢 Started deployment notifier task')
 
-    bot.loop.create_task(_playback_watchdog_loop())
+    _playback_watchdog_loop.start()
     logging.info('🎧 Started playback watchdog task')
 
     if COZY_ENABLE_AUDIO_RESTORE:
         audio_monitor = AudioRestorationMonitor(bot)
-        bot.loop.create_task(audio_monitor.start_monitoring())
+        task = bot.loop.create_task(audio_monitor.start_monitoring())
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
         logging.info('🎵 Started audio restoration monitor task')
 
     # Python packages summary

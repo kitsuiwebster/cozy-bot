@@ -128,7 +128,6 @@ async def finalize_all_sessions():
                                 user_session['accumulated_time'] += duration
                                 
                                 # Award points for voice time
-                                result = cozy_gamification.add_listening_time(user_id, duration)
                                 logging.info(f"👉 USER FINALIZED: {member.name} session ended before deployment")
                         
                         finalized_count += 1

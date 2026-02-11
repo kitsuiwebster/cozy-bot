@@ -56,7 +56,7 @@ class AudioRestorationMonitor:
                     # Clean up failed task file
                     try:
                         os.remove(file_path)
-                    except:
+                    except Exception:
                         pass
                         
         except Exception as e:
@@ -117,8 +117,13 @@ class AudioRestorationMonitor:
     # Process a single audio restoration task
     async def process_restore_task(self, file_path):
         try:
-            with open(file_path, 'r') as f:
-                task_data = json.load(f)
+            loop = asyncio.get_event_loop()
+
+            def read_task_file():
+                with open(file_path, 'r') as f:
+                    return json.load(f)
+
+            task_data = await loop.run_in_executor(None, read_task_file)
             
             guild_id = int(task_data['guild_id'])
             channel_id = int(task_data['channel_id'])

@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import aiohttp
@@ -148,7 +148,7 @@ async def sync_maintenance() -> List[Dict[str, Any]]:
             "status": item.get("status") or "under-maintenance",
             "active": True,
             "timezone": item.get("timezone") or item.get("timezoneOption"),
-            "started_at": previous.get("started_at") or datetime.utcnow().isoformat(),
+            "started_at": previous.get("started_at") or datetime.now(timezone.utc).isoformat(),
             "ended_at": previous.get("ended_at"),
             "date_range": item.get("dateRange"),
             "time_range": item.get("timeRange"),
@@ -160,7 +160,7 @@ async def sync_maintenance() -> List[Dict[str, Any]]:
             payload = dict(doc)
             payload["active"] = False
             payload["status"] = "completed"
-            payload["ended_at"] = payload.get("ended_at") or datetime.utcnow().isoformat()
+            payload["ended_at"] = payload.get("ended_at") or datetime.now(timezone.utc).isoformat()
             await save_maintenance(maintenance_id, payload)
 
     history = await load_maintenance()

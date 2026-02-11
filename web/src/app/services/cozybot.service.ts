@@ -97,12 +97,12 @@ export interface UserDetails {
   providedIn: 'root'
 })
 export class CozybotService {
-  private apiUrl = environment.apiUrl;
+  private readonly apiUrl = environment.apiUrl;
   private liveStatsCache: LiveStats | null = null;
   private topUsersCache: LeaderboardResponse | null = null;
-  private userDetailsCache = new Map<string, UserDetails>();
+  private readonly userDetailsCache = new Map<string, UserDetails>();
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   getTopUsers(): Observable<LeaderboardResponse> {
     return this.http.get<LeaderboardResponse>(`${this.apiUrl}/top-users`).pipe(

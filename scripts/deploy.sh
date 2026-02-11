@@ -184,25 +184,29 @@ echo "🔧 Setting up data directory permissions..."
 mkdir -p data
 sudo chown -R $USER:$USER data/ 2>/dev/null || chown -R $USER:$USER data/
 
-# Build and start only bot container (don't touch other services)
+# Build and start only bot container
 echo ""
 echo "🏗️  Building and starting bot container only..."
 echo "👉 Building with configured mode"
 
 echo ""
-echo "🔍 Starting Docker build process..."
-docker compose --env-file .env up -d --build --no-deps --force-recreate discord-bot 2>&1 | \
+echo "🔍 Starting Docker build process (no-cache)..."
+docker compose --env-file .env build --no-cache discord-bot 2>&1 | \
   stdbuf -oL -eL grep -v "transferring context\|transferring dockerfile\|naming to docker.io" | \
   stdbuf -oL -eL grep -E "^#|^\[|Built|Created|Started|Error|FAILED|COPY|RUN|exporting" | \
   stdbuf -oL -eL grep -v "CACHED.*apt-get\|CACHED.*WORKDIR\|CACHED.*requirements\|CACHED.*pip install" || true
 BUILD_EXIT_CODE=${PIPESTATUS[0]}
 
 if [ $BUILD_EXIT_CODE -eq 0 ]; then
-    echo "✅ Container built and started successfully"
+    echo "✅ Image built successfully"
 else
-    echo "❌ Failed to build/start container (exit code: $BUILD_EXIT_CODE)"
+    echo "❌ Failed to build image (exit code: $BUILD_EXIT_CODE)"
     exit 1
 fi
+
+echo ""
+echo "🚀 Starting new container..."
+docker compose --env-file .env up -d --no-deps --force-recreate discord-bot
 
 # Verify container is running
 echo ""
@@ -217,10 +221,10 @@ if [ ! -z "$CONTAINER_STATUS" ]; then
     # Restore user sessions after deployment
     echo ""
     echo "👉 Restoring user sessions..."
-    sleep 2  # Give the bot a moment to fully initialize
-    set +e  # Don't exit on curl error
+    sleep 2 
+    set +e 
     SESSION_RESTORE_RESULT=$(curl -s -X POST "http://localhost:${BOT_API_PORT}/api/live/audio/restore-sessions" 2>/dev/null || echo '{}')
-    set -e  # Re-enable exit on error
+    set -e
     if echo "$SESSION_RESTORE_RESULT" | grep -q '"success":true'; then
         SESSIONS_RESTORED=$(echo "$SESSION_RESTORE_RESULT" | grep -o '"sessions_restored":[0-9]*' | cut -d':' -f2 2>/dev/null || echo "0")
         echo "👉 Restored ${SESSIONS_RESTORED} user sessions"
