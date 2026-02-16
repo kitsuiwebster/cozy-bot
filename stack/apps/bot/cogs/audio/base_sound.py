@@ -58,6 +58,13 @@ class BaseSoundCog(commands.Cog):
         self.guild_states = {}
         self.connection_locks = {}  # Prevent simultaneous connection attempts per guild
 
+    def _get_connection_lock(self, guild_id):
+        lock = self.connection_locks.get(guild_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self.connection_locks[guild_id] = lock
+        return lock
+
     async def play_sound_command(self, interaction, prompt_message):
         await interaction.response.defer()
 
@@ -471,21 +478,68 @@ class BaseSoundCog(commands.Cog):
     async def restart_audio_loop(self, guild_id):
         try:
             guild_state = self.get_guild_state(guild_id)
-            voice_client = guild_state.get('voice_client')
+            guild = self.bot.get_guild(guild_id)
+            voice_client = guild.voice_client if guild else None
             current_sound = guild_state['current_sound']
+            guild_name = guild.name if guild else f"guild {guild_id}"
 
-            # Get voice client from guild if not in state
-            if not voice_client:
-                guild = self.bot.get_guild(guild_id)
-                if guild:
+            if not guild:
+                logging.info(f"🔄 restart_audio_loop skipped: guild not found for {guild_id}")
+                return
+
+            # Recover voice connection if Discord dropped it while users are still present.
+            voice_is_ready = (
+                voice_client
+                and voice_client.channel
+                and (not hasattr(voice_client, "is_connected") or voice_client.is_connected())
+            )
+            if not voice_is_ready:
+                target_channel = guild_state.get('target_channel')
+                if not target_channel:
+                    logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
+                    return
+
+                human_members = [m for m in target_channel.members if not m.bot]
+                if not human_members:
+                    logging.info(
+                        f"🔄 restart_audio_loop skipped: no listeners in target channel for guild {guild_id}"
+                    )
+                    return
+
+                lock = self._get_connection_lock(guild_id)
+                async with lock:
                     voice_client = guild.voice_client
-            # Skip if voice is not connected
-            if not voice_client or (hasattr(voice_client, "is_connected") and not voice_client.is_connected()):
+                    voice_is_ready = (
+                        voice_client
+                        and voice_client.channel
+                        and (not hasattr(voice_client, "is_connected") or voice_client.is_connected())
+                    )
+
+                    if not voice_is_ready:
+                        try:
+                            if voice_client:
+                                await voice_client.disconnect()
+                        except Exception:
+                            pass
+
+                        try:
+                            voice_client = await target_channel.connect()
+                            await asyncio.sleep(0.3)
+                            guild_state['target_channel'] = target_channel
+                            await self.start_disconnect_timer(guild_id)
+                            logging.info(
+                                f"🔗 restart_audio_loop recovered voice connection in {guild_name}"
+                            )
+                        except Exception as reconnect_error:
+                            logging.warning(
+                                f"🔄 restart_audio_loop reconnect failed for guild {guild_id}: {reconnect_error}"
+                            )
+                            return
+
+            if not voice_client or not voice_client.channel:
                 logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
                 return
 
-            guild = self.bot.get_guild(guild_id)
-            guild_name = guild.name if guild else f"guild {guild_id}"
             logging.info("")
             logging.info("")
             logging.info(f"👉 Restarting \033[36m{current_sound}\033[0m in {guild_name}")
