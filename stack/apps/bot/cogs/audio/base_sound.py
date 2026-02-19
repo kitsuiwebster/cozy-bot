@@ -220,7 +220,6 @@ class BaseSoundCog(commands.Cog):
 
                 # Connect without timeout (like romeo-bot)
                 voice_client = await user_channel.connect()
-                logging.info(f"✅ Connected! is_connected={voice_client.is_connected()}")
                 did_connect = True
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->connected: {int((time.monotonic() - t0) * 1000)}ms")
@@ -404,11 +403,6 @@ class BaseSoundCog(commands.Cog):
                 voice_states = getattr(voice_client.channel, "voice_states", {}) or {}
                 non_bot_voice_ids = [uid for uid in voice_states.keys() if uid != self.bot.user.id]
                 human_members = [m for m in voice_client.channel.members if not m.bot]
-
-                logging.info(
-                    f"🔍 AUTO-DISCONNECT CHECK: guild={guild.name} "
-                    f"voice_states={len(non_bot_voice_ids)} members={len(human_members)}"
-                )
 
                 if not non_bot_voice_ids and not human_members:
                     # Channel is empty, disconnect

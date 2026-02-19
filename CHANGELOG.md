@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.0.1] - 2026-02-03
+## [2.0.2] - 2026-02-19
+
+### Added
+
+- Dedicated Trivy security scan workflow in GitHub Actions (`.github/workflows/trivy-scan.yml`) for CI/CD-only image scanning.
+
+### Fixed
+
+- Audio loop stability by restoring native FFmpeg stream looping (`-stream_loop -1`) to prevent periodic write errors during track rollover.
+- FFmpeg cleanup resilience by ignoring sporadic `EBADF` process cleanup failures in Discord player teardown.
+- Duplicate bot voice disconnect handling now idempotent to prevent double session finalization and duplicate point/time saves.
+- Live API latency serialization now guards against non-finite float values to avoid JSON compliance crashes.
+- Public API `/api/public/top-servers` sorting bug causing HTTP 500 (invalid sort key function signature).
+
+## [2.0.2] - 2026-02-03
 
 ### Added
 
