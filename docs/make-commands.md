@@ -1,6 +1,8 @@
 # Make Commands
 
 ## Global
+- `make doctor` - Check required local tools for this repo.
+- `make install` - Install Linux CLI tools and all repo dependencies.
 - `make start-all` - Start all services.
 - `make stop-all` - Stop all services.
 - `make rebuild-all` - Rebuild and recreate all services.
