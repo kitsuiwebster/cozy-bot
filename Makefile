@@ -1,4 +1,4 @@
-.PHONY: help start-all stop-all ui \
+.PHONY: help doctor install start-all stop-all ui \
         start stop restart rebuild-bot logs-bot \
         start-api stop-api restart-api rebuild-api logs-api \
         start-status stop-status restart-status rebuild-status logs-status \
@@ -18,6 +18,8 @@ help:
 	@echo "ℹ️  Environment directory: $(ENV_DIR)"
 	@echo ""
 	@echo "🚀 Global:"
+	@echo "  make doctor           - Check required local tools for this repo"
+	@echo "  make install          - Install Linux CLI tools + all repo dependencies"
 	@echo "  make start-all        - Start ALL services"
 	@echo "  make stop-all         - Stop ALL services"
 	@echo "  make rebuild-all      - Rebuild ALL services"
@@ -76,6 +78,96 @@ help:
 	@echo ""
 	@echo "🔗 UI Links:"
 	@echo "  make ui               - Show UI links"
+
+# ============================================
+# LOCAL SETUP
+# ============================================
+
+doctor:
+	@echo "🩺 Checking local environment for CozyBot..."
+	@echo ""
+	@missing=0; \
+	check_cmd() { \
+		if command -v "$$1" >/dev/null 2>&1; then \
+			printf "✅ %-18s %s\n" "$$1" "$$($$2 2>/dev/null | head -n 1)"; \
+		else \
+			printf "❌ %-18s missing\n" "$$1"; \
+			missing=1; \
+		fi; \
+	}; \
+	check_cmd git "git --version"; \
+	check_cmd make "make --version"; \
+	check_cmd curl "curl --version"; \
+	check_cmd jq "jq --version"; \
+	check_cmd python3 "python3 --version"; \
+	check_cmd pip3 "pip3 --version"; \
+	check_cmd node "node --version"; \
+	check_cmd npm "npm --version"; \
+	check_cmd yarn "yarn --version"; \
+	check_cmd ffmpeg "ffmpeg -version"; \
+	check_cmd docker "docker --version"; \
+	if command -v docker >/dev/null 2>&1; then \
+		if docker compose version >/dev/null 2>&1; then \
+			printf "✅ %-18s %s\n" "docker compose" "$$(docker compose version | head -n 1)"; \
+		else \
+			printf "❌ %-18s missing\n" "docker compose"; \
+			missing=1; \
+		fi; \
+	fi; \
+	echo ""; \
+	if [ "$$missing" -eq 0 ]; then \
+		echo "✅ Doctor check passed"; \
+	else \
+		echo "⚠️ Doctor check found missing tools"; \
+		echo "👉 Run: make install"; \
+		exit 1; \
+	fi
+
+install:
+	@echo "📦 Installing Linux tools and repo dependencies..."
+	@if [ "$$(uname -s)" != "Linux" ]; then echo "❌ make install supports Linux only"; exit 1; fi
+	@set -e; \
+	if [ "$$(id -u)" -eq 0 ]; then AS_ROOT=""; \
+	elif command -v sudo >/dev/null 2>&1; then AS_ROOT="sudo"; \
+	else echo "❌ sudo is required (or run as root)"; exit 1; fi; \
+	if command -v apt-get >/dev/null 2>&1; then \
+		echo "🔧 Package manager: apt-get"; \
+		$$AS_ROOT apt-get update; \
+		$$AS_ROOT apt-get install -y git make curl jq python3 python3-pip python3-venv ffmpeg nodejs npm docker.io docker-compose-plugin ca-certificates; \
+	elif command -v dnf >/dev/null 2>&1; then \
+		echo "🔧 Package manager: dnf"; \
+		$$AS_ROOT dnf install -y git make curl jq python3 python3-pip ffmpeg nodejs npm docker docker-compose-plugin ca-certificates || true; \
+		$$AS_ROOT dnf install -y git make curl jq python3 python3-pip ffmpeg nodejs npm docker ca-certificates; \
+	elif command -v pacman >/dev/null 2>&1; then \
+		echo "🔧 Package manager: pacman"; \
+		$$AS_ROOT pacman -Sy --noconfirm git make curl jq python python-pip ffmpeg nodejs npm docker docker-compose ca-certificates; \
+	elif command -v zypper >/dev/null 2>&1; then \
+		echo "🔧 Package manager: zypper"; \
+		$$AS_ROOT zypper --non-interactive install git make curl jq python3 python3-pip ffmpeg nodejs npm docker docker-compose ca-certificates; \
+	else \
+		echo "❌ Unsupported Linux package manager"; \
+		exit 1; \
+	fi; \
+	if ! command -v yarn >/dev/null 2>&1; then \
+		if command -v corepack >/dev/null 2>&1; then \
+			echo "📦 Enabling yarn via corepack..."; \
+			$$AS_ROOT corepack enable; \
+			$$AS_ROOT corepack prepare yarn@stable --activate; \
+		else \
+			echo "📦 Installing yarn via npm..."; \
+			$$AS_ROOT npm install -g yarn; \
+		fi; \
+	fi
+	@echo "🐍 Installing Python deps (bot)..."
+	@python3 -m pip install --upgrade pip setuptools wheel
+	@python3 -m pip install -r stack/apps/bot/requirements.txt
+	@echo "🐍 Installing Python deps (status-api)..."
+	@python3 -m pip install -r stack/apps/status-api/requirements.txt
+	@echo "🌐 Installing web deps (yarn)..."
+	@cd web && yarn install
+	@echo ""
+	@$(MAKE) doctor
+	@echo "✅ Install complete"
 
 # ============================================
 # START / STOP
@@ -302,5 +394,3 @@ ui:
 	echo "  Uptime Kuma:   http://localhost:$${KUMA_PORT}" && \
 	echo "  Public API:    http://localhost:$${API_PORT}/docs" && \
 	echo "  CouchDB:       http://localhost:$${DB_PORT}/_utils"
-
-
