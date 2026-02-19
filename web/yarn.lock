@@ -4344,8 +4344,8 @@ gradient-path@^2.3.0:
     tinygradient "^1.0.0"
 
 handle-thing@^2.0.0:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/handle-thing/-/handle-thing-2.0.2.tgz#857f79ce359580c340d43081cc648970d0bb234e"
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/handle-thing/-/handle-thing-2.0.1.tgz#857f79ce359580c340d43081cc648970d0bb234e"
   integrity sha512-9Qn4yBxelxoh2Ow62nP+Ka/kMnOXRi8BXnRaUwezLNhqelnN49xKz4F/dPP8OYLxLxq6JDtZb2i9XznUQbNPTg==
 
 has-flag@^4.0.0:
@@ -7209,7 +7209,7 @@ webpack-merge@6.0.1:
   dependencies:
     clone-deep "^4.0.1"
     flat "^5.0.2"
-    wildcard "^2.0.2"
+    wildcard "^2.0.1"
 
 webpack-sources@^3.0.0, webpack-sources@^3.2.3:
   version "3.3.3"
@@ -7287,9 +7287,9 @@ which@^4.0.0:
   dependencies:
     isexe "^3.1.1"
 
-wildcard@^2.0.2:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/wildcard/-/wildcard-2.0.2.tgz#5ab10d02487198954836b6349f74fff961e10f67"
+wildcard@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/wildcard/-/wildcard-2.0.1.tgz#5ab10d02487198954836b6349f74fff961e10f67"
   integrity sha512-CC1bOL87PIWSBhDcTrdeLo6eGT7mCFtrg0uIJtqJUFyK+eJnzl8A1niH56uu7KMa5XFrtiV+AQuHO3n7DsHnLQ==
 
 "wrap-ansi-cjs@npm:wrap-ansi@^7.0.0":
