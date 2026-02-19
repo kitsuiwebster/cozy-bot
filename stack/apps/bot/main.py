@@ -11,6 +11,8 @@ import fcntl
 import aiohttp
 import threading
 import warnings
+import errno
+import math
 from utils.deployment.deployment_notifier import DeploymentNotifier
 from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 from utils.logging_utils import setup_logging
@@ -52,6 +54,43 @@ intents.voice_states = True
 # Initialize Discord bot instance with command prefix and intents
 bot = commands.Bot(command_prefix="/", intents=intents)
 logging.debug(f"⚔️ Bot guilds: {bot.guilds}")
+
+
+def patch_discord_ffmpeg_cleanup():
+    """Ignore sporadic EBADF during FFmpeg process cleanup in discord.py worker threads."""
+    try:
+        import discord.player as discord_player
+
+        original_kill = getattr(discord_player.FFmpegAudio, "_kill_process", None)
+        if not original_kill or getattr(original_kill, "_cozy_safe_patch", False):
+            return
+
+        def safe_kill_process(self):
+            try:
+                return original_kill(self)
+            except OSError as exc:
+                if exc.errno == errno.EBADF:
+                    logging.warning("⚠️ Ignored FFmpeg cleanup EBADF (process already closed)")
+                    return
+                raise
+
+        safe_kill_process._cozy_safe_patch = True
+        discord_player.FFmpegAudio._kill_process = safe_kill_process
+    except Exception as exc:
+        logging.warning(f"⚠️ Could not patch discord FFmpeg cleanup: {exc}")
+
+
+def finite_float(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if math.isfinite(number):
+        return number
+    return float(default)
+
+
+patch_discord_ffmpeg_cleanup()
 
 # Track user join in background to avoid blocking Discord events
 def _track_user_join_sync(user_id, member, guild_id):
@@ -728,36 +767,61 @@ async def on_voice_state_update(member, before, after):
 
         # Bot left voice channel
         elif before.channel is not None and after.channel is None:
+            duplicate_disconnect_event = False
+            session_duration = 0.0
+            total_time = 0.0
+
             if guild_id in guild_voice_time:
                 guild_data = guild_voice_time[guild_id]
-                if isinstance(guild_data, list) and len(guild_data) >= 2 and guild_data[0] is not None:
-                    start_time = datetime.fromisoformat(guild_data[0])
-                    accumulated_time = guild_data[1]
-                    time_spent = datetime.now() - start_time
-                    session_duration = time_spent.total_seconds()
-                    total_time = accumulated_time + session_duration
-                    guild_voice_time[guild_id] = [None, total_time]
+                if isinstance(guild_data, list) and len(guild_data) >= 2:
+                    start_at = guild_data[0]
+                    accumulated_time = finite_float(guild_data[1], default=0.0)
+                    total_time = accumulated_time
+                    if start_at is None:
+                        duplicate_disconnect_event = True
+                    else:
+                        try:
+                            start_time = datetime.fromisoformat(start_at)
+                            time_spent = datetime.now() - start_time
+                            session_duration = max(0.0, finite_float(time_spent.total_seconds(), default=0.0))
+                            total_time = accumulated_time + session_duration
+                        except Exception:
+                            logging.warning(
+                                f"⚠️ Invalid guild_data format for {guild_id}, preserved accumulated time: "
+                                f"{format_duration(accumulated_time)}"
+                            )
+                            session_duration = 0.0
+                            total_time = accumulated_time
 
+                    guild_voice_time[guild_id] = [None, total_time]
+                else:
+                    accumulated_time = 0.0
+                    if isinstance(guild_data, list) and len(guild_data) >= 2:
+                        accumulated_time = finite_float(guild_data[1], default=0.0)
+                    guild_voice_time[guild_id] = [None, accumulated_time]
+                    total_time = accumulated_time
+                    duplicate_disconnect_event = True
+
+                if not duplicate_disconnect_event:
                     if guild_id not in guild_voice_time_changes:
                         guild_voice_time_changes[guild_id] = 0
                     guild_voice_time_changes[guild_id] += session_duration
+                    logging.info("")
+                    logging.info("")
+                    logging.info(
+                        f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: "
+                        f"\033[94m+{format_duration(session_duration)}\033[0m, server total: "
+                        f"\033[94m{format_duration(total_time)}\033[0m"
+                    )
+                    logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
+                    create_background_task(asyncio.to_thread(save_voice_time_data))
+                    schedule_live_stats_update()
                 else:
-                    # Preserve accumulated time even if format is invalid
-                    accumulated_time = guild_data[1] if isinstance(guild_data, list) and len(guild_data) >= 2 else 0
-                    guild_voice_time[guild_id] = [None, accumulated_time]
-                    session_duration = 0
-                    total_time = accumulated_time
-                    logging.warning(f"⚠️ Invalid guild_data format for {guild_id}, preserved accumulated time: {format_duration(accumulated_time)}")
-                logging.info("")
-                logging.info("")
-                logging.info(f"👋 BOT DISCONNECT: Left {before.channel.guild.name} - session: \033[94m+{format_duration(session_duration)}\033[0m, server total: \033[94m{format_duration(total_time)}\033[0m")
-                logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
-                create_background_task(asyncio.to_thread(save_voice_time_data))
-                schedule_live_stats_update()
+                    logging.info(f"🔁 Ignored duplicate bot disconnect event in {before.channel.guild.name}")
 
-            if guild_id in user_voice_sessions:
+            session = user_voice_sessions.pop(guild_id, None)
+            if session:
                 from cogs.stats.gamification import cozy_gamification
-                session = user_voice_sessions[guild_id]
 
                 for user_id, user_data in session['users'].items():
                     if not isinstance(user_data, dict) or 'join_time' not in user_data or 'accumulated_time' not in user_data:
@@ -778,8 +842,6 @@ async def on_voice_state_update(member, before, after):
                         logging.info(f"👋 BOT DISCONNECT: {username} final session - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
 
                     cozy_gamification.finalize_current_sound(user_id)
-
-                del user_voice_sessions[guild_id]
         return
 
     # Handle user voice channel changes

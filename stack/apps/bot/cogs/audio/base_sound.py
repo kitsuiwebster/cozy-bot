@@ -338,7 +338,12 @@ class BaseSoundCog(commands.Cog):
                 # Play audio like romeo-bot - simple and direct
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->before-ffmpeg: {int((time.monotonic() - t0) * 1000)}ms")
-                audio_source = FFmpegPCMAudio(sound_path, executable="ffmpeg", options='-loglevel panic')
+                audio_source = FFmpegPCMAudio(
+                    sound_path,
+                    executable="ffmpeg",
+                    options='-loglevel panic',
+                    stderr=subprocess.DEVNULL,
+                )
                 if not voice_client.is_playing():
                     voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
                 if perf_enabled:

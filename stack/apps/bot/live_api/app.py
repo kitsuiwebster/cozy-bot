@@ -4,6 +4,7 @@ from datetime import datetime
 import logging
 import json
 import os
+import math
 
 try:
     from utils.audio.audio_state_manager import audio_state_manager
@@ -21,6 +22,16 @@ app = FastAPI(
     description="Bot-only control endpoints (live)",
     version="2.0.1"
 )
+
+
+def finite_float(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if math.isfinite(number):
+        return number
+    return float(default)
 
 class BotHealthResponse(BaseModel):
     status: str
@@ -73,7 +84,7 @@ async def bot_health():
             "latency_ms": 0.0
         }
 
-    latency_ms = round(bot_instance.latency * 1000, 2)
+    latency_ms = round(finite_float(bot_instance.latency, 0.0) * 1000, 2)
     return {
         "status": "ok",
         "connected": True,
