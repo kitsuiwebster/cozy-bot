@@ -1,4 +1,26 @@
 services:
+  # Security scans for external images
+  trivy-uptime-kuma:
+    image: aquasec/trivy:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: image --exit-code 0 --ignore-unfixed --severity HIGH,CRITICAL louislam/uptime-kuma:1
+    restart: "no"
+
+  trivy-couchdb:
+    image: aquasec/trivy:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: image --exit-code 0 --ignore-unfixed --severity HIGH,CRITICAL couchdb:3
+    restart: "no"
+
+  trivy-nginx:
+    image: aquasec/trivy:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: image --exit-code 0 --ignore-unfixed --severity HIGH,CRITICAL nginx:alpine
+    restart: "no"
+
   # Uptime monitoring service
   uptime-kuma:
     image: louislam/uptime-kuma:1
