@@ -199,7 +199,7 @@ class AudioRestorationMonitor:
             # Play the audio with callback for looping (removed -stream_loop for instant start)
             audio_source = FFmpegPCMAudio(
                 sound_path,
-                before_options='-loglevel error',
+                before_options='-stream_loop -1 -loglevel error',
                 stderr=subprocess.DEVNULL,
             )
             # Use the cog's after_playing callback if available
