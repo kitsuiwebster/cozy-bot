@@ -220,7 +220,6 @@ class BaseSoundCog(commands.Cog):
 
                 # Connect without timeout (like romeo-bot)
                 voice_client = await user_channel.connect()
-                logging.info(f"✅ Connected! is_connected={voice_client.is_connected()}")
                 did_connect = True
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->connected: {int((time.monotonic() - t0) * 1000)}ms")
@@ -338,7 +337,12 @@ class BaseSoundCog(commands.Cog):
                 # Play audio like romeo-bot - simple and direct
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->before-ffmpeg: {int((time.monotonic() - t0) * 1000)}ms")
-                audio_source = FFmpegPCMAudio(sound_path, executable="ffmpeg", options='-loglevel panic')
+                audio_source = FFmpegPCMAudio(
+                    sound_path,
+                    executable="ffmpeg",
+                    before_options='-stream_loop -1 -loglevel panic',
+                    stderr=subprocess.DEVNULL,
+                )
                 if not voice_client.is_playing():
                     voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
                 if perf_enabled:
@@ -399,11 +403,6 @@ class BaseSoundCog(commands.Cog):
                 voice_states = getattr(voice_client.channel, "voice_states", {}) or {}
                 non_bot_voice_ids = [uid for uid in voice_states.keys() if uid != self.bot.user.id]
                 human_members = [m for m in voice_client.channel.members if not m.bot]
-
-                logging.info(
-                    f"🔍 AUTO-DISCONNECT CHECK: guild={guild.name} "
-                    f"voice_states={len(non_bot_voice_ids)} members={len(human_members)}"
-                )
 
                 if not non_bot_voice_ids and not human_members:
                     # Channel is empty, disconnect
@@ -569,7 +568,11 @@ class BaseSoundCog(commands.Cog):
             # Restart audio if file exists and voice client is ready
             # NOTE: Using voice_client.channel check instead of is_connected() due to discord.py 2.3.2 bug
             if os.path.exists(sound_path) and voice_client.channel and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel panic', stderr=subprocess.DEVNULL)
+                audio_source = FFmpegPCMAudio(
+                    sound_path,
+                    before_options='-stream_loop -1 -loglevel panic',
+                    stderr=subprocess.DEVNULL,
+                )
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             
         except Exception as e:

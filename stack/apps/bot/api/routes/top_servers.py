@@ -57,7 +57,8 @@ async def get_top_servers(limit: int = None):
             return TopServersResponse(servers=[], total_count=0)
         
         # Sort guilds by accumulated voice time in descending order (with safe access)
-        def safe_sort_key():
+        def safe_sort_key(item):
+            _, voice_time = item
             if isinstance(voice_time, (list, tuple)) and len(voice_time) > 1:
                 return voice_time[1] if isinstance(voice_time[1], (int, float)) else 0
             return 0

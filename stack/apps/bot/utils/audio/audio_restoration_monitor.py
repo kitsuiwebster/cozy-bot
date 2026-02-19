@@ -3,6 +3,7 @@ import json
 import os
 import glob
 import logging
+import subprocess
 from datetime import datetime
 
 # Monitor and process audio restoration tasks after deployment or reconnection
@@ -196,7 +197,11 @@ class AudioRestorationMonitor:
                     logging.info(f"✅ Updated {cog_name} guild_state for {guild.name}")
 
             # Play the audio with callback for looping (removed -stream_loop for instant start)
-            audio_source = FFmpegPCMAudio(sound_path, before_options='-loglevel error')
+            audio_source = FFmpegPCMAudio(
+                sound_path,
+                before_options='-stream_loop -1 -loglevel error',
+                stderr=subprocess.DEVNULL,
+            )
             # Use the cog's after_playing callback if available
             if cog and hasattr(cog, 'after_playing'):
                 voice_client.play(audio_source, after=lambda e: cog.after_playing(e, guild.id))

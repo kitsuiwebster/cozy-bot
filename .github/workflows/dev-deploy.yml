@@ -4,7 +4,56 @@ on:
     branches: [ dev ]
 
 jobs:
+  trivy-images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - louislam/uptime-kuma:1
+          - couchdb:3
+          - nginx:alpine
+    steps:
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ matrix.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "0"
+
+  sonarqube-scan:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ℹ️ SonarQube skipped (missing credentials)
+        if: env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' || env.SONAR_PROJECT_KEY == ''
+        run: |
+          echo "Skipping SonarQube scan: SONAR_TOKEN/SONAR_HOST_URL/SONAR_PROJECT_KEY not configured yet."
+
+      - name: 🔎 SonarQube scan
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' && env.SONAR_PROJECT_KEY != ''
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.projectName=cozy-discord-bot
+
   deploy:
+    needs: [trivy-images, sonarqube-scan]
     runs-on: ubuntu-latest
     environment: development
     steps:
