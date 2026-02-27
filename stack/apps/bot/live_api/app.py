@@ -20,7 +20,7 @@ def set_bot_instance(bot):
 app = FastAPI(
     title="CozyBot Bot API",
     description="Bot-only control endpoints (live)",
-    version="2.0.2"
+    version="2.0.3"
 )
 
 

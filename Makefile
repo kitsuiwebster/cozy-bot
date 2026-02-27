@@ -19,7 +19,7 @@ help:
 	@echo ""
 	@echo "🚀 Global:"
 	@echo "  make doctor           - Check required local tools for this repo"
-	@echo "  make install          - Install Linux CLI tools + all repo dependencies"
+	@echo "  make install          - Install Linux CLI tools + web dependencies"
 	@echo "  make start-all        - Start ALL services"
 	@echo "  make stop-all         - Stop ALL services"
 	@echo "  make rebuild-all      - Rebuild ALL services"
@@ -124,7 +124,7 @@ doctor:
 	fi
 
 install:
-	@echo "📦 Installing Linux tools and repo dependencies..."
+	@echo "📦 Installing Linux CLI tools..."
 	@if [ "$$(uname -s)" != "Linux" ]; then echo "❌ make install supports Linux only"; exit 1; fi
 	@set -e; \
 	if [ "$$(id -u)" -eq 0 ]; then AS_ROOT=""; \
@@ -133,17 +133,71 @@ install:
 	if command -v apt-get >/dev/null 2>&1; then \
 		echo "🔧 Package manager: apt-get"; \
 		$$AS_ROOT apt-get update; \
-		$$AS_ROOT apt-get install -y git make curl jq python3 python3-pip python3-venv ffmpeg nodejs npm docker.io docker-compose-plugin ca-certificates; \
+		PKGS="ca-certificates"; \
+		command -v git >/dev/null 2>&1 || PKGS="$$PKGS git"; \
+		command -v make >/dev/null 2>&1 || PKGS="$$PKGS make"; \
+		command -v curl >/dev/null 2>&1 || PKGS="$$PKGS curl"; \
+		command -v jq >/dev/null 2>&1 || PKGS="$$PKGS jq"; \
+		command -v python3 >/dev/null 2>&1 || PKGS="$$PKGS python3"; \
+		command -v pip3 >/dev/null 2>&1 || PKGS="$$PKGS python3-pip"; \
+		python3 -m venv --help >/dev/null 2>&1 || PKGS="$$PKGS python3-venv"; \
+		command -v ffmpeg >/dev/null 2>&1 || PKGS="$$PKGS ffmpeg"; \
+		command -v node >/dev/null 2>&1 || PKGS="$$PKGS nodejs"; \
+		command -v npm >/dev/null 2>&1 || PKGS="$$PKGS npm"; \
+		command -v docker >/dev/null 2>&1 || PKGS="$$PKGS docker.io"; \
+		if command -v docker >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then PKGS="$$PKGS docker-compose-plugin"; fi; \
+		echo "📦 apt packages to install:$$PKGS"; \
+		$$AS_ROOT apt-get install -y $$PKGS; \
 	elif command -v dnf >/dev/null 2>&1; then \
 		echo "🔧 Package manager: dnf"; \
-		$$AS_ROOT dnf install -y git make curl jq python3 python3-pip ffmpeg nodejs npm docker docker-compose-plugin ca-certificates || true; \
-		$$AS_ROOT dnf install -y git make curl jq python3 python3-pip ffmpeg nodejs npm docker ca-certificates; \
+		PKGS="ca-certificates"; \
+		command -v git >/dev/null 2>&1 || PKGS="$$PKGS git"; \
+		command -v make >/dev/null 2>&1 || PKGS="$$PKGS make"; \
+		command -v curl >/dev/null 2>&1 || PKGS="$$PKGS curl"; \
+		command -v jq >/dev/null 2>&1 || PKGS="$$PKGS jq"; \
+		command -v python3 >/dev/null 2>&1 || PKGS="$$PKGS python3"; \
+		command -v pip3 >/dev/null 2>&1 || PKGS="$$PKGS python3-pip"; \
+		command -v ffmpeg >/dev/null 2>&1 || PKGS="$$PKGS ffmpeg"; \
+		command -v node >/dev/null 2>&1 || PKGS="$$PKGS nodejs"; \
+		command -v npm >/dev/null 2>&1 || PKGS="$$PKGS npm"; \
+		command -v docker >/dev/null 2>&1 || PKGS="$$PKGS docker"; \
+		echo "📦 dnf packages to install:$$PKGS"; \
+		$$AS_ROOT dnf install -y $$PKGS; \
+		if command -v docker >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then \
+			$$AS_ROOT dnf install -y docker-compose-plugin || true; \
+		fi; \
 	elif command -v pacman >/dev/null 2>&1; then \
 		echo "🔧 Package manager: pacman"; \
-		$$AS_ROOT pacman -Sy --noconfirm git make curl jq python python-pip ffmpeg nodejs npm docker docker-compose ca-certificates; \
+		PKGS="ca-certificates"; \
+		command -v git >/dev/null 2>&1 || PKGS="$$PKGS git"; \
+		command -v make >/dev/null 2>&1 || PKGS="$$PKGS make"; \
+		command -v curl >/dev/null 2>&1 || PKGS="$$PKGS curl"; \
+		command -v jq >/dev/null 2>&1 || PKGS="$$PKGS jq"; \
+		command -v python3 >/dev/null 2>&1 || PKGS="$$PKGS python"; \
+		command -v pip3 >/dev/null 2>&1 || PKGS="$$PKGS python-pip"; \
+		command -v ffmpeg >/dev/null 2>&1 || PKGS="$$PKGS ffmpeg"; \
+		command -v node >/dev/null 2>&1 || PKGS="$$PKGS nodejs"; \
+		command -v npm >/dev/null 2>&1 || PKGS="$$PKGS npm"; \
+		command -v docker >/dev/null 2>&1 || PKGS="$$PKGS docker"; \
+		if command -v docker >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then PKGS="$$PKGS docker-compose"; fi; \
+		echo "📦 pacman packages to install:$$PKGS"; \
+		$$AS_ROOT pacman -Sy --noconfirm $$PKGS; \
 	elif command -v zypper >/dev/null 2>&1; then \
 		echo "🔧 Package manager: zypper"; \
-		$$AS_ROOT zypper --non-interactive install git make curl jq python3 python3-pip ffmpeg nodejs npm docker docker-compose ca-certificates; \
+		PKGS="ca-certificates"; \
+		command -v git >/dev/null 2>&1 || PKGS="$$PKGS git"; \
+		command -v make >/dev/null 2>&1 || PKGS="$$PKGS make"; \
+		command -v curl >/dev/null 2>&1 || PKGS="$$PKGS curl"; \
+		command -v jq >/dev/null 2>&1 || PKGS="$$PKGS jq"; \
+		command -v python3 >/dev/null 2>&1 || PKGS="$$PKGS python3"; \
+		command -v pip3 >/dev/null 2>&1 || PKGS="$$PKGS python3-pip"; \
+		command -v ffmpeg >/dev/null 2>&1 || PKGS="$$PKGS ffmpeg"; \
+		command -v node >/dev/null 2>&1 || PKGS="$$PKGS nodejs"; \
+		command -v npm >/dev/null 2>&1 || PKGS="$$PKGS npm"; \
+		command -v docker >/dev/null 2>&1 || PKGS="$$PKGS docker"; \
+		if command -v docker >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then PKGS="$$PKGS docker-compose"; fi; \
+		echo "📦 zypper packages to install:$$PKGS"; \
+		$$AS_ROOT zypper --non-interactive install $$PKGS; \
 	else \
 		echo "❌ Unsupported Linux package manager"; \
 		exit 1; \
@@ -158,13 +212,8 @@ install:
 			$$AS_ROOT npm install -g yarn; \
 		fi; \
 	fi
-	@echo "🐍 Installing Python deps (bot)..."
-	@python3 -m pip install --upgrade pip setuptools wheel
-	@python3 -m pip install -r stack/apps/bot/requirements.txt
-	@echo "🐍 Installing Python deps (status-api)..."
-	@python3 -m pip install -r stack/apps/status-api/requirements.txt
 	@echo "🌐 Installing web deps (yarn)..."
-	@cd web && yarn install
+	@cd web && yarn install --no-lockfile
 	@echo ""
 	@$(MAKE) doctor
 	@echo "✅ Install complete"

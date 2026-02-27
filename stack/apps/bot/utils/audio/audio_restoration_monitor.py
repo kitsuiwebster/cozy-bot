@@ -3,7 +3,6 @@ import json
 import os
 import glob
 import logging
-import subprocess
 from datetime import datetime
 
 # Monitor and process audio restoration tasks after deployment or reconnection
@@ -200,7 +199,6 @@ class AudioRestorationMonitor:
             audio_source = FFmpegPCMAudio(
                 sound_path,
                 before_options='-stream_loop -1 -loglevel error',
-                stderr=subprocess.DEVNULL,
             )
             # Use the cog's after_playing callback if available
             if cog and hasattr(cog, 'after_playing'):
