@@ -5,7 +5,6 @@ from discord.ui import Button, View
 import os
 import asyncio
 import logging
-import subprocess
 from ..stats.gamification import cozy_gamification
 
 # Global state tracking which cog is playing in each guild and current sounds (survives reconnections)
@@ -159,11 +158,14 @@ class BaseSoundCog(commands.Cog):
 
         if error:
             logging.error(f"❌ Player error: {error}")
-            if guild_state['current_sound'] and guild_state['is_playing']:
-                self.bot.loop.create_task(self.restart_audio_loop(guild_id))
-        else:
-            if guild_state['current_sound'] and guild_state['is_playing']:
-                self.bot.loop.create_task(self.restart_audio_loop(guild_id))
+        if guild_state['current_sound'] and guild_state['is_playing']:
+            # Keep one restart task per guild to avoid watchdog/after concurrency.
+            current_loop_task = guild_state.get('loop_task')
+            if current_loop_task and not current_loop_task.done():
+                return
+            loop_task = self.bot.loop.create_task(self.restart_audio_loop(guild_id))
+            guild_state['loop_task'] = loop_task
+            loop_task.add_done_callback(lambda _: guild_state.update({'loop_task': None}))
 
     async def on_button_click(self, interaction):
         perf_enabled = os.getenv("COZY_PERF_LOGS") == "1"
@@ -341,7 +343,6 @@ class BaseSoundCog(commands.Cog):
                     sound_path,
                     executable="ffmpeg",
                     before_options='-stream_loop -1 -loglevel panic',
-                    stderr=subprocess.DEVNULL,
                 )
                 if not voice_client.is_playing():
                     voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
@@ -571,7 +572,6 @@ class BaseSoundCog(commands.Cog):
                 audio_source = FFmpegPCMAudio(
                     sound_path,
                     before_options='-stream_loop -1 -loglevel panic',
-                    stderr=subprocess.DEVNULL,
                 )
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             
