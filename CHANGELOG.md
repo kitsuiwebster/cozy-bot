@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.3] - 2026-02-27
+
+### Fixed
+
+- Fixed Discord `FFmpegPCMAudio` stderr misconfiguration (`stderr=subprocess.DEVNULL`) that caused recurring `Write error` crashes and rapid reconnect/restart loops.
+- Prevented concurrent restart races by enforcing a single restart task per guild in audio loop recovery.
+
 ## [2.0.2] - 2026-02-19
 
 ### Added
@@ -16,7 +23,7 @@ All notable changes to this project will be documented in this file.
 - Live API latency serialization now guards against non-finite float values to avoid JSON compliance crashes.
 - Public API `/api/public/top-servers` sorting bug causing HTTP 500 (invalid sort key function signature).
 
-## [2.0.2] - 2026-02-03
+## [2.0.1] - 2026-02-03
 
 ### Added
 
