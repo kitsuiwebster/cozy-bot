@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.4] - 2026-02-28
+
+### Changed
+
+- Updated bot dependency pin to `discord.py==2.7.0` for DAVE voice protocol compatibility.
+
+### Fixed
+
+- Voice restart recovery now avoids false reconnect/disconnect races (`Already connected to a voice channel`) and keeps playback loop more stable.
+- User session joins are now recorded in normal voice-join flows, fixing `sessions_joined`/recent activity inconsistencies for newer users.
+
 ## [2.0.3] - 2026-02-27
 
 ### Fixed
