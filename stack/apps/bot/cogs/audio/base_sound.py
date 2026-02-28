@@ -488,11 +488,9 @@ class BaseSoundCog(commands.Cog):
                 return
 
             # Recover voice connection if Discord dropped it while users are still present.
-            voice_is_ready = (
-                voice_client
-                and voice_client.channel
-                and (not hasattr(voice_client, "is_connected") or voice_client.is_connected())
-            )
+            # `is_connected()` can report false negatives on some reconnect edges.
+            # If we have a channel bound, treat voice as ready.
+            voice_is_ready = bool(voice_client and voice_client.channel)
             if not voice_is_ready:
                 target_channel = guild_state.get('target_channel')
                 if not target_channel:
@@ -509,19 +507,9 @@ class BaseSoundCog(commands.Cog):
                 lock = self._get_connection_lock(guild_id)
                 async with lock:
                     voice_client = guild.voice_client
-                    voice_is_ready = (
-                        voice_client
-                        and voice_client.channel
-                        and (not hasattr(voice_client, "is_connected") or voice_client.is_connected())
-                    )
+                    voice_is_ready = bool(voice_client and voice_client.channel)
 
                     if not voice_is_ready:
-                        try:
-                            if voice_client:
-                                await voice_client.disconnect()
-                        except Exception:
-                            pass
-
                         try:
                             voice_client = await target_channel.connect()
                             await asyncio.sleep(0.3)
@@ -531,10 +519,27 @@ class BaseSoundCog(commands.Cog):
                                 f"🔗 restart_audio_loop recovered voice connection in {guild_name}"
                             )
                         except Exception as reconnect_error:
-                            logging.warning(
-                                f"🔄 restart_audio_loop reconnect failed for guild {guild_id}: {reconnect_error}"
-                            )
-                            return
+                            # Race condition: Discord reports already connected while recovering.
+                            if "Already connected to a voice channel" in str(reconnect_error):
+                                voice_client = guild.voice_client
+                                if voice_client and voice_client.channel:
+                                    logging.info(
+                                        f"🔗 restart_audio_loop recovered existing voice connection in {guild_name}"
+                                    )
+                                    await self.start_disconnect_timer(guild_id)
+                                    voice_is_ready = True
+                                    pass
+                                else:
+                                    logging.warning(
+                                        f"🔄 restart_audio_loop reconnect race but no active channel for guild {guild_id}"
+                                    )
+                                    return
+                            else:
+                                logging.warning(
+                                    f"🔄 restart_audio_loop reconnect failed for guild {guild_id}: "
+                                    f"{type(reconnect_error).__name__}: {reconnect_error!r}"
+                                )
+                                return
 
             if not voice_client or not voice_client.channel:
                 logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
