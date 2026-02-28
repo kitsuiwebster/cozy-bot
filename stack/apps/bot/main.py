@@ -99,6 +99,7 @@ def _track_user_join_sync(user_id, member, guild_id):
 
         # Don't save immediately for user tracking
         cozy_gamification.update_username(user_id, member.name, member.global_name or member.name, save_immediately=False)
+        cozy_gamification.join_session(user_id, member.name, save_immediately=False)
 
         # Find currently playing sound to track for new user
         current_sound = None
@@ -140,6 +141,7 @@ def _track_bot_join_sync(guild_id, guild_name, channel, current_users):
             }
             # Don't save immediately to avoid blocking the event loop
             cozy_gamification.update_username(user_id, user.name, user.global_name or user.name, save_immediately=False)
+            cozy_gamification.join_session(user_id, user.name, save_immediately=False)
             logging.info("")
             logging.info(f"👉 USER JOIN: \033[35m{user.name}\033[0m was already in channel when bot joined {channel.name} in {guild_name}")
 
@@ -1075,7 +1077,7 @@ async def run_bot():
 # Main entry point for bot execution
 if __name__ == "__main__":
     # Welcome message
-    print("✨ Welcome to CozyBot CLI v2.0.3 by @kitsuiwebster\n")
+    print("✨ Welcome to CozyBot CLI v2.0.4 by @kitsuiwebster\n")
 
     loop = asyncio.get_event_loop()
     if COZY_ENABLE_BOT_API:

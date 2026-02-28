@@ -136,9 +136,9 @@ export class CozybotService {
     return this.http.get<SoundsResponse>(`${this.apiUrl}/top-sounds`);
   }
 
-  getUserDetails(username: string): Observable<UserDetails> {
+  getUserDetails(username: string, forceRefresh = false): Observable<UserDetails> {
     const cached = this.userDetailsCache.get(username);
-    if (cached) {
+    if (cached && !forceRefresh) {
       return of(cached);
     }
     const encodedUsername = encodeURIComponent(username);

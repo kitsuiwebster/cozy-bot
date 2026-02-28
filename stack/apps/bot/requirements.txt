@@ -3,7 +3,7 @@ aiosignal>=1.4.0
 attrs==23.2.0
 cffi>=2.0.0
 couchdb3==1.2.0
-discord.py==2.6.4
+discord.py==2.7.0
 fastapi==0.104.1
 ffmpeg==1.4
 frozenlist==1.4.1

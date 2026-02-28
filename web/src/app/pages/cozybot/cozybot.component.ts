@@ -870,7 +870,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.loadingUserDetails = true;
     this.selectedUserDetails = null;
 
-    this.cozybotService.getUserDetails(username).subscribe({
+    this.cozybotService.getUserDetails(username, true).subscribe({
       next: (details) => {
         this.selectedUserDetails = details;
         this.loadingUserDetails = false;
