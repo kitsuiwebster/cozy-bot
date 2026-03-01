@@ -6,6 +6,7 @@
         start-kuma stop-kuma restart-kuma rebuild-kuma logs-kuma \
         start-db stop-db restart-db rebuild-db logs-db seed-db \
         start-couchdb stop-couchdb restart-couchdb rebuild-couchdb logs-couchdb \
+        backup-db-offsite restore-db-offsite list-db-backups \
         rebuild rebuild-all logs logs-all logs-core status-all clean
 
 ENV_DIR ?= stack
@@ -75,6 +76,9 @@ help:
 	@echo ""
 	@echo "🧹 Maintenance:"
 	@echo "  make clean            - Clean up Docker resources"
+	@echo "  make backup-db-offsite - Run offsite CouchDB backup (restic)"
+	@echo "  make list-db-backups   - List offsite restic snapshots"
+	@echo "  make restore-db-offsite CONFIRM=1 SNAPSHOT=<id|latest> - Restore CouchDB backup"
 	@echo ""
 	@echo "🔗 UI Links:"
 	@echo "  make ui               - Show UI links"
@@ -427,6 +431,20 @@ clean:
 	@echo "🧹 Cleaning up..."
 	@docker system prune -a -f
 	@docker volume prune -f
+
+backup-db-offsite:
+	@./scripts/backup_couchdb_offsite.sh
+
+list-db-backups:
+	@set -a; . ./stack/infra/.env.prod; . /root/.restic-couchdb.env; set +a; restic snapshots
+
+restore-db-offsite:
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "ERROR: set CONFIRM=1 to allow destructive restore"; \
+		echo "Example: make restore-db-offsite CONFIRM=1 SNAPSHOT=latest"; \
+		exit 1; \
+	fi
+	@./scripts/restore_couchdb_offsite.sh --yes $(if $(SNAPSHOT),--snapshot $(SNAPSHOT),)
 
 # ============================================
 # UI LINKS
