@@ -4,21 +4,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-COMPOSE_FILE="${COMPOSE_FILE:-${REPO_ROOT}/stack/infra/docker-compose.yml}"
-ENV_FILE="${ENV_FILE:-${REPO_ROOT}/stack/infra/.env.prod}"
+ENV_FILE="${ENV_FILE:-${REPO_ROOT}/stack/infra/.env}"
 RESTIC_ENV_FILE="${RESTIC_ENV_FILE:-/root/.restic-couchdb.env}"
 SNAPSHOT="${SNAPSHOT:-latest}"
+BULK_SIZE="${BULK_SIZE:-500}"
 CONFIRMED=0
 
 usage() {
-  cat <<'EOF'
+  cat <<'EOF_USAGE'
 Usage:
   restore_couchdb_offsite.sh [--snapshot <id|latest>] --yes
 
 Description:
-  Restores CouchDB Docker volume data from a restic snapshot.
-  WARNING: this replaces all data in the CouchDB volume.
-EOF
+  Restores CouchDB from a logical restic backup.
+  WARNING: this drops and recreates databases from the snapshot.
+EOF_USAGE
 }
 
 while [[ $# -gt 0 ]]; do
@@ -58,15 +58,12 @@ if [[ ! -f "${RESTIC_ENV_FILE}" ]]; then
   exit 1
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "ERROR: docker not found" >&2
-  exit 1
-fi
-
-if ! command -v restic >/dev/null 2>&1; then
-  echo "ERROR: restic not found" >&2
-  exit 1
-fi
+for cmd in curl jq restic tar gzip; do
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "ERROR: ${cmd} not found" >&2
+    exit 1
+  fi
+done
 
 set -a
 # shellcheck disable=SC1090
@@ -75,47 +72,120 @@ source "${ENV_FILE}"
 source "${RESTIC_ENV_FILE}"
 set +a
 
-: "${COUCHDB_VOLUME:?COUCHDB_VOLUME is required in ${ENV_FILE}}"
+: "${COUCHDB_USER:?COUCHDB_USER is required in ${ENV_FILE}}"
+: "${COUCHDB_PASSWORD:?COUCHDB_PASSWORD is required in ${ENV_FILE}}"
+: "${COUCHDB_PORT:?COUCHDB_PORT is required in ${ENV_FILE}}"
 : "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY is required in ${RESTIC_ENV_FILE}}"
 : "${RESTIC_PASSWORD:?RESTIC_PASSWORD is required in ${RESTIC_ENV_FILE}}"
 
+COUCHDB_BACKUP_URL="${COUCHDB_BACKUP_URL:-http://127.0.0.1:${COUCHDB_PORT}}"
+AUTH=(--user "${COUCHDB_USER}:${COUCHDB_PASSWORD}")
 WORK_DIR="$(mktemp -d)"
-COUCHDB_STOPPED=0
+EXTRACT_DIR="${WORK_DIR}/extract"
 
 cleanup() {
-  if [[ "${COUCHDB_STOPPED}" -eq 1 ]]; then
-    docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" start couchdb >/dev/null 2>&1 || true
-  fi
   rm -rf "${WORK_DIR}"
 }
 trap cleanup EXIT INT TERM
 
-echo "[1/6] Restoring snapshot ${SNAPSHOT} into temporary workspace..."
+urlencode() {
+  jq -rn --arg v "$1" '$v|@uri'
+}
+
+api_status() {
+  local method="$1"
+  local url="$2"
+  local data_file="${3:-}"
+  if [[ -n "${data_file}" ]]; then
+    curl -sS -o /dev/null -w "%{http_code}" "${AUTH[@]}" -H "Content-Type: application/json" -X "${method}" "${url}" --data-binary "@${data_file}"
+  else
+    curl -sS -o /dev/null -w "%{http_code}" "${AUTH[@]}" -H "Content-Type: application/json" -X "${method}" "${url}"
+  fi
+}
+
+echo "[1/6] Checking CouchDB availability..."
+curl -fsS "${AUTH[@]}" "${COUCHDB_BACKUP_URL}/_up" >/dev/null
+
+echo "[2/6] Restoring snapshot ${SNAPSHOT} into workspace..."
 restic restore "${SNAPSHOT}" --target "${WORK_DIR}"
 
-ARCHIVE="$(find "${WORK_DIR}" -type f -name 'couchdb-volume-*.tar.gz' | head -n 1)"
+ARCHIVE="$(find "${WORK_DIR}" -type f -name 'couchdb-logical-*.tar.gz' | head -n 1)"
 if [[ -z "${ARCHIVE}" ]]; then
-  echo "ERROR: no CouchDB archive found in snapshot ${SNAPSHOT}" >&2
+  echo "ERROR: no logical backup archive found in snapshot ${SNAPSHOT}" >&2
   exit 1
 fi
-ARCHIVE_REL="${ARCHIVE#${WORK_DIR}/}"
 
-echo "[2/6] Stopping couchdb container..."
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" stop couchdb >/dev/null
-COUCHDB_STOPPED=1
+echo "[3/6] Extracting archive..."
+mkdir -p "${EXTRACT_DIR}"
+tar -xzf "${ARCHIVE}" -C "${EXTRACT_DIR}"
 
-echo "[3/6] Cleaning target volume ${COUCHDB_VOLUME}..."
-docker run --rm -v "${COUCHDB_VOLUME}:/to" alpine sh -c "find /to -mindepth 1 -delete"
+MANIFEST="${EXTRACT_DIR}/manifest.json"
+if [[ ! -f "${MANIFEST}" ]]; then
+  echo "ERROR: manifest.json missing in backup archive" >&2
+  exit 1
+fi
 
-echo "[4/6] Extracting restored archive into volume..."
-docker run --rm \
-  -v "${COUCHDB_VOLUME}:/to" \
-  -v "${WORK_DIR}:/from:ro" \
-  alpine sh -c "tar -xzf /from/${ARCHIVE_REL} -C /to"
+echo "[4/6] Recreating databases from backup..."
+while IFS= read -r db; do
+  db_uri="$(urlencode "${db}")"
+  db_url="${COUCHDB_BACKUP_URL}/${db_uri}"
 
-echo "[5/6] Restarting couchdb container..."
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" start couchdb >/dev/null
-COUCHDB_STOPPED=0
+  del_code="$(api_status DELETE "${db_url}")"
+  if [[ "${del_code}" != "200" && "${del_code}" != "404" ]]; then
+    echo "ERROR: failed to drop db ${db} (HTTP ${del_code})" >&2
+    exit 1
+  fi
 
-echo "[6/6] Restore completed."
-echo "Tip: verify with 'make logs-db' and CouchDB /_up endpoint."
+  put_code="$(api_status PUT "${db_url}")"
+  if [[ "${put_code}" != "201" && "${put_code}" != "202" && "${put_code}" != "412" ]]; then
+    echo "ERROR: failed to create db ${db} (HTTP ${put_code})" >&2
+    exit 1
+  fi
+
+  dump_file="${EXTRACT_DIR}/dbs/${db_uri}.ndjson.gz"
+  if [[ ! -f "${dump_file}" ]]; then
+    echo "  - restored ${db} (empty)"
+    continue
+  fi
+
+  chunk_file="${WORK_DIR}/chunk.ndjson"
+  payload_file="${WORK_DIR}/bulk.json"
+  : > "${chunk_file}"
+  count=0
+
+  flush_chunk() {
+    if [[ "${count}" -eq 0 ]]; then
+      return
+    fi
+
+    jq -s '{docs: .}' "${chunk_file}" > "${payload_file}"
+    code="$(api_status POST "${db_url}/_bulk_docs" "${payload_file}")"
+    if [[ "${code}" != "201" && "${code}" != "202" ]]; then
+      echo "ERROR: bulk import failed for ${db} (HTTP ${code})" >&2
+      exit 1
+    fi
+
+    : > "${chunk_file}"
+    count=0
+  }
+
+  while IFS= read -r doc; do
+    if [[ -z "${doc}" ]]; then
+      continue
+    fi
+    echo "${doc}" | jq -c 'del(._rev)' >> "${chunk_file}"
+    count=$((count + 1))
+    if [[ "${count}" -ge "${BULK_SIZE}" ]]; then
+      flush_chunk
+    fi
+  done < <(gzip -dc "${dump_file}")
+
+  flush_chunk
+  echo "  - restored ${db}"
+done < <(jq -r '.databases[]' "${MANIFEST}")
+
+echo "[5/6] Restore finished."
+
+echo "[6/6] Post-check:"
+echo "- run: make logs-db"
+echo "- check: ${COUCHDB_BACKUP_URL}/_up"

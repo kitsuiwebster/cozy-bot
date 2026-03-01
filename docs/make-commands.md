@@ -53,9 +53,8 @@
 - `make rebuild-db` - Recreate the CouchDB container.
 - `make logs-db` - Tail CouchDB logs.
 - `make seed-db` - Seed CouchDB design views.
-- `make backup-db-offsite` - Backup CouchDB volume to offsite restic repository.
+- `make backup-db-offsite` - Backup CouchDB data offsite (online, no CouchDB stop).
 - `make list-db-backups` - List offsite restic snapshots.
-- `make restore-db-offsite CONFIRM=1 SNAPSHOT=<id|latest>` - Restore offsite backup.
 
 ## Combined Logs
 - `make logs-core` - Tail combined bot + public API logs.

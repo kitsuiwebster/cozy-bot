@@ -82,3 +82,5 @@ dev_backup/
 
 jsons/
 request.txt
+
+restic-couchdb.env
