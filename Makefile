@@ -435,7 +435,7 @@ backup-db-offsite:
 	@./scripts/backup_couchdb_offsite.sh
 
 list-db-backups:
-	@set -a; . ./stack/infra/.env; . /root/.restic-couchdb.env; set +a; restic snapshots
+	@set -a; . /root/.restic-couchdb.env; set +a; restic snapshots
 
 # ============================================
 # UI LINKS

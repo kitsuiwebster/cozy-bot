@@ -40,18 +40,43 @@ if ! command -v restic >/dev/null 2>&1; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "${ENV_FILE}"
-# shellcheck disable=SC1090
-source "${RESTIC_ENV_FILE}"
-set +a
+get_env_value() {
+  local file="$1"
+  local key="$2"
+  local line value
+  line="$(grep -E "^${key}=" "${file}" | tail -n 1 || true)"
+  value="${line#*=}"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "${value}"
+}
+
+COUCHDB_USER="$(get_env_value "${ENV_FILE}" "COUCHDB_USER")"
+COUCHDB_PASSWORD="$(get_env_value "${ENV_FILE}" "COUCHDB_PASSWORD")"
+COUCHDB_PORT="$(get_env_value "${ENV_FILE}" "COUCHDB_PORT")"
+
+RESTIC_REPOSITORY="$(get_env_value "${RESTIC_ENV_FILE}" "RESTIC_REPOSITORY")"
+RESTIC_PASSWORD="$(get_env_value "${RESTIC_ENV_FILE}" "RESTIC_PASSWORD")"
+AWS_ACCESS_KEY_ID="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_ACCESS_KEY_ID")"
+AWS_SECRET_ACCESS_KEY="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_SECRET_ACCESS_KEY")"
+AWS_DEFAULT_REGION="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_DEFAULT_REGION")"
+AWS_ENDPOINT_URL="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_ENDPOINT_URL")"
 
 : "${COUCHDB_USER:?COUCHDB_USER is required in ${ENV_FILE}}"
 : "${COUCHDB_PASSWORD:?COUCHDB_PASSWORD is required in ${ENV_FILE}}"
 : "${COUCHDB_PORT:?COUCHDB_PORT is required in ${ENV_FILE}}"
 : "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY is required in ${RESTIC_ENV_FILE}}"
 : "${RESTIC_PASSWORD:?RESTIC_PASSWORD is required in ${RESTIC_ENV_FILE}}"
+
+export RESTIC_REPOSITORY RESTIC_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+if [[ -n "${AWS_DEFAULT_REGION}" ]]; then
+  export AWS_DEFAULT_REGION
+fi
+if [[ -n "${AWS_ENDPOINT_URL}" ]]; then
+  export AWS_ENDPOINT_URL
+fi
 
 COUCHDB_BACKUP_URL="${COUCHDB_BACKUP_URL:-http://127.0.0.1:${COUCHDB_PORT}}"
 AUTH=(--user "${COUCHDB_USER}:${COUCHDB_PASSWORD}")
