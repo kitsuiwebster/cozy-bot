@@ -779,6 +779,18 @@
 .leaderboard-list {
   padding: 0;
 
+  button.leaderboard-item {
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
   .leaderboard-item {
     display: grid;
     grid-template-columns: 1fr auto 60px;
