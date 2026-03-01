@@ -4,8 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-COMPOSE_FILE="${COMPOSE_FILE:-${REPO_ROOT}/stack/infra/docker-compose.yml}"
-ENV_FILE="${ENV_FILE:-${REPO_ROOT}/stack/infra/.env.prod}"
+ENV_FILE="${ENV_FILE:-${REPO_ROOT}/stack/infra/.env}"
 RESTIC_ENV_FILE="${RESTIC_ENV_FILE:-/root/.restic-couchdb.env}"
 TMP_DIR="${TMP_DIR:-/tmp}"
 
@@ -14,6 +13,7 @@ KEEP_WEEKLY="${KEEP_WEEKLY:-4}"
 KEEP_MONTHLY="${KEEP_MONTHLY:-12}"
 RUN_CHECK="${RUN_CHECK:-1}"
 CHECK_SUBSET="${CHECK_SUBSET:-5%}"
+PAGE_SIZE="${PAGE_SIZE:-1000}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "ERROR: missing ENV_FILE: ${ENV_FILE}" >&2
@@ -25,8 +25,13 @@ if [[ ! -f "${RESTIC_ENV_FILE}" ]]; then
   exit 1
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "ERROR: docker not found" >&2
+if ! command -v curl >/dev/null 2>&1; then
+  echo "ERROR: curl not found" >&2
+  exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq not found" >&2
   exit 1
 fi
 
@@ -35,48 +40,121 @@ if ! command -v restic >/dev/null 2>&1; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "${ENV_FILE}"
-# shellcheck disable=SC1090
-source "${RESTIC_ENV_FILE}"
-set +a
+get_env_value() {
+  local file="$1"
+  local key="$2"
+  local line value
+  line="$(grep -E "^${key}=" "${file}" | tail -n 1 || true)"
+  value="${line#*=}"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "${value}"
+}
 
-: "${COUCHDB_VOLUME:?COUCHDB_VOLUME is required in ${ENV_FILE}}"
+COUCHDB_USER="$(get_env_value "${ENV_FILE}" "COUCHDB_USER")"
+COUCHDB_PASSWORD="$(get_env_value "${ENV_FILE}" "COUCHDB_PASSWORD")"
+COUCHDB_PORT="$(get_env_value "${ENV_FILE}" "COUCHDB_PORT")"
+
+RESTIC_REPOSITORY="$(get_env_value "${RESTIC_ENV_FILE}" "RESTIC_REPOSITORY")"
+RESTIC_PASSWORD="$(get_env_value "${RESTIC_ENV_FILE}" "RESTIC_PASSWORD")"
+AWS_ACCESS_KEY_ID="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_ACCESS_KEY_ID")"
+AWS_SECRET_ACCESS_KEY="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_SECRET_ACCESS_KEY")"
+AWS_DEFAULT_REGION="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_DEFAULT_REGION")"
+AWS_ENDPOINT_URL="$(get_env_value "${RESTIC_ENV_FILE}" "AWS_ENDPOINT_URL")"
+
+: "${COUCHDB_USER:?COUCHDB_USER is required in ${ENV_FILE}}"
+: "${COUCHDB_PASSWORD:?COUCHDB_PASSWORD is required in ${ENV_FILE}}"
+: "${COUCHDB_PORT:?COUCHDB_PORT is required in ${ENV_FILE}}"
 : "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY is required in ${RESTIC_ENV_FILE}}"
 : "${RESTIC_PASSWORD:?RESTIC_PASSWORD is required in ${RESTIC_ENV_FILE}}"
 
+export RESTIC_REPOSITORY RESTIC_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+if [[ -n "${AWS_DEFAULT_REGION}" ]]; then
+  export AWS_DEFAULT_REGION
+fi
+if [[ -n "${AWS_ENDPOINT_URL}" ]]; then
+  export AWS_ENDPOINT_URL
+fi
+
+COUCHDB_BACKUP_URL="${COUCHDB_BACKUP_URL:-http://127.0.0.1:${COUCHDB_PORT}}"
+AUTH=(--user "${COUCHDB_USER}:${COUCHDB_PASSWORD}")
+
 mkdir -p "${TMP_DIR}"
 TS="$(date +%F-%H%M%S)"
-ARCHIVE="${TMP_DIR}/couchdb-volume-${COUCHDB_VOLUME}-${TS}.tar.gz"
-COUCHDB_STOPPED=0
+WORK_DIR="$(mktemp -d "${TMP_DIR}/couchdb-logical-${TS}-XXXX")"
+EXPORT_DIR="${WORK_DIR}/export"
+ARCHIVE="${TMP_DIR}/couchdb-logical-${TS}.tar.gz"
 
 cleanup() {
-  if [[ "${COUCHDB_STOPPED}" -eq 1 ]]; then
-    docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" start couchdb >/dev/null 2>&1 || true
-  fi
+  rm -rf "${WORK_DIR}"
   [[ -f "${ARCHIVE}" ]] && rm -f "${ARCHIVE}"
 }
 trap cleanup EXIT INT TERM
 
-echo "[1/6] Stopping couchdb container..."
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" stop couchdb >/dev/null
-COUCHDB_STOPPED=1
+mkdir -p "${EXPORT_DIR}/dbs"
 
-echo "[2/6] Creating local archive from volume ${COUCHDB_VOLUME}..."
-docker run --rm \
-  -v "${COUCHDB_VOLUME}:/from:ro" \
-  -v "${TMP_DIR}:/to" \
-  alpine sh -c "tar -czf /to/$(basename "${ARCHIVE}") -C /from ."
+urlencode() {
+  jq -rn --arg v "$1" '$v|@uri'
+}
 
-echo "[3/6] Restarting couchdb container..."
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" start couchdb >/dev/null
-COUCHDB_STOPPED=0
+echo "[1/6] Checking CouchDB availability (no downtime backup)..."
+curl -fsS "${AUTH[@]}" "${COUCHDB_BACKUP_URL}/_up" >/dev/null
 
-echo "[4/6] Sending encrypted backup to offsite repository..."
-restic backup "${ARCHIVE}" --tag couchdb --tag cozy
+echo "[2/6] Listing databases..."
+DBS_JSON="${EXPORT_DIR}/db_list.json"
+curl -fsS "${AUTH[@]}" "${COUCHDB_BACKUP_URL}/_all_dbs" > "${DBS_JSON}"
 
-echo "[5/6] Applying retention policy..."
+jq -n \
+  --arg created_at "$(date -Iseconds)" \
+  --arg couchdb_url "${COUCHDB_BACKUP_URL}" \
+  --argjson databases "$(cat "${DBS_JSON}")" \
+  '{created_at: $created_at, couchdb_url: $couchdb_url, databases: $databases}' \
+  > "${EXPORT_DIR}/manifest.json"
+
+echo "[3/6] Exporting documents for each database..."
+while IFS= read -r db; do
+  db_uri="$(urlencode "${db}")"
+  out_file="${EXPORT_DIR}/dbs/${db_uri}.ndjson"
+  : > "${out_file}"
+
+  last_id=""
+  while :; do
+    query="include_docs=true&limit=${PAGE_SIZE}"
+    if [[ -n "${last_id}" ]]; then
+      startkey="$(jq -rn --arg v "${last_id}" '$v|tojson|@uri')"
+      startkey_docid="$(urlencode "${last_id}")"
+      query+="&startkey=${startkey}&startkey_docid=${startkey_docid}&skip=1"
+    fi
+
+    resp_file="${WORK_DIR}/resp.json"
+    curl -fsS "${AUTH[@]}" "${COUCHDB_BACKUP_URL}/${db_uri}/_all_docs?${query}" > "${resp_file}"
+
+    rows_len="$(jq '.rows | length' "${resp_file}")"
+    if [[ "${rows_len}" -eq 0 ]]; then
+      break
+    fi
+
+    jq -c '.rows[].doc' "${resp_file}" >> "${out_file}"
+    last_id="$(jq -r '.rows[-1].id' "${resp_file}")"
+
+    if [[ "${rows_len}" -lt "${PAGE_SIZE}" ]]; then
+      break
+    fi
+  done
+
+  gzip -f "${out_file}"
+  echo "  - exported ${db}"
+done < <(jq -r '.[]' "${DBS_JSON}")
+
+echo "[4/6] Creating archive..."
+tar -czf "${ARCHIVE}" -C "${EXPORT_DIR}" .
+
+echo "[5/6] Sending encrypted backup to offsite repository..."
+restic backup "${ARCHIVE}" --tag couchdb --tag cozy --tag logical
+
+echo "[6/6] Applying retention policy..."
 restic forget \
   --keep-daily "${KEEP_DAILY}" \
   --keep-weekly "${KEEP_WEEKLY}" \
@@ -84,10 +162,7 @@ restic forget \
   --prune
 
 if [[ "${RUN_CHECK}" == "1" ]]; then
-  echo "[6/6] Verifying repository integrity..."
   restic check --read-data-subset="${CHECK_SUBSET}"
-else
-  echo "[6/6] Integrity check skipped (RUN_CHECK=${RUN_CHECK})."
 fi
 
-echo "Backup completed successfully."
+echo "Backup completed successfully (no CouchDB stop/start)."
