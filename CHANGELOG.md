@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.5] - 2026-03-05
+
+### Fixed
+
+- Fixed voice connections by adding DAVE protocol support (`discord.py[voice]`, `davey`).
+
 ## [2.0.4] - 2026-02-28
 
 ### Changed
