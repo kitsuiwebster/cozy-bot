@@ -32,6 +32,6 @@ async def api_health():
         "status": "ok",
         "details": {
             "service": "cozybot-api",
-            "version": "2.0.4"
+            "version": "2.0.5"
         }
     }
