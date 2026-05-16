@@ -603,6 +603,12 @@ async def _playback_watchdog_loop():
 
                 if guild_state.get('current_sound') and guild_state.get('is_playing'):
                     if not voice_client.is_playing():
+                        # Skip silently when the channel has no human listeners: the
+                        # bot is about to auto-disconnect, "playback stalled" is not
+                        # the real cause, and warning + spawning a restart task that
+                        # will immediately bail just spams the logs.
+                        if not any(not m.bot for m in voice_client.channel.members):
+                            continue
                         now = time.monotonic()
                         last_restart = _playback_watchdog_loop.last_restart_by_guild.get(guild.id, 0.0)
                         if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
