@@ -393,7 +393,20 @@ class BaseSoundCog(commands.Cog):
                 guild_state['tracking_task'] = tracking_task
 
                 sound_label = self.sound_labels.get(sound_filename, sound_filename)
-                await interaction.followup.send(f"🎵 Now playing: {sound_label}")
+                now_playing_msg = await interaction.followup.send(f"🎵 Now playing: {sound_label}", wait=True)
+
+                # Auto-delete the "Now playing" notice after 5 minutes so the
+                # channel doesn't pile up announcements during long sessions.
+                # The audio keeps playing — only the chat message is removed.
+                async def _auto_delete_now_playing():
+                    try:
+                        await asyncio.sleep(300)
+                        await now_playing_msg.delete()
+                    except Exception:
+                        # Message may already be gone, channel deleted, perms revoked — ignore.
+                        pass
+
+                self.bot.loop.create_task(_auto_delete_now_playing())
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->followup: {int((time.monotonic() - t0) * 1000)}ms")
             else:
