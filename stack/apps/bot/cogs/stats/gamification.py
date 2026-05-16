@@ -121,9 +121,22 @@ class CozyGamification:
     def update_username(self, user_id: str, username: str, display_name: str = None, save_immediately: bool = True):
 
         user_id = str(user_id)
+        # When a caller doesn't know the display_name (e.g. internal session bumps),
+        # preserve whatever we previously stored instead of clobbering it with the
+        # username. Without this, every join_session would flatten the global name
+        # (e.g. "Raph✨") back to the raw username, then the next event would set
+        # it correctly — causing leaderboard names to flicker between formats.
+        existing = self.usernames.get(user_id) if isinstance(self.usernames.get(user_id), dict) else None
+        if display_name:
+            effective_display = display_name
+        elif existing and existing.get('display_name'):
+            effective_display = existing['display_name']
+        else:
+            effective_display = username
+
         self.usernames[user_id] = {
             'username': username,
-            'display_name': display_name or username,
+            'display_name': effective_display,
             'last_updated': datetime.now().isoformat()
         }
         if save_immediately:
@@ -585,7 +598,11 @@ class CozyGamification:
         user_stats['last_join_time'] = current_time.isoformat()
 
         if username:
-            self.update_username(user_id, username, username, save_immediately=save_immediately)
+            # Don't pass username as display_name — that would clobber an existing
+            # global name. update_username preserves the existing display_name when
+            # none is passed, which is what we want here (callers that know the
+            # display_name update it explicitly elsewhere).
+            self.update_username(user_id, username, save_immediately=save_immediately)
 
         # Update daily streak (UTC day boundary)
         today = _today_utc_key()
