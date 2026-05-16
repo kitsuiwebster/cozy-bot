@@ -57,7 +57,12 @@ class FancyFormatter(logging.Formatter):
             emoji_padded = f"{emoji}  "
         else:
             emoji_padded = f"{emoji} "
-        return f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
+        line = f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
+        if record.exc_info:
+            line += "\n" + self.formatException(record.exc_info)
+        elif record.exc_text:
+            line += "\n" + record.exc_text
+        return line
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

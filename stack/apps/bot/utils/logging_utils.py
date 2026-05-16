@@ -43,7 +43,15 @@ class FancyFormatter(logging.Formatter):
             emoji_padded = f"{emoji}  "
         else:
             emoji_padded = f"{emoji} "
-        return f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
+        line = f"{color}{emoji_padded}[{timestamp}] {record.levelname:<8} {reset}{record.getMessage()}"
+        # Append traceback when the log call passed exc_info=True or a logger
+        # (like discord.py's) attached an exception to the record. Without this
+        # the bot silently swallows every "Ignoring exception" stack trace.
+        if record.exc_info:
+            line += "\n" + self.formatException(record.exc_info)
+        elif record.exc_text:
+            line += "\n" + record.exc_text
+        return line
 
 
 class _LogFilter(logging.Filter):
