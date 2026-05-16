@@ -135,16 +135,18 @@ services:
       - STATUS_HISTORY_RETENTION_DAYS=${STATUS_HISTORY_RETENTION_DAYS:-90}
       - STATUS_PAGE_SLUG=${STATUS_PAGE_SLUG:-cozy}
       - STATUS_PAGE_URL=${STATUS_PAGE_URL:-http://uptime-kuma:3001}
-      - STATUS_MONITOR_PUBLIC_URL=${STATUS_MONITOR_PUBLIC_URL:-http://cozy-public-api:8000/api/public/health}
-      - STATUS_MONITOR_LIVE_URL=${STATUS_MONITOR_LIVE_URL:-http://cozy-live-bot:8002/api/live/bot/health}
-      - STATUS_MONITOR_DB_URL=${STATUS_MONITOR_DB_URL:-http://cozy-couchdb:5984/_up}
+      # Defaults derive from the service container-name vars so renaming a
+      # container in env doesn't silently break status-api's reachability.
+      - STATUS_MONITOR_PUBLIC_URL=${STATUS_MONITOR_PUBLIC_URL:-http://${API_CONTAINER_NAME:-cozy-api}:8000/api/public/health}
+      - STATUS_MONITOR_LIVE_URL=${STATUS_MONITOR_LIVE_URL:-http://${CONTAINER_NAME:-cozy-discord-bot}:8002/api/live/bot/health}
+      - STATUS_MONITOR_DB_URL=${STATUS_MONITOR_DB_URL:-http://${COUCHDB_CONTAINER_NAME:-cozy-couchdb}:5984/_up}
     ports:
       - "${STATUS_API_PORT:-8010}:8010"
     volumes:
       - status-api-data:/data
     depends_on:
       uptime-kuma:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/api/status/monitors').read()"]
       interval: 30s
