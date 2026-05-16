@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://api.cozybot.online/api/public'
+  apiUrl: 'http://localhost:8000/api/public'
 };
