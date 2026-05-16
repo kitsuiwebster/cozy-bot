@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-05-17
+
+### Added
+
+- Telegram notifier for warning/error logs, listener count changes, and achievement unlocks (env-driven, with throttling).
+- Sound buttons usable by anyone in the bot's voice channel.
+- "Now playing" message auto-deletes after 5 minutes.
+- Loading skeletons with shimmer animation on the status page.
+- Status page favicon matching the CozyBot logo.
+- `make help` warning markers on commands that can affect CouchDB data.
+
+### Changed
+
+- Frontend dev environment now points at the local API by default; production unchanged.
+- CORS origins and Status API monitor URLs driven by environment variables instead of hardcoded values.
+- `status-api` waits for Uptime Kuma to be healthy before starting (was just "started").
+
+### Fixed
+
+- CouchDB writes no longer lost silently on concurrent conflicts (retry with backoff up to 5 times).
+- API healthchecks now reflect actual dependency state instead of always reporting OK.
+- Audio start/stop/restart actions for a guild serialized to remove race conditions on shared state.
+- Streak rollover and daily activity now use a consistent UTC day boundary regardless of host timezone.
+- User identifiers normalized to a single type across gamification, preventing duplicate keys.
+- Leaderboard display names no longer flicker between the global name and the raw username.
+- Loyalty bonuses (30 min / 1 h / 12 h on the same sound) reachable again after a quick voice rejoin.
+- Sound-master achievements (Rain/Sea/Sparkles/Music) now actually unlock when earned.
+- Session credit reordered so concurrent finalize/backup paths no longer double-credit listening time or points.
+- 30-minute session cap now logs the user and sound responsible for the trimmed credit.
+- Top-N and debug endpoints capped/paginated to prevent unbounded responses.
+- Admin endpoints reject out-of-range numbers and return 404 (not 500) for unknown users.
+- `simple_deployment/check-status` returns a proper error code on failure (was HTTP 200 with `status: "error"`).
+- API error responses no longer leak internal Python tracebacks.
+- Duplicate audio control endpoints on the public API removed; canonical routes live under `/api/live/audio/*`.
+- Obsolete startup handoff to the removed endpoints cleaned up.
+- Playback watchdog no longer warns about "stalled" audio when the voice channel is simply empty.
+- Exception tracebacks now appear in logs for Discord.py "Ignoring exception" messages.
+- Website fetches now time out after 15 seconds, render a real 404 on unknown URLs, and stop leaking subscriptions in long-running tabs.
+- Status page polling cancels in-flight requests under slow networks instead of stacking them.
+- Deploy script no longer masks docker build failures as success.
+- Re-running the CouchDB migration merges existing docs instead of silently skipping them.
+- CI security scan workflow restored.
+
 ## [2.0.5] - 2026-03-05
 
 ### Fixed
