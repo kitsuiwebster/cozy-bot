@@ -2,6 +2,14 @@
 // Use Nginx proxy to avoid CORS issues
 const STATUS_API_URL = '/api/status';
 
+// Per-tick request timeout. Without it, a slow network leaves the previous
+// poll hanging while the next poll starts — requests stack up.
+const REQUEST_TIMEOUT_MS = 8000;
+
+// AbortController shared by the current poll; the next poll cancels it before
+// starting so we never have two concurrent updateStatus() in flight.
+let inflightAbort = null;
+
 // Uptime periods to display
 const UPTIME_PERIODS = [
     { label: '90d', days: 90 },
@@ -12,11 +20,12 @@ const UPTIME_PERIODS = [
 ];
 
 // Fetch monitors from the API
-async function fetchMonitors() {
+async function fetchMonitors(signal) {
     try {
         const cacheBuster = Date.now();
         const response = await fetch(`${STATUS_API_URL}/monitors?t=${cacheBuster}`, {
             cache: 'no-cache',
+            signal,
             headers: {
                 'Cache-Control': 'no-cache',
                 'Pragma': 'no-cache'
@@ -30,17 +39,19 @@ async function fetchMonitors() {
         const data = await response.json();
         return data;
     } catch (error) {
+        if (error.name === 'AbortError') return null;
         console.error('Error fetching monitors:', error);
         return null;
     }
 }
 
 // Fetch heartbeats from the API
-async function fetchHeartbeats() {
+async function fetchHeartbeats(signal) {
     try {
         const cacheBuster = Date.now();
         const response = await fetch(`${STATUS_API_URL}/history?window=90d&t=${cacheBuster}`, {
             cache: 'no-cache',
+            signal,
             headers: {
                 'Cache-Control': 'no-cache',
                 'Pragma': 'no-cache'
@@ -54,16 +65,18 @@ async function fetchHeartbeats() {
         const data = await response.json();
         return data;
     } catch (error) {
+        if (error.name === 'AbortError') return null;
         console.error('Error fetching heartbeats:', error);
         return null;
     }
 }
 
-async function fetchMaintenance() {
+async function fetchMaintenance(signal) {
     try {
         const cacheBuster = Date.now();
         const response = await fetch(`${STATUS_API_URL}/maintenance?t=${cacheBuster}`, {
             cache: 'no-cache',
+            signal,
             headers: {
                 'Cache-Control': 'no-cache',
                 'Pragma': 'no-cache'
@@ -77,6 +90,7 @@ async function fetchMaintenance() {
         const data = await response.json();
         return data;
     } catch (error) {
+        if (error.name === 'AbortError') return null;
         console.error('Error fetching maintenance:', error);
         return null;
     }
@@ -430,12 +444,28 @@ function renderMaintenance(maintenanceData) {
 
 // Update the page
 async function updateStatus() {
-    // Fetch monitors and heartbeats in parallel
-    const [monitorsData, heartbeatsData, maintenanceData] = await Promise.all([
-        fetchMonitors(),
-        fetchHeartbeats(),
-        fetchMaintenance()
-    ]);
+    // Cancel any still-pending requests from the previous tick before starting
+    // a new round — prevents request pile-up when the network is slow.
+    if (inflightAbort) {
+        inflightAbort.abort();
+    }
+    const ctrl = new AbortController();
+    inflightAbort = ctrl;
+    const timeoutId = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+
+    let monitorsData, heartbeatsData, maintenanceData;
+    try {
+        [monitorsData, heartbeatsData, maintenanceData] = await Promise.all([
+            fetchMonitors(ctrl.signal),
+            fetchHeartbeats(ctrl.signal),
+            fetchMaintenance(ctrl.signal)
+        ]);
+    } finally {
+        clearTimeout(timeoutId);
+        if (inflightAbort === ctrl) {
+            inflightAbort = null;
+        }
+    }
 
     if (!monitorsData || !monitorsData.monitors) {
         console.error('Invalid monitors data structure from API');

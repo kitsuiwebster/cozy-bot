@@ -1,9 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import sys
 import os
 import json
+import logging
 from pydantic import BaseModel
+
+# Cap user-supplied list sizes to prevent unbounded responses
+MAX_TOP_LIMIT = 1000
 
 # Add project root to path to import cogs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -132,7 +136,7 @@ class TopSoundsResponse(BaseModel):
 
 # Get most listened sounds globally
 @router.get("/top-sounds", response_model=TopSoundsResponse)
-async def get_top_sounds(limit: int = None):
+async def get_top_sounds(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         user_data = load_cozy_points_data()
         
@@ -180,9 +184,12 @@ async def get_top_sounds(limit: int = None):
             sounds=sounds_list,
             total_sounds=len(sounds_list)
         )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
+
+    except HTTPException:
+        raise
+    except Exception:
+        logging.exception("top_users: error fetching top sounds")
+        raise HTTPException(status_code=500, detail="Internal error fetching top sounds")
 
 # Compute streak from provided stats to avoid stale in-memory cache
 def get_current_streak_from_stats(user_stats: dict) -> int:
@@ -190,9 +197,9 @@ def get_current_streak_from_stats(user_stats: dict) -> int:
     if not last_active:
         return 0
     try:
-        from datetime import datetime
-        last = datetime.strptime(last_active, '%Y-%m-%d')
-        today = datetime.now()
+        from datetime import date, datetime, timezone
+        last = date.fromisoformat(last_active)
+        today = datetime.now(timezone.utc).date()
         days_diff = (today - last).days
         if days_diff <= 1:
             streak = user_stats.get('daily_streak', 0)
@@ -203,7 +210,7 @@ def get_current_streak_from_stats(user_stats: dict) -> int:
 
 # Get top users by cozy points
 @router.get("/top-users", response_model=TopUsersResponse)
-async def get_top_users(limit: int = None):
+async def get_top_users(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         # Load data directly from the same JSON files the bot uses
         user_data_raw = load_cozy_points_data()
@@ -268,14 +275,14 @@ async def get_top_users(limit: int = None):
                 if favorite_sound:
                     favorite_sound_emoji = get_sound_display_name(favorite_sound)
 
-            # Calculate days since last activity
+            # Calculate days since last activity (UTC day boundary)
             days_since_last_activity = None
             last_active_date = original_stats.get('last_active_date')
             if last_active_date:
                 try:
-                    from datetime import datetime
-                    last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
-                    today = datetime.now()
+                    from datetime import date, datetime, timezone
+                    last_active = date.fromisoformat(last_active_date)
+                    today = datetime.now(timezone.utc).date()
                     days_since_last_activity = (today - last_active).days
                 except Exception:
                     days_since_last_activity = None
@@ -302,15 +309,18 @@ async def get_top_users(limit: int = None):
             users=users,
             total_count=len(users)
         )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching top users: {str(e)}")
+
+    except HTTPException:
+        raise
+    except Exception:
+        logging.exception("top_users: error fetching top users")
+        raise HTTPException(status_code=500, detail="Internal error fetching top users")
 
 # Get detailed profile for a specific user by username
 @router.get("/user/{username}", response_model=UserDetailedProfile)
 async def get_user_profile(username: str):
     try:
-        from datetime import datetime
+        from datetime import date, datetime, timezone
 
         # Load data
         user_data_raw = load_cozy_points_data()
@@ -357,13 +367,13 @@ async def get_user_profile(username: str):
         # Get current valid streak from fresh user stats
         current_streak = get_current_streak_from_stats(user_stats)
 
-        # Calculate days since last activity
+        # Calculate days since last activity (UTC day boundary)
         days_since_last_activity = None
         last_active_date = user_stats.get('last_active_date')
         if last_active_date:
             try:
-                last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
-                today = datetime.now()
+                last_active = date.fromisoformat(last_active_date)
+                today = datetime.now(timezone.utc).date()
                 days_since_last_activity = (today - last_active).days
             except Exception:
                 days_since_last_activity = None
@@ -447,5 +457,6 @@ async def get_user_profile(username: str):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching user profile: {str(e)}")
+    except Exception:
+        logging.exception("top_users: error fetching user profile")
+        raise HTTPException(status_code=500, detail="Internal error fetching user profile")

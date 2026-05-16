@@ -1,11 +1,29 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, date
 from typing import Dict, List, Optional
 import asyncio
 import logging
 import traceback
 from utils.storage.couchdb_client import get_couchdb_client
+
+
+# Streak/day-key helpers — always UTC so a bot running in UTC and a user in any
+# timezone see the same day boundary. Without this, a user listening at 23:00 UTC
+# could roll over (or not) depending on the host's local tz, breaking streaks.
+def _today_utc_key() -> str:
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+
+def _parse_aware(iso_str: str) -> Optional[datetime]:
+    """Parse an ISO datetime, treating legacy naive timestamps as UTC."""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+    except Exception:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 # Terminal color formatting helpers
 def colorize_points(text):
@@ -103,9 +121,22 @@ class CozyGamification:
     def update_username(self, user_id: str, username: str, display_name: str = None, save_immediately: bool = True):
 
         user_id = str(user_id)
+        # When a caller doesn't know the display_name (e.g. internal session bumps),
+        # preserve whatever we previously stored instead of clobbering it with the
+        # username. Without this, every join_session would flatten the global name
+        # (e.g. "Raph✨") back to the raw username, then the next event would set
+        # it correctly — causing leaderboard names to flicker between formats.
+        existing = self.usernames.get(user_id) if isinstance(self.usernames.get(user_id), dict) else None
+        if display_name:
+            effective_display = display_name
+        elif existing and existing.get('display_name'):
+            effective_display = existing['display_name']
+        else:
+            effective_display = username
+
         self.usernames[user_id] = {
             'username': username,
-            'display_name': display_name or username,
+            'display_name': effective_display,
             'last_updated': datetime.now().isoformat()
         }
         if save_immediately:
@@ -201,6 +232,7 @@ class CozyGamification:
     # Add points and handle leveling up
     def add_points(self, user_id: str, points: int, reason: str = "Listening", save_data: bool = True) -> Dict:
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         user_stats['total_points'] += points
 
@@ -247,9 +279,21 @@ class CozyGamification:
             new_level, progress = self.calculate_level(user_stats['total_points'])
             user_stats['level'] = new_level
             user_stats['level_progress'] = progress
-            
+
             username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
             logging.info(f"🏆 Achievement bonus: {username} {colorize_points(f'+{achievement_bonus} points')} for {len(new_achievements)} new achievement(s)")
+
+            try:
+                from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
+                display_username = self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                ach_lines = "\n".join(f"• {tg_escape(a)}" for a in new_achievements)
+                tg_notify(
+                    f"🏆 <b>Achievement unlocked</b> — {tg_escape(display_username)}\n"
+                    f"{ach_lines}\n"
+                    f"<i>+{achievement_bonus} pts bonus</i>"
+                )
+            except Exception:
+                pass
             
             # Track achievement bonus in breakdown
             if user_id not in self.changes_since_save['user_points_breakdown']:
@@ -311,6 +355,7 @@ class CozyGamification:
     
     def add_listening_time(self, user_id: str, seconds: float):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         user_stats['listening_time'] += seconds
         
@@ -331,6 +376,7 @@ class CozyGamification:
     
     def track_sound_start(self, user_id: str, sound_name: str, save_immediately: bool = True):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
 
         # Note: finalize_current_sound is now handled at the calling site to control timing
@@ -383,21 +429,34 @@ class CozyGamification:
     
     def finalize_current_sound(self, user_id: str):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         current_sound = user_stats.get('current_sound')
-        
+
         if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
             try:
+                # Capture the session window locally, then clear current_sound *before*
+                # crediting. If a concurrent finalize or periodic_backup re-enters for
+                # the same user, it sees None and skips — eliminating any chance of
+                # double-counting the same time slice into points or listening_time.
                 start_time = datetime.fromisoformat(current_sound['start_time'])
-                duration = (datetime.now() - start_time).total_seconds()
-                
-                # Cap duration to 30 minutes to prevent corrupted data
-                max_duration = 30 * 60  # 30 minutes in seconds
-                if duration > max_duration:
-                    duration = max_duration
-                
                 from cogs.audio.sound_mappings import normalize_sound_name
                 sound_name = normalize_sound_name(current_sound['name'])
+                user_stats['current_sound'] = None
+
+                duration = (datetime.now() - start_time).total_seconds()
+
+                # Cap duration to 30 minutes to prevent corrupted data. Warn so
+                # long-listener stats that suddenly plateau become explainable.
+                max_duration = 30 * 60  # 30 minutes in seconds
+                if duration > max_duration:
+                    username = self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                    logging.warning(
+                        f"⚠️ Capping session duration for {username} on {sound_name}: "
+                        f"{duration/60:.1f}min observed, credited as 30min"
+                    )
+                    duration = max_duration
+
                 if 'listening_time_by_sound' not in user_stats:
                     user_stats['listening_time_by_sound'] = {}
                 if sound_name not in user_stats['listening_time_by_sound']:
@@ -413,8 +472,8 @@ class CozyGamification:
                     user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
                 user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += duration
                 user_stats['listening_time'] += duration  # Update total listening time
-                user_stats['current_sound'] = None
-                
+                # current_sound was already cleared above (before crediting) — no need to repeat.
+
                 # Track changes for periodic logging - SAFE ACCESS
                 try:
                     if not isinstance(self.changes_since_save['user_listening_time'], dict):
@@ -507,25 +566,41 @@ class CozyGamification:
     
     def join_session(self, user_id: str, username: str = None, force_bonus: bool = False, save_immediately: bool = True):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
 
         # Check for recent join to prevent duplicate points from reconnections
         last_join_time = user_stats.get('last_join_time')
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
 
         # Prevent duplicate join points within 2 minutes
         award_join_points = True
         if not force_bonus and last_join_time:
-            try:
-                last_join = datetime.fromisoformat(last_join_time)
-                time_since_last_join = (current_time - last_join).total_seconds()
-                if time_since_last_join < 120:
-                    award_join_points = False
-            except Exception:
-                award_join_points = True
+            last_join = _parse_aware(last_join_time)
+            if last_join is not None:
+                try:
+                    time_since_last_join = (current_time - last_join).total_seconds()
+                    if time_since_last_join < 120:
+                        award_join_points = False
+                except Exception:
+                    award_join_points = True
 
-        # Reset consecutive listening time for all sounds
-        if 'listening_time_by_sound' in user_stats:
+        # Reset consecutive listening time only on a real break (>10 min since last
+        # join). Quick reconnects/network blips shouldn't wipe loyalty progress —
+        # otherwise the 30min/1h/12h loyalty bonuses become unreachable for anyone
+        # who ever drops out mid-session.
+        should_reset_consecutive = True
+        if last_join_time:
+            last_join = _parse_aware(last_join_time)
+            if last_join is not None:
+                try:
+                    gap_seconds = (current_time - last_join).total_seconds()
+                    if 0 <= gap_seconds < 600:  # less than 10 minutes
+                        should_reset_consecutive = False
+                except Exception:
+                    pass
+
+        if should_reset_consecutive and 'listening_time_by_sound' in user_stats:
             for sound_name in user_stats['listening_time_by_sound']:
                 if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
                     user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
@@ -535,10 +610,14 @@ class CozyGamification:
         user_stats['last_join_time'] = current_time.isoformat()
 
         if username:
-            self.update_username(user_id, username, username, save_immediately=save_immediately)
+            # Don't pass username as display_name — that would clobber an existing
+            # global name. update_username preserves the existing display_name when
+            # none is passed, which is what we want here (callers that know the
+            # display_name update it explicitly elsewhere).
+            self.update_username(user_id, username, save_immediately=save_immediately)
 
-        # Update daily streak
-        today = datetime.now().strftime('%Y-%m-%d')
+        # Update daily streak (UTC day boundary)
+        today = _today_utc_key()
         last_active = user_stats.get('last_active_date')
 
         if last_active != today:
@@ -577,13 +656,12 @@ class CozyGamification:
     def get_current_streak(self, user_id: str) -> int:
 
         user_stats = self.get_user_stats(user_id)
-        today = datetime.now().strftime('%Y-%m-%d')
         last_active = user_stats.get('last_active_date')
-        
+
         if last_active:
             try:
-                last = datetime.strptime(last_active, '%Y-%m-%d')
-                current = datetime.strptime(today, '%Y-%m-%d')
+                last = date.fromisoformat(last_active)
+                current = datetime.now(timezone.utc).date()
                 days_diff = (current - last).days
 
                 if days_diff <= 1:
@@ -715,19 +793,25 @@ class CozyGamification:
                 user_stats['achievements'].append(achievement)
                 achievements.append(achievement)
         
-        # Sound preference achievements
-        fav_sounds = user_stats['favorite_sounds']
-        if fav_sounds:
+        # Sound preference achievements — read from listening_time_by_sound, which
+        # IS populated. The legacy `favorite_sounds` field was never written, making
+        # these four achievements permanently unreachable.
+        listening_by_sound = user_stats.get('listening_time_by_sound', {})
+        if listening_by_sound:
             sound_achievements = {
                 "🌧️ Rain Master": "rain",
-                "🌊 Sea Master": "sea", 
+                "🌊 Sea Master": "sea",
                 "✨ Sparkles Master": "sparkles",
-                "🎵 Music Master": "background-music"
+                "🎵 Music Master": "background-music",
             }
-            
+
             for achievement, sound_type in sound_achievements.items():
                 if achievement not in current_achievements:
-                    sound_count = sum(count for sound, count in fav_sounds.items() if sound_type in sound.lower())
+                    sound_count = sum(
+                        sound_data.get('session_count', 0)
+                        for sound_name, sound_data in listening_by_sound.items()
+                        if isinstance(sound_data, dict) and sound_type in sound_name.lower()
+                    )
                     if sound_count >= 50:
                         user_stats['achievements'].append(achievement)
                         achievements.append(achievement)
@@ -736,6 +820,7 @@ class CozyGamification:
     
     def check_category_completion_bonus(self, user_id: str, sound_name: str, save_data: bool = True) -> int:
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         listening_times = user_stats.get('listening_time_by_sound', {})
         

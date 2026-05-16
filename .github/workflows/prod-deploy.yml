@@ -16,7 +16,7 @@ jobs:
           - nginx:alpine
     steps:
       - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: image
           image-ref: ${{ matrix.image }}

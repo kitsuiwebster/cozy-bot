@@ -191,11 +191,17 @@ echo "👉 Building with configured mode"
 
 echo ""
 echo "🔍 Starting Docker build process (no-cache)..."
+# `set +e` so a failing tail-grep (no matches → exit 1) doesn't kill the script
+# under `set -e`. Crucially, no `|| true` on the pipeline itself: that would
+# overwrite PIPESTATUS with the `true` command's exit (0) and mask a real
+# docker build failure as success.
+set +e
 docker compose --env-file .env build --no-cache discord-bot 2>&1 | \
   stdbuf -oL -eL grep -v "transferring context\|transferring dockerfile\|naming to docker.io" | \
   stdbuf -oL -eL grep -E "^#|^\[|Built|Created|Started|Error|FAILED|COPY|RUN|exporting" | \
-  stdbuf -oL -eL grep -v "CACHED.*apt-get\|CACHED.*WORKDIR\|CACHED.*requirements\|CACHED.*pip install" || true
+  stdbuf -oL -eL grep -v "CACHED.*apt-get\|CACHED.*WORKDIR\|CACHED.*requirements\|CACHED.*pip install"
 BUILD_EXIT_CODE=${PIPESTATUS[0]}
+set -e
 
 if [ $BUILD_EXIT_CODE -eq 0 ]; then
     echo "✅ Image built successfully"

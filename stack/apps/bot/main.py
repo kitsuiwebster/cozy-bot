@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 import os
 from discord.ext import commands, tasks
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import asyncio
 import time
@@ -192,6 +192,23 @@ def format_duration(seconds):
             return f"{hours}h {minutes}m"
         return f"{hours}h"
 
+# Build the Telegram "N person/people listening" line.
+# Counts every human currently in any voice channel the bot is connected to,
+# across all guilds. Pass exclude_channel to discount a channel the bot is
+# about to leave (e.g. mid-disconnect, when bot.voice_clients still references it).
+def _total_listeners_text(exclude_channel=None):
+    total = 0
+    for guild in bot.guilds:
+        vc = guild.voice_client
+        if not vc or not vc.channel:
+            continue
+        if exclude_channel is not None and vc.channel.id == exclude_channel.id:
+            continue
+        total += sum(1 for m in vc.channel.members if not m.bot)
+    suffix = "person listening" if total == 1 else "people listening"
+    return f"✨ <b>{total}</b> {suffix}"
+
+
 # Save voice time data to CouchDB
 def save_voice_time_data(silent=False):
     try:
@@ -333,10 +350,17 @@ async def periodic_backup():
                         continue
                     
                     start_time = datetime.fromisoformat(current_sound['start_time'])
-                    session_duration = (datetime.now() - start_time).total_seconds()
+                    now = datetime.now()
+                    session_duration = (now - start_time).total_seconds()
                     from cogs.audio.sound_mappings import normalize_sound_name
                     sound_name = normalize_sound_name(current_sound['name'])
                     current_sound['name'] = sound_name
+
+                    # Advance start_time NOW, before crediting. If a concurrent
+                    # finalize_current_sound is dispatched for the same user mid-loop,
+                    # it will compute a near-zero duration off the new start_time
+                    # instead of re-crediting the same window.
+                    current_sound['start_time'] = now.isoformat()
 
                     # Cap session duration at 30 minutes to prevent corrupted data
                     max_session_duration = 30 * 60
@@ -349,8 +373,8 @@ async def periodic_backup():
                     if session_duration > 0:
                         user_stats['listening_time'] += session_duration
 
-                        # Ensure daily streak updates even if join event was missed
-                        today = datetime.now().strftime('%Y-%m-%d')
+                        # Ensure daily streak updates even if join event was missed (UTC day boundary)
+                        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
                         last_active = user_stats.get('last_active_date')
                         if last_active != today:
                             try:
@@ -410,7 +434,7 @@ async def periodic_backup():
                                 'points': streak_bonus
                             })
 
-                        current_sound['start_time'] = datetime.now().isoformat()
+                        # start_time was already advanced above (before crediting) — no need to repeat.
 
                         for guild_id, session_data in user_voice_sessions.items():
                             if user_id in session_data.get('users', {}):
@@ -596,6 +620,12 @@ async def _playback_watchdog_loop():
 
                 if guild_state.get('current_sound') and guild_state.get('is_playing'):
                     if not voice_client.is_playing():
+                        # Skip silently when the channel has no human listeners: the
+                        # bot is about to auto-disconnect, "playback stalled" is not
+                        # the real cause, and warning + spawning a restart task that
+                        # will immediately bail just spams the logs.
+                        if not any(not m.bot for m in voice_client.channel.members):
+                            continue
                         now = time.monotonic()
                         last_restart = _playback_watchdog_loop.last_restart_by_guild.get(guild.id, 0.0)
                         if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
@@ -763,6 +793,12 @@ async def on_voice_state_update(member, before, after):
             logging.info("")
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
 
+            try:
+                from utils.telegram_notifier import notify as tg_notify
+                tg_notify(_total_listeners_text())
+            except Exception:
+                pass
+
             # Track in background to not block Discord connection
             create_background_task(asyncio.to_thread(_track_bot_join_sync, guild_id, member.guild.name, after.channel, current_users))
             schedule_live_stats_update()
@@ -816,6 +852,14 @@ async def on_voice_state_update(member, before, after):
                         f"\033[94m{format_duration(total_time)}\033[0m"
                     )
                     logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
+
+                    try:
+                        from utils.telegram_notifier import notify as tg_notify
+                        # The bot just dropped this voice client; compute the new total without it.
+                        tg_notify(_total_listeners_text(exclude_channel=before.channel))
+                    except Exception:
+                        pass
+
                     create_background_task(asyncio.to_thread(save_voice_time_data))
                     schedule_live_stats_update()
                 else:
@@ -875,6 +919,12 @@ async def on_voice_state_update(member, before, after):
         logging.info("")
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
+        try:
+            from utils.telegram_notifier import notify as tg_notify
+            tg_notify(_total_listeners_text())
+        except Exception:
+            pass
+
         # Track in background to avoid blocking Discord events
         create_background_task(asyncio.to_thread(_track_user_join_sync, user_id, member, guild_id))
         schedule_live_stats_update()
@@ -898,6 +948,12 @@ async def on_voice_state_update(member, before, after):
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
+
+            try:
+                from utils.telegram_notifier import notify as tg_notify
+                tg_notify(_total_listeners_text())
+            except Exception:
+                pass
 
             cozy_gamification.finalize_current_sound(user_id)
             logging.info(f"👉 SOUND TRACKING: Finalized current sound for \033[35m{member.name}\033[0m")
@@ -942,12 +998,9 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with API: {e}')
 
-    try:
-        from api.routes.audio_restore import set_bot_instance as set_audio_bot_instance
-        set_audio_bot_instance(bot)
-        logging.info('🔗 Bot instance shared with audio restore API')
-    except Exception as e:
-        logging.warning(f'⚠️ Could not share bot instance with audio restore API: {e}')
+    # audio_restore no longer needs bot_instance — the audio mutation endpoints
+    # were deduped into the live API (see live_api/app.py). The public API's
+    # audio_restore module only exposes a read-only CouchDB endpoint now.
 
     try:
         from api.routes.health import set_bot_instance as set_health_bot_instance

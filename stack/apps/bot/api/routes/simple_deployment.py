@@ -38,8 +38,6 @@ async def check_deployment_status():
             "users_notified": data.get("total_users", 0),
             "timestamp": data.get("timestamp")
         }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error reading deployment status: {e}"
-        }
+    except Exception:
+        logging.exception("simple_deployment: error reading deployment status")
+        raise HTTPException(status_code=500, detail="Internal error reading deployment status")
