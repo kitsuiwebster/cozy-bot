@@ -977,12 +977,9 @@ async def on_ready():
     except Exception as e:
         logging.warning(f'⚠️ Could not share bot instance with API: {e}')
 
-    try:
-        from api.routes.audio_restore import set_bot_instance as set_audio_bot_instance
-        set_audio_bot_instance(bot)
-        logging.info('🔗 Bot instance shared with audio restore API')
-    except Exception as e:
-        logging.warning(f'⚠️ Could not share bot instance with audio restore API: {e}')
+    # audio_restore no longer needs bot_instance — the audio mutation endpoints
+    # were deduped into the live API (see live_api/app.py). The public API's
+    # audio_restore module only exposes a read-only CouchDB endpoint now.
 
     try:
         from api.routes.health import set_bot_instance as set_health_bot_instance
