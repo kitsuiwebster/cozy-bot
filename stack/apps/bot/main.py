@@ -776,6 +776,17 @@ async def on_voice_state_update(member, before, after):
             logging.info("")
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
 
+            try:
+                from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
+                names = ", ".join(tg_escape(u.name) for u in current_users) or "(empty)"
+                tg_notify(
+                    f"✨ <b>Bot join</b> — <i>{tg_escape(after.channel.name)}</i> "
+                    f"({tg_escape(member.guild.name)})\n"
+                    f"With: {names}"
+                )
+            except Exception:
+                pass
+
             # Track in background to not block Discord connection
             create_background_task(asyncio.to_thread(_track_bot_join_sync, guild_id, member.guild.name, after.channel, current_users))
             schedule_live_stats_update()
@@ -829,6 +840,17 @@ async def on_voice_state_update(member, before, after):
                         f"\033[94m{format_duration(total_time)}\033[0m"
                     )
                     logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
+
+                    try:
+                        from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
+                        tg_notify(
+                            f"✨ <b>Bot disconnect</b> — <i>{tg_escape(before.channel.name)}</i> "
+                            f"({tg_escape(before.channel.guild.name)})\n"
+                            f"Session: <code>{format_duration(session_duration)}</code>"
+                        )
+                    except Exception:
+                        pass
+
                     create_background_task(asyncio.to_thread(save_voice_time_data))
                     schedule_live_stats_update()
                 else:
