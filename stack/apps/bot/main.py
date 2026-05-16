@@ -192,6 +192,23 @@ def format_duration(seconds):
             return f"{hours}h {minutes}m"
         return f"{hours}h"
 
+# Build the Telegram "N person/people listening" line.
+# Counts every human currently in any voice channel the bot is connected to,
+# across all guilds. Pass exclude_channel to discount a channel the bot is
+# about to leave (e.g. mid-disconnect, when bot.voice_clients still references it).
+def _total_listeners_text(exclude_channel=None):
+    total = 0
+    for guild in bot.guilds:
+        vc = guild.voice_client
+        if not vc or not vc.channel:
+            continue
+        if exclude_channel is not None and vc.channel.id == exclude_channel.id:
+            continue
+        total += sum(1 for m in vc.channel.members if not m.bot)
+    suffix = "person listening" if total == 1 else "people listening"
+    return f"✨ <b>{total}</b> {suffix}"
+
+
 # Save voice time data to CouchDB
 def save_voice_time_data(silent=False):
     try:
@@ -777,13 +794,8 @@ async def on_voice_state_update(member, before, after):
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
 
             try:
-                from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-                n = len(current_users)
-                suffix = "person listening" if n == 1 else "people listening"
-                tg_notify(
-                    f"✨ <b>{n}</b> {suffix} in <i>{tg_escape(after.channel.name)}</i> "
-                    f"({tg_escape(member.guild.name)})"
-                )
+                from utils.telegram_notifier import notify as tg_notify
+                tg_notify(_total_listeners_text())
             except Exception:
                 pass
 
@@ -842,11 +854,9 @@ async def on_voice_state_update(member, before, after):
                     logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
 
                     try:
-                        from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-                        tg_notify(
-                            f"✨ <b>0</b> people listening in <i>{tg_escape(before.channel.name)}</i> "
-                            f"({tg_escape(before.channel.guild.name)})"
-                        )
+                        from utils.telegram_notifier import notify as tg_notify
+                        # The bot just dropped this voice client; compute the new total without it.
+                        tg_notify(_total_listeners_text(exclude_channel=before.channel))
                     except Exception:
                         pass
 
@@ -910,13 +920,8 @@ async def on_voice_state_update(member, before, after):
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
         try:
-            from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-            n = sum(1 for m in after.channel.members if not m.bot)
-            suffix = "person listening" if n == 1 else "people listening"
-            tg_notify(
-                f"✨ <b>{n}</b> {suffix} in <i>{tg_escape(after.channel.name)}</i> "
-                f"({tg_escape(member.guild.name)})"
-            )
+            from utils.telegram_notifier import notify as tg_notify
+            tg_notify(_total_listeners_text())
         except Exception:
             pass
 
@@ -945,13 +950,8 @@ async def on_voice_state_update(member, before, after):
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
 
             try:
-                from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-                n = sum(1 for m in before.channel.members if not m.bot)
-                suffix = "person listening" if n == 1 else "people listening"
-                tg_notify(
-                    f"✨ <b>{n}</b> {suffix} in <i>{tg_escape(before.channel.name)}</i> "
-                    f"({tg_escape(member.guild.name)})"
-                )
+                from utils.telegram_notifier import notify as tg_notify
+                tg_notify(_total_listeners_text())
             except Exception:
                 pass
 
