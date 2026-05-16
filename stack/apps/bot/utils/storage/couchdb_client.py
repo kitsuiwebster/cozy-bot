@@ -1,6 +1,7 @@
 import couchdb3
 import logging
 import os
+import time
 import urllib.request
 import json
 import threading
@@ -85,29 +86,48 @@ class CouchDBClient:
             return True
         return self._save_document_sync(db, doc_id, data)
 
-    def _save_document_sync(self, db, doc_id: str, data: Dict) -> bool:
-        """Save or update a document (sync)"""
-        try:
-            # Get existing document to preserve _rev
-            existing = db.get(doc_id)
+    def _save_document_sync(self, db, doc_id: str, data: Dict, max_retries: int = 5) -> bool:
+        """Save or update a document (sync). Retries on 409 conflicts by refetching _rev.
 
-            if existing:
-                # Update existing document
-                data['_id'] = doc_id
-                data['_rev'] = existing['_rev']
-                data['updated_at'] = datetime.now().isoformat()
-            else:
-                # Create new document
-                data['_id'] = doc_id
-                data['created_at'] = datetime.now().isoformat()
-                data['updated_at'] = datetime.now().isoformat()
+        Without retry, concurrent writers (bot + public API + live API on the same doc)
+        silently lose the loser's write. Semantics here remain last-write-wins, but each
+        attempt re-reads _rev so no write is dropped due to a stale revision token.
+        """
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                existing = db.get(doc_id)
 
-            db.save(data)
-            return True
+                if existing:
+                    data['_id'] = doc_id
+                    data['_rev'] = existing['_rev']
+                    data['updated_at'] = datetime.now().isoformat()
+                else:
+                    data.pop('_rev', None)
+                    data['_id'] = doc_id
+                    data['created_at'] = datetime.now().isoformat()
+                    data['updated_at'] = datetime.now().isoformat()
 
-        except Exception as e:
-            logging.error(f"❌ Failed to save document {doc_id}: {e}")
-            return False
+                db.save(data)
+                if attempt > 0:
+                    logging.debug(f"✅ Saved document {doc_id} after {attempt} retry(ies)")
+                return True
+
+            except Exception as e:
+                last_error = e
+                status = getattr(e, 'status_code', None) or getattr(e, 'status', None)
+                is_conflict = status == 409 or 'conflict' in str(e).lower()
+
+                if is_conflict and attempt < max_retries:
+                    # Exponential backoff with cap (50ms, 100ms, 200ms, 400ms, 500ms)
+                    time.sleep(min(0.05 * (2 ** attempt), 0.5))
+                    continue
+
+                logging.error(f"❌ Failed to save document {doc_id}: {e}")
+                return False
+
+        logging.error(f"❌ Failed to save document {doc_id} after {max_retries + 1} attempts (conflict storm): {last_error}")
+        return False
 
     def delete_document(self, db, doc_id: str) -> bool:
         """Delete a document by ID"""
