@@ -778,11 +778,11 @@ async def on_voice_state_update(member, before, after):
 
             try:
                 from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-                names = ", ".join(tg_escape(u.name) for u in current_users) or "(empty)"
+                n = len(current_users)
+                suffix = "person listening" if n == 1 else "people listening"
                 tg_notify(
-                    f"✨ <b>Bot join</b> — <i>{tg_escape(after.channel.name)}</i> "
-                    f"({tg_escape(member.guild.name)})\n"
-                    f"With: {names}"
+                    f"✨ <b>{n}</b> {suffix} in <i>{tg_escape(after.channel.name)}</i> "
+                    f"({tg_escape(member.guild.name)})"
                 )
             except Exception:
                 pass
@@ -844,9 +844,8 @@ async def on_voice_state_update(member, before, after):
                     try:
                         from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
                         tg_notify(
-                            f"✨ <b>Bot disconnect</b> — <i>{tg_escape(before.channel.name)}</i> "
-                            f"({tg_escape(before.channel.guild.name)})\n"
-                            f"Session: <code>{format_duration(session_duration)}</code>"
+                            f"✨ <b>0</b> people listening in <i>{tg_escape(before.channel.name)}</i> "
+                            f"({tg_escape(before.channel.guild.name)})"
                         )
                     except Exception:
                         pass
@@ -912,9 +911,10 @@ async def on_voice_state_update(member, before, after):
 
         try:
             from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
+            n = sum(1 for m in after.channel.members if not m.bot)
+            suffix = "person listening" if n == 1 else "people listening"
             tg_notify(
-                f"🔊 <b>Join</b> — {tg_escape(member.name)} "
-                f"in <i>{tg_escape(after.channel.name)}</i> "
+                f"✨ <b>{n}</b> {suffix} in <i>{tg_escape(after.channel.name)}</i> "
                 f"({tg_escape(member.guild.name)})"
             )
         except Exception:
@@ -946,12 +946,11 @@ async def on_voice_state_update(member, before, after):
 
             try:
                 from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-                duration_str = format_duration(total_session_time) if final_duration > 0 else '0s'
+                n = sum(1 for m in before.channel.members if not m.bot)
+                suffix = "person listening" if n == 1 else "people listening"
                 tg_notify(
-                    f"👋 <b>Leave</b> — {tg_escape(member.name)} "
-                    f"from <i>{tg_escape(before.channel.name)}</i> "
-                    f"({tg_escape(member.guild.name)}) "
-                    f"after <code>{duration_str}</code>"
+                    f"✨ <b>{n}</b> {suffix} in <i>{tg_escape(before.channel.name)}</i> "
+                    f"({tg_escape(member.guild.name)})"
                 )
             except Exception:
                 pass
