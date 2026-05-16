@@ -385,19 +385,25 @@ class CozyGamification:
 
         user_stats = self.get_user_stats(user_id)
         current_sound = user_stats.get('current_sound')
-        
+
         if current_sound and isinstance(current_sound, dict) and 'start_time' in current_sound:
             try:
+                # Capture the session window locally, then clear current_sound *before*
+                # crediting. If a concurrent finalize or periodic_backup re-enters for
+                # the same user, it sees None and skips — eliminating any chance of
+                # double-counting the same time slice into points or listening_time.
                 start_time = datetime.fromisoformat(current_sound['start_time'])
+                from cogs.audio.sound_mappings import normalize_sound_name
+                sound_name = normalize_sound_name(current_sound['name'])
+                user_stats['current_sound'] = None
+
                 duration = (datetime.now() - start_time).total_seconds()
-                
+
                 # Cap duration to 30 minutes to prevent corrupted data
                 max_duration = 30 * 60  # 30 minutes in seconds
                 if duration > max_duration:
                     duration = max_duration
-                
-                from cogs.audio.sound_mappings import normalize_sound_name
-                sound_name = normalize_sound_name(current_sound['name'])
+
                 if 'listening_time_by_sound' not in user_stats:
                     user_stats['listening_time_by_sound'] = {}
                 if sound_name not in user_stats['listening_time_by_sound']:
@@ -413,8 +419,8 @@ class CozyGamification:
                     user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
                 user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] += duration
                 user_stats['listening_time'] += duration  # Update total listening time
-                user_stats['current_sound'] = None
-                
+                # current_sound was already cleared above (before crediting) — no need to repeat.
+
                 # Track changes for periodic logging - SAFE ACCESS
                 try:
                     if not isinstance(self.changes_since_save['user_listening_time'], dict):

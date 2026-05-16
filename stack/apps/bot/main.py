@@ -333,10 +333,17 @@ async def periodic_backup():
                         continue
                     
                     start_time = datetime.fromisoformat(current_sound['start_time'])
-                    session_duration = (datetime.now() - start_time).total_seconds()
+                    now = datetime.now()
+                    session_duration = (now - start_time).total_seconds()
                     from cogs.audio.sound_mappings import normalize_sound_name
                     sound_name = normalize_sound_name(current_sound['name'])
                     current_sound['name'] = sound_name
+
+                    # Advance start_time NOW, before crediting. If a concurrent
+                    # finalize_current_sound is dispatched for the same user mid-loop,
+                    # it will compute a near-zero duration off the new start_time
+                    # instead of re-crediting the same window.
+                    current_sound['start_time'] = now.isoformat()
 
                     # Cap session duration at 30 minutes to prevent corrupted data
                     max_session_duration = 30 * 60
@@ -410,7 +417,7 @@ async def periodic_backup():
                                 'points': streak_bonus
                             })
 
-                        current_sound['start_time'] = datetime.now().isoformat()
+                        # start_time was already advanced above (before crediting) — no need to repeat.
 
                         for guild_id, session_data in user_voice_sessions.items():
                             if user_id in session_data.get('users', {}):
