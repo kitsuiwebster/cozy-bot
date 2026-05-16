@@ -671,3 +671,68 @@ footer {
         transform: scale(1.1);
     }
 }
+
+/* Skeleton loading cards — rendered in index.html before app.js fetches data.
+   Each .skeleton-shimmer block animates a gradient sweep to signal loading. */
+.monitor-skeleton .skeleton-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.monitor-skeleton .skeleton-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+}
+
+.skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(168, 85, 247, 0.12) 40%,
+        rgba(168, 85, 247, 0.22) 50%,
+        rgba(168, 85, 247, 0.12) 60%,
+        transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+.skeleton-name {
+    height: 28px;
+    width: 40%;
+    min-width: 160px;
+}
+
+.skeleton-badge {
+    height: 28px;
+    width: 180px;
+    border-radius: 9999px;
+}
+
+.skeleton-row {
+    height: 28px;
+    width: 100%;
+}
+
+@keyframes skeleton-sweep {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
