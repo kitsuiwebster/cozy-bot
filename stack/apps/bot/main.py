@@ -888,6 +888,16 @@ async def on_voice_state_update(member, before, after):
         logging.info("")
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
+        try:
+            from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
+            tg_notify(
+                f"🔊 <b>Join</b> — {tg_escape(member.name)} "
+                f"in <i>{tg_escape(after.channel.name)}</i> "
+                f"({tg_escape(member.guild.name)})"
+            )
+        except Exception:
+            pass
+
         # Track in background to avoid blocking Discord events
         create_background_task(asyncio.to_thread(_track_user_join_sync, user_id, member, guild_id))
         schedule_live_stats_update()
@@ -911,6 +921,18 @@ async def on_voice_state_update(member, before, after):
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - total: \033[94m{format_duration(total_session_time)}\033[0m, final chunk: \033[94m{format_duration(final_duration)}\033[0m, \033[32m+{points_to_add} points\033[0m")
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
+
+            try:
+                from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
+                duration_str = format_duration(total_session_time) if final_duration > 0 else '0s'
+                tg_notify(
+                    f"👋 <b>Leave</b> — {tg_escape(member.name)} "
+                    f"from <i>{tg_escape(before.channel.name)}</i> "
+                    f"({tg_escape(member.guild.name)}) "
+                    f"after <code>{duration_str}</code>"
+                )
+            except Exception:
+                pass
 
             cozy_gamification.finalize_current_sound(user_id)
             logging.info(f"👉 SOUND TRACKING: Finalized current sound for \033[35m{member.name}\033[0m")
