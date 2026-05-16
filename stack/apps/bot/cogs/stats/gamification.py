@@ -219,6 +219,7 @@ class CozyGamification:
     # Add points and handle leveling up
     def add_points(self, user_id: str, points: int, reason: str = "Listening", save_data: bool = True) -> Dict:
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         user_stats['total_points'] += points
 
@@ -329,6 +330,7 @@ class CozyGamification:
     
     def add_listening_time(self, user_id: str, seconds: float):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         user_stats['listening_time'] += seconds
         
@@ -349,6 +351,7 @@ class CozyGamification:
     
     def track_sound_start(self, user_id: str, sound_name: str, save_immediately: bool = True):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
 
         # Note: finalize_current_sound is now handled at the calling site to control timing
@@ -401,6 +404,7 @@ class CozyGamification:
     
     def finalize_current_sound(self, user_id: str):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         current_sound = user_stats.get('current_sound')
 
@@ -537,6 +541,7 @@ class CozyGamification:
     
     def join_session(self, user_id: str, username: str = None, force_bonus: bool = False, save_immediately: bool = True):
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
 
         # Check for recent join to prevent duplicate points from reconnections
@@ -786,6 +791,7 @@ class CozyGamification:
     
     def check_category_completion_bonus(self, user_id: str, sound_name: str, save_data: bool = True) -> int:
 
+        user_id = str(user_id)
         user_stats = self.get_user_stats(user_id)
         listening_times = user_stats.get('listening_time_by_sound', {})
         

@@ -133,7 +133,7 @@ class BaseSoundCog(commands.Cog):
 
             for member in current_users:
                 cozy_gamification.update_username(str(member.id), member.name, member.global_name or member.name, save_immediately=False)
-                cozy_gamification.track_sound_start(member.id, sound_filename, save_immediately=False)
+                cozy_gamification.track_sound_start(str(member.id), sound_filename, save_immediately=False)
                 logging.info(f"🎵 Tracking \033[36m{sound_filename}\033[0m for \033[35m{member.name}\033[0m")
 
             # Save once after processing all users
@@ -443,7 +443,7 @@ class BaseSoundCog(commands.Cog):
             logging.info("")
             logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
             for member in current_users:
-                cozy_gamification.finalize_current_sound(member.id)
+                cozy_gamification.finalize_current_sound(str(member.id))
                 logging.info(f"🛑 Finalized sound tracking for {member.name}")
         
         # Cancel disconnect timer
