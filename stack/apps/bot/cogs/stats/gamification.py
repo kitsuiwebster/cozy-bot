@@ -1,11 +1,29 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, date
 from typing import Dict, List, Optional
 import asyncio
 import logging
 import traceback
 from utils.storage.couchdb_client import get_couchdb_client
+
+
+# Streak/day-key helpers — always UTC so a bot running in UTC and a user in any
+# timezone see the same day boundary. Without this, a user listening at 23:00 UTC
+# could roll over (or not) depending on the host's local tz, breaking streaks.
+def _today_utc_key() -> str:
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+
+def _parse_aware(iso_str: str) -> Optional[datetime]:
+    """Parse an ISO datetime, treating legacy naive timestamps as UTC."""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+    except Exception:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 # Terminal color formatting helpers
 def colorize_points(text):
@@ -517,18 +535,19 @@ class CozyGamification:
 
         # Check for recent join to prevent duplicate points from reconnections
         last_join_time = user_stats.get('last_join_time')
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
 
         # Prevent duplicate join points within 2 minutes
         award_join_points = True
         if not force_bonus and last_join_time:
-            try:
-                last_join = datetime.fromisoformat(last_join_time)
-                time_since_last_join = (current_time - last_join).total_seconds()
-                if time_since_last_join < 120:
-                    award_join_points = False
-            except Exception:
-                award_join_points = True
+            last_join = _parse_aware(last_join_time)
+            if last_join is not None:
+                try:
+                    time_since_last_join = (current_time - last_join).total_seconds()
+                    if time_since_last_join < 120:
+                        award_join_points = False
+                except Exception:
+                    award_join_points = True
 
         # Reset consecutive listening time for all sounds
         if 'listening_time_by_sound' in user_stats:
@@ -543,8 +562,8 @@ class CozyGamification:
         if username:
             self.update_username(user_id, username, username, save_immediately=save_immediately)
 
-        # Update daily streak
-        today = datetime.now().strftime('%Y-%m-%d')
+        # Update daily streak (UTC day boundary)
+        today = _today_utc_key()
         last_active = user_stats.get('last_active_date')
 
         if last_active != today:
@@ -583,13 +602,12 @@ class CozyGamification:
     def get_current_streak(self, user_id: str) -> int:
 
         user_stats = self.get_user_stats(user_id)
-        today = datetime.now().strftime('%Y-%m-%d')
         last_active = user_stats.get('last_active_date')
-        
+
         if last_active:
             try:
-                last = datetime.strptime(last_active, '%Y-%m-%d')
-                current = datetime.strptime(today, '%Y-%m-%d')
+                last = date.fromisoformat(last_active)
+                current = datetime.now(timezone.utc).date()
                 days_diff = (current - last).days
 
                 if days_diff <= 1:

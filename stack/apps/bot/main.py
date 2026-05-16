@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 import os
 from discord.ext import commands, tasks
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import asyncio
 import time
@@ -356,8 +356,8 @@ async def periodic_backup():
                     if session_duration > 0:
                         user_stats['listening_time'] += session_duration
 
-                        # Ensure daily streak updates even if join event was missed
-                        today = datetime.now().strftime('%Y-%m-%d')
+                        # Ensure daily streak updates even if join event was missed (UTC day boundary)
+                        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
                         last_active = user_stats.get('last_active_date')
                         if last_active != today:
                             try:

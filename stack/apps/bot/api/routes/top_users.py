@@ -197,9 +197,9 @@ def get_current_streak_from_stats(user_stats: dict) -> int:
     if not last_active:
         return 0
     try:
-        from datetime import datetime
-        last = datetime.strptime(last_active, '%Y-%m-%d')
-        today = datetime.now()
+        from datetime import date, datetime, timezone
+        last = date.fromisoformat(last_active)
+        today = datetime.now(timezone.utc).date()
         days_diff = (today - last).days
         if days_diff <= 1:
             streak = user_stats.get('daily_streak', 0)
@@ -275,14 +275,14 @@ async def get_top_users(limit: Optional[int] = Query(default=None, ge=1, le=MAX_
                 if favorite_sound:
                     favorite_sound_emoji = get_sound_display_name(favorite_sound)
 
-            # Calculate days since last activity
+            # Calculate days since last activity (UTC day boundary)
             days_since_last_activity = None
             last_active_date = original_stats.get('last_active_date')
             if last_active_date:
                 try:
-                    from datetime import datetime
-                    last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
-                    today = datetime.now()
+                    from datetime import date, datetime, timezone
+                    last_active = date.fromisoformat(last_active_date)
+                    today = datetime.now(timezone.utc).date()
                     days_since_last_activity = (today - last_active).days
                 except Exception:
                     days_since_last_activity = None
@@ -320,7 +320,7 @@ async def get_top_users(limit: Optional[int] = Query(default=None, ge=1, le=MAX_
 @router.get("/user/{username}", response_model=UserDetailedProfile)
 async def get_user_profile(username: str):
     try:
-        from datetime import datetime
+        from datetime import date, datetime, timezone
 
         # Load data
         user_data_raw = load_cozy_points_data()
@@ -367,13 +367,13 @@ async def get_user_profile(username: str):
         # Get current valid streak from fresh user stats
         current_streak = get_current_streak_from_stats(user_stats)
 
-        # Calculate days since last activity
+        # Calculate days since last activity (UTC day boundary)
         days_since_last_activity = None
         last_active_date = user_stats.get('last_active_date')
         if last_active_date:
             try:
-                last_active = datetime.strptime(last_active_date, '%Y-%m-%d')
-                today = datetime.now()
+                last_active = date.fromisoformat(last_active_date)
+                today = datetime.now(timezone.utc).date()
                 days_since_last_activity = (today - last_active).days
             except Exception:
                 days_since_last_activity = None
