@@ -3,6 +3,7 @@ from typing import Optional
 import sys
 import os
 import json
+import logging
 from pydantic import BaseModel, Field
 
 # Reasonable bounds for points/seconds payloads — prevents nonsense like INT_MIN
@@ -189,8 +190,9 @@ async def modify_user_points(request: PointsRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error modifying points: {str(e)}")
+    except Exception:
+        logging.exception("admin: error modifying points")
+        raise HTTPException(status_code=500, detail="Internal error modifying points")
 
 # Add or remove listening time (in seconds) from a user by username (protected by API key)
 @router.post("/time", response_model=TimeResponse, dependencies=[Depends(validate_api_key)])
@@ -232,8 +234,9 @@ async def modify_user_time(request: TimeRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error modifying time: {str(e)}")
+    except Exception:
+        logging.exception("admin: error modifying time")
+        raise HTTPException(status_code=500, detail="Internal error modifying time")
 
 # Get raw decrypted user data for debugging (protected by API key)
 @router.get("/debug/user/{user_id}")
@@ -254,8 +257,9 @@ async def get_raw_user_data(user_id: str, api_key: str = Depends(validate_api_ke
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting user data: {str(e)}")
+    except Exception:
+        logging.exception("admin: error getting user data")
+        raise HTTPException(status_code=500, detail="Internal error getting user data")
 
 # Get all decrypted cozy_points.json data for debugging (protected by API key)
 @router.get("/debug/all-data")
@@ -292,8 +296,9 @@ async def get_all_raw_data(
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting all data: {str(e)}")
+    except Exception:
+        logging.exception("admin: error getting all data")
+        raise HTTPException(status_code=500, detail="Internal error getting all data")
 
 # Add listening_time_by_sound data to a user by username (protected by API key)
 @router.post("/add-sound", response_model=AddSoundResponse, dependencies=[Depends(validate_api_key)])
@@ -331,8 +336,9 @@ async def add_user_sound(request: AddSoundRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error adding sound data: {str(e)}")
+    except Exception:
+        logging.exception("admin: error adding sound data")
+        raise HTTPException(status_code=500, detail="Internal error adding sound data")
 
 # Delete a user completely from the database by user_id (protected by API key)
 @router.delete("/user", response_model=DeleteUserResponse, dependencies=[Depends(validate_api_key)])
@@ -363,8 +369,9 @@ async def delete_user(request: DeleteUserRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
+    except Exception:
+        logging.exception("admin: error deleting user")
+        raise HTTPException(status_code=500, detail="Internal error deleting user")
 
 # Add or remove listening time (in seconds) from a server by guild_id (protected by API key)
 @router.post("/server-time", response_model=ServerTimeResponse, dependencies=[Depends(validate_api_key)])
@@ -421,5 +428,6 @@ async def modify_server_time(request: ServerTimeRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error modifying server time: {str(e)}")
+    except Exception:
+        logging.exception("admin: error modifying server time")
+        raise HTTPException(status_code=500, detail="Internal error modifying server time")

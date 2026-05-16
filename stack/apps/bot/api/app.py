@@ -6,7 +6,27 @@ from .routes.simple_deployment import router as simple_deployment_router
 from .routes.audio_restore import router as audio_restore_router
 from .routes.health import router as health_router
 import logging
+import os
 import sys
+
+# Default CORS origins for the official prod + local dev frontends.
+# Override with CORS_ALLOWED_ORIGINS env var (comma-separated) for staging or
+# alternate deployments. Wildcard "*" is intentionally disallowed alongside
+# allow_credentials=True (browsers reject that combination anyway).
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:4200",
+    "https://kitsuiwebster.com",
+    "https://cozybot.online",
+    "https://www.cozybot.online",
+    "https://api.cozybot.online",
+]
+
+def _load_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+    if not raw:
+        return DEFAULT_CORS_ORIGINS
+    return [o.strip() for o in raw.split(",") if o.strip()]
 
 # Configure logging similar to bot, but with 🔥 for INFO
 class FancyFormatter(logging.Formatter):
@@ -69,14 +89,7 @@ app = FastAPI(
 # Configure CORS for web access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://kitsuiwebster.com",
-        "http://90.60.191.159:8000",
-        "https://cozybot.online",
-        "https://www.cozybot.online",
-        "https://api.cozybot.online",
-    ],
+    allow_origins=_load_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

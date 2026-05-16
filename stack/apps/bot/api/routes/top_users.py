@@ -3,6 +3,7 @@ from typing import List, Optional
 import sys
 import os
 import json
+import logging
 from pydantic import BaseModel
 
 # Cap user-supplied list sizes to prevent unbounded responses
@@ -186,8 +187,9 @@ async def get_top_sounds(limit: Optional[int] = Query(default=None, ge=1, le=MAX
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
+    except Exception:
+        logging.exception("top_users: error fetching top sounds")
+        raise HTTPException(status_code=500, detail="Internal error fetching top sounds")
 
 # Compute streak from provided stats to avoid stale in-memory cache
 def get_current_streak_from_stats(user_stats: dict) -> int:
@@ -310,8 +312,9 @@ async def get_top_users(limit: Optional[int] = Query(default=None, ge=1, le=MAX_
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching top users: {str(e)}")
+    except Exception:
+        logging.exception("top_users: error fetching top users")
+        raise HTTPException(status_code=500, detail="Internal error fetching top users")
 
 # Get detailed profile for a specific user by username
 @router.get("/user/{username}", response_model=UserDetailedProfile)
@@ -454,5 +457,6 @@ async def get_user_profile(username: str):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching user profile: {str(e)}")
+    except Exception:
+        logging.exception("top_users: error fetching user profile")
+        raise HTTPException(status_code=500, detail="Internal error fetching user profile")

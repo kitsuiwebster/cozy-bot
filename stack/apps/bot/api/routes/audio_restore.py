@@ -57,9 +57,9 @@ async def save_audio_state():
             message=f"Saved {sessions_saved} active audio sessions"
         )
         
-    except Exception as e:
-        logging.error(f"❌ Failed to save audio state: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save audio state: {str(e)}")
+    except Exception:
+        logging.exception("audio_restore: failed to save audio state")
+        raise HTTPException(status_code=500, detail="Internal error saving audio state")
 
 # Restore audio state after deployment (manual trigger)
 @router.post("/audio/restore-state", response_model=RestoreStatusResponse)
@@ -81,9 +81,9 @@ async def restore_audio_state():
             message=f"Restored {sessions_restored} audio sessions"
         )
         
-    except Exception as e:
-        logging.error(f"❌ Failed to restore audio state: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to restore audio state: {str(e)}")
+    except Exception:
+        logging.exception("audio_restore: failed to restore audio state")
+        raise HTTPException(status_code=500, detail="Internal error restoring audio state")
 
 # Finalize all active user sessions before deployment
 @router.post("/audio/finalize-sessions")
@@ -140,9 +140,9 @@ async def finalize_all_sessions():
             "message": f"Finalized {finalized_count} active sessions"
         }
         
-    except Exception as e:
-        logging.error(f"❌ Failed to finalize sessions: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to finalize sessions: {str(e)}")
+    except Exception:
+        logging.exception("audio_restore: failed to finalize sessions")
+        raise HTTPException(status_code=500, detail="Internal error finalizing sessions")
 
 # Restore user sessions after deployment
 @router.post("/audio/restore-sessions")
@@ -213,9 +213,9 @@ async def restore_user_sessions():
             "message": f"Restored {restored_count} user sessions"
         }
         
-    except Exception as e:
-        logging.error(f"❌ Failed to restore sessions: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to restore sessions: {str(e)}")
+    except Exception:
+        logging.exception("audio_restore: failed to restore sessions")
+        raise HTTPException(status_code=500, detail="Internal error restoring sessions")
 
 # Get pending audio restore tasks
 @router.get("/audio/restore-tasks")
@@ -241,6 +241,6 @@ async def get_restore_tasks():
             "tasks": tasks
         }
 
-    except Exception as e:
-        logging.error(f"❌ Failed to get restore tasks: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get restore tasks: {str(e)}")
+    except Exception:
+        logging.exception("audio_restore: failed to get restore tasks")
+        raise HTTPException(status_code=500, detail="Internal error getting restore tasks")

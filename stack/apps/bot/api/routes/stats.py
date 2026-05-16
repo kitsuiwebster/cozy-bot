@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import asyncio
+import logging
 import urllib.request
 from utils.storage.couchdb_client import get_couchdb_client
 
@@ -117,5 +118,8 @@ async def get_total_stats():
             last_updated=last_updated
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching total stats: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logging.exception("stats: error fetching total stats")
+        raise HTTPException(status_code=500, detail="Internal error fetching total stats")

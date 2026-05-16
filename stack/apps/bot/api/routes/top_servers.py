@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import json
 import os
+import logging
 from pydantic import BaseModel
 
 # Cap user-supplied list sizes to prevent unbounded responses
@@ -104,5 +105,6 @@ async def get_top_servers(limit: Optional[int] = Query(default=None, ge=1, le=MA
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching top servers: {str(e)}")
+    except Exception:
+        logging.exception("top_servers: error fetching top servers")
+        raise HTTPException(status_code=500, detail="Internal error fetching top servers")
