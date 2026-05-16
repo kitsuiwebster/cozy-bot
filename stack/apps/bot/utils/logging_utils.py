@@ -92,6 +92,14 @@ def setup_logging(discord_log_level: str = "WARNING"):
     # Apply log filter
     handler.addFilter(_LogFilter())
 
+    # Telegram operational alerts (warning+). Attached at WARNING so it stays
+    # quiet during normal runs; the notifier itself short-circuits when
+    # TELEGRAM_ENABLED != "1", so this is a no-op if not configured.
+    from .telegram_log_handler import TelegramLogHandler
+    telegram_handler = TelegramLogHandler(level=logging.WARNING)
+    telegram_handler.addFilter(_LogFilter())
+    logger.addHandler(telegram_handler)
+
     # Set Discord log level
     discord_log_level_value = getattr(logging, discord_log_level.upper(), logging.WARNING)
     discord_logger.setLevel(discord_log_level_value)
