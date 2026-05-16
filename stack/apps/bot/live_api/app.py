@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime
 import logging
@@ -63,7 +64,22 @@ class DeploymentRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "mode": "live_api"}
+    # Live API runs in-process with the bot — report the bot's actual readiness
+    # rather than just "the HTTP server is up". 503 when the bot isn't connected
+    # so external probes (kuma, LB) see the degradation.
+    bot_connected = (
+        bot_instance is not None
+        and bot_instance.is_ready()
+        and not bot_instance.is_closed()
+    )
+    payload = {
+        "status": "ok" if bot_connected else "degraded",
+        "mode": "live_api",
+        "bot_connected": bot_connected,
+    }
+    if not bot_connected:
+        return JSONResponse(content=payload, status_code=503)
+    return payload
 
 @app.get("/api/live/bot/health", response_model=BotHealthResponse)
 async def bot_health():
