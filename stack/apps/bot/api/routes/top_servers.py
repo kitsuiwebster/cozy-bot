@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import json
 import os
 from pydantic import BaseModel
+
+# Cap user-supplied list sizes to prevent unbounded responses
+MAX_TOP_LIMIT = 1000
 
 # Initialize FastAPI router for server stats endpoints
 router = APIRouter()
@@ -47,7 +50,7 @@ def format_time(total_seconds: int) -> str:
 
 # Get top servers by voice time
 @router.get("/top-servers", response_model=TopServersResponse)
-async def get_top_servers(limit: int = None):
+async def get_top_servers(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         # Load voice time and server names data
         guild_voice_time = load_voice_time_data()
@@ -98,6 +101,8 @@ async def get_top_servers(limit: int = None):
             servers=servers,
             total_count=len(servers)
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top servers: {str(e)}")

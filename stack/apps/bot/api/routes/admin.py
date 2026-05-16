@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Query
 from typing import Optional
 import sys
 import os
 import json
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# Reasonable bounds for points/seconds payloads — prevents nonsense like INT_MIN
+MAX_POINTS = 1_000_000
+MAX_SECONDS = 31_536_000  # 1 year in seconds
+MAX_DEBUG_PAGE_SIZE = 1000
 
 # Add project root to path to import cogs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -91,8 +96,8 @@ def validate_api_key(x_api_key: Optional[str] = Header(None)):
 
 # Request model for points modification
 class PointsRequest(BaseModel):
-    username: str
-    points: int
+    username: str = Field(..., min_length=1, max_length=128)
+    points: int = Field(..., ge=-MAX_POINTS, le=MAX_POINTS)
 
 # Response model for points modification
 class PointsResponse(BaseModel):
@@ -105,8 +110,8 @@ class PointsResponse(BaseModel):
 
 # Request model for listening time modification
 class TimeRequest(BaseModel):
-    username: str
-    seconds: int
+    username: str = Field(..., min_length=1, max_length=128)
+    seconds: int = Field(..., ge=-MAX_SECONDS, le=MAX_SECONDS)
 
 # Response model for listening time modification
 class TimeResponse(BaseModel):
@@ -119,10 +124,10 @@ class TimeResponse(BaseModel):
 
 # Request model for adding sound data
 class AddSoundRequest(BaseModel):
-    username: str
-    sound_name: str
-    total_time: float
-    session_count: int = 1
+    username: str = Field(..., min_length=1, max_length=128)
+    sound_name: str = Field(..., min_length=1, max_length=128)
+    total_time: float = Field(..., ge=0, le=MAX_SECONDS)
+    session_count: int = Field(default=1, ge=0, le=1_000_000)
 
 # Response model for adding sound data
 class AddSoundResponse(BaseModel):
@@ -134,7 +139,7 @@ class AddSoundResponse(BaseModel):
 
 # Request model for user deletion
 class DeleteUserRequest(BaseModel):
-    user_id: str
+    user_id: str = Field(..., min_length=1, max_length=64)
 
 # Response model for user deletion
 class DeleteUserResponse(BaseModel):
@@ -144,8 +149,8 @@ class DeleteUserResponse(BaseModel):
 
 # Request model for server time modification
 class ServerTimeRequest(BaseModel):
-    guild_id: str
-    seconds: int
+    guild_id: str = Field(..., min_length=1, max_length=64)
+    seconds: int = Field(..., ge=-MAX_SECONDS, le=MAX_SECONDS)
 
 # Response model for server time modification
 class ServerTimeResponse(BaseModel):
@@ -181,7 +186,9 @@ async def modify_user_points(request: PointsRequest):
             new_total=new_total,
             message=f"Successfully {'added' if request.points >= 0 else 'removed'} {abs(request.points)} points"
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error modifying points: {str(e)}")
 
@@ -195,7 +202,7 @@ async def modify_user_time(request: TimeRequest):
         # Get current user stats
         user_stats = cozy_gamification.get_user_stats(user_id)
         if user_stats is None:
-            raise HTTPException(status_code=500, detail="Failed to get user stats")
+            raise HTTPException(status_code=404, detail="User stats not found")
         current_time = user_stats.get('listening_time', 0)
         
         # Add time (can be negative to remove)
@@ -222,7 +229,9 @@ async def modify_user_time(request: TimeRequest):
             new_total=new_time,
             message=f"Successfully {'added' if request.seconds >= 0 else 'removed'} {abs(seconds_actually_added)} seconds"
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error modifying time: {str(e)}")
 
@@ -232,7 +241,9 @@ async def get_raw_user_data(user_id: str, api_key: str = Depends(validate_api_ke
     try:
         # Get raw user data
         user_stats = cozy_gamification.get_user_stats(user_id)
-        
+        if user_stats is None:
+            raise HTTPException(status_code=404, detail=f"User '{user_id}' not found")
+
         return {
             "user_id": user_id,
             "raw_data": user_stats,
@@ -240,34 +251,47 @@ async def get_raw_user_data(user_id: str, api_key: str = Depends(validate_api_ke
             "sound_count": len(user_stats.get("listening_time_by_sound", {})),
             "sounds": list(user_stats.get("listening_time_by_sound", {}).keys()) if "listening_time_by_sound" in user_stats else []
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting user data: {str(e)}")
 
 # Get all decrypted cozy_points.json data for debugging (protected by API key)
 @router.get("/debug/all-data")
-async def get_all_raw_data(api_key: str = Depends(validate_api_key)):
+async def get_all_raw_data(
+    api_key: str = Depends(validate_api_key),
+    limit: int = Query(default=100, ge=1, le=MAX_DEBUG_PAGE_SIZE),
+    offset: int = Query(default=0, ge=0),
+):
     try:
-        # Get all raw data
+        # Counts are computed over the full dataset; raw_data is paginated
+        # to avoid dumping the entire user_data dict on a single request.
         all_data = cozy_gamification.user_data
-        
-        # Count users with missing sound data
+
         users_without_sounds = 0
         users_with_sounds = 0
-        
         for user_id, user_stats in all_data.items():
             if "listening_time_by_sound" not in user_stats or len(user_stats.get("listening_time_by_sound", {})) == 0:
                 users_without_sounds += 1
             else:
                 users_with_sounds += 1
-        
+
+        items = list(all_data.items())
+        page = dict(items[offset:offset + limit])
+
         return {
             "total_users": len(all_data),
             "users_with_sound_data": users_with_sounds,
             "users_without_sound_data": users_without_sounds,
-            "raw_data": all_data
+            "offset": offset,
+            "limit": limit,
+            "returned": len(page),
+            "raw_data": page,
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting all data: {str(e)}")
 
@@ -281,8 +305,8 @@ async def add_user_sound(request: AddSoundRequest):
         # Get user stats
         user_stats = cozy_gamification.get_user_stats(user_id)
         if user_stats is None:
-            raise HTTPException(status_code=500, detail="Failed to get user stats")
-        
+            raise HTTPException(status_code=404, detail="User stats not found")
+
         # Initialize listening_time_by_sound if not exists
         if "listening_time_by_sound" not in user_stats:
             user_stats["listening_time_by_sound"] = {}
@@ -304,7 +328,9 @@ async def add_user_sound(request: AddSoundRequest):
             sound_name=request.sound_name,
             message=f"Successfully added {request.sound_name} with {request.total_time}s total time"
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding sound data: {str(e)}")
 
@@ -335,6 +361,8 @@ async def delete_user(request: DeleteUserRequest):
             message=f"Successfully deleted user '{user_id}' and all associated data"
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
 
@@ -391,5 +419,7 @@ async def modify_server_time(request: ServerTimeRequest):
             message=f"Successfully {'added' if request.seconds >= 0 else 'removed'} {abs(seconds_actually_added)} seconds to {server_name}"
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error modifying server time: {str(e)}")

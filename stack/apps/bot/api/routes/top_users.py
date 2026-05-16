@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import sys
 import os
 import json
 from pydantic import BaseModel
+
+# Cap user-supplied list sizes to prevent unbounded responses
+MAX_TOP_LIMIT = 1000
 
 # Add project root to path to import cogs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -132,7 +135,7 @@ class TopSoundsResponse(BaseModel):
 
 # Get most listened sounds globally
 @router.get("/top-sounds", response_model=TopSoundsResponse)
-async def get_top_sounds(limit: int = None):
+async def get_top_sounds(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         user_data = load_cozy_points_data()
         
@@ -180,7 +183,9 @@ async def get_top_sounds(limit: int = None):
             sounds=sounds_list,
             total_sounds=len(sounds_list)
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top sounds: {str(e)}")
 
@@ -203,7 +208,7 @@ def get_current_streak_from_stats(user_stats: dict) -> int:
 
 # Get top users by cozy points
 @router.get("/top-users", response_model=TopUsersResponse)
-async def get_top_users(limit: int = None):
+async def get_top_users(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         # Load data directly from the same JSON files the bot uses
         user_data_raw = load_cozy_points_data()
@@ -302,7 +307,9 @@ async def get_top_users(limit: int = None):
             users=users,
             total_count=len(users)
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching top users: {str(e)}")
 
