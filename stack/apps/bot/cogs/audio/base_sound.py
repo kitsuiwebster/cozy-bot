@@ -11,6 +11,27 @@ from ..stats.gamification import cozy_gamification
 global_playing_states = {}
 global_current_sounds = {}
 
+# Shared per-guild audio mutation locks. The watchdog (main.py) and a user-
+# initiated stop_sound can both touch the same guild_state concurrently;
+# without a shared lock they can produce duplicated restarts, audio left
+# hanging, or stale `current_sound` references. Acquire this around any
+# code that starts, stops, or restarts audio for a guild.
+_guild_audio_locks: dict = {}
+
+
+def get_guild_audio_lock(guild_id) -> asyncio.Lock:
+    """Returns the shared audio mutation lock for a guild, creating it lazily.
+
+    Safe to call from any async context — single-threaded asyncio means the
+    lookup/create sequence is atomic between awaits. Lock instances are kept
+    indefinitely (small fixed memory cost; cleared only on bot shutdown).
+    """
+    lock = _guild_audio_locks.get(guild_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _guild_audio_locks[guild_id] = lock
+    return lock
+
 # Base view for interactive sound selection buttons
 class BaseSoundView(View):
     def __init__(self, sounds, sound_labels, user_id, bot, cog_name):
@@ -431,51 +452,63 @@ class BaseSoundCog(commands.Cog):
     # Stop audio playback and disconnect from voice
     async def stop_sound(self, interaction, guild_id):
         await interaction.response.defer()
-        
-        guild_state = self.get_guild_state(guild_id)
-        voice_client = interaction.guild.voice_client
-        
-        # Finalize sound sessions for all users before stopping
-        from cogs.stats.gamification import cozy_gamification
-        if voice_client and voice_client.channel:
-            current_users = [member for member in voice_client.channel.members if not member.bot]
-            logging.info("")
-            logging.info("")
-            logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
-            for member in current_users:
-                cozy_gamification.finalize_current_sound(str(member.id))
-                logging.info(f"🛑 Finalized sound tracking for {member.name}")
-        
-        # Cancel disconnect timer
-        if guild_state['disconnect_timer']:
-            guild_state['disconnect_timer'].cancel()
-            guild_state['disconnect_timer'] = None
-        
-        if voice_client:
-            if voice_client.is_playing():
-                guild_state['suppress_restart'] = True
-                voice_client.stop()
-            await voice_client.disconnect()
-            guild_state['is_playing'] = False
-            guild_state['current_sound'] = None
-            
-            # Clear global state
-            global global_current_sounds
-            if interaction.guild.id in global_current_sounds:
-                del global_current_sounds[interaction.guild.id]
 
-            try:
-                import main
-                main.schedule_live_stats_update()
-            except Exception:
-                pass
-            
-            await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
-        else:
-            await interaction.followup.send("❌ No sound is currently playing.", ephemeral=True)
+        # Serialize against the watchdog's restart_audio_loop and any concurrent
+        # start/stop for the same guild — without this, stopping can race with
+        # a watchdog-triggered restart and leave the bot playing or holding a
+        # dangling voice connection.
+        async with get_guild_audio_lock(guild_id):
+            guild_state = self.get_guild_state(guild_id)
+            voice_client = interaction.guild.voice_client
+
+            # Finalize sound sessions for all users before stopping
+            from cogs.stats.gamification import cozy_gamification
+            if voice_client and voice_client.channel:
+                current_users = [member for member in voice_client.channel.members if not member.bot]
+                logging.info("")
+                logging.info("")
+                logging.info(f"🛑 SOUND STOP: Finalizing sound tracking for {len(current_users)} users in {voice_client.channel.name} ({interaction.guild.name})")
+                for member in current_users:
+                    cozy_gamification.finalize_current_sound(str(member.id))
+                    logging.info(f"🛑 Finalized sound tracking for {member.name}")
+
+            # Cancel disconnect timer
+            if guild_state['disconnect_timer']:
+                guild_state['disconnect_timer'].cancel()
+                guild_state['disconnect_timer'] = None
+
+            if voice_client:
+                if voice_client.is_playing():
+                    guild_state['suppress_restart'] = True
+                    voice_client.stop()
+                await voice_client.disconnect()
+                guild_state['is_playing'] = False
+                guild_state['current_sound'] = None
+
+                # Clear global state
+                global global_current_sounds
+                if interaction.guild.id in global_current_sounds:
+                    del global_current_sounds[interaction.guild.id]
+
+                try:
+                    import main
+                    main.schedule_live_stats_update()
+                except Exception:
+                    pass
+
+                await interaction.followup.send("⏹️ Stopped playing and left voice channel.")
+            else:
+                await interaction.followup.send("❌ No sound is currently playing.", ephemeral=True)
 
     # Restart audio loop for continuous playback
     async def restart_audio_loop(self, guild_id):
+        # Acquire the shared audio mutation lock for this guild. Without it the
+        # watchdog (which schedules this) and stop_sound (which clears state)
+        # can interleave and produce a restart against torn-down state.
+        async with get_guild_audio_lock(guild_id):
+            return await self._restart_audio_loop_locked(guild_id)
+
+    async def _restart_audio_loop_locked(self, guild_id):
         try:
             guild_state = self.get_guild_state(guild_id)
             guild = self.bot.get_guild(guild_id)
