@@ -7,7 +7,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Title, Meta } from '@angular/platform-browser';
 import { CozybotService, CozyUser, LeaderboardResponse, LiveStats, CozyServer, CozySound, ServersResponse, SoundsResponse, UserDetails } from '../../services/cozybot.service';
-import { interval, Subscription } from 'rxjs';
+import { interval, Subject, Subscription } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
 import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
@@ -86,6 +87,11 @@ export class CozybotComponent implements OnInit, OnDestroy {
 
   private statsSubscription: Subscription | null = null;
   private headerStatsSubscription: Subscription | null = null;
+  // Emits on destroy so every inner HTTP subscribe can complete cleanly.
+  // Without this, the 5s and 60s polling loops leak in-flight responses that
+  // try to update state after the component is gone — visible as CPU drift
+  // after the tab stays open for ~30 min.
+  private readonly destroy$ = new Subject<void>();
 
   // ===========================================================================
   // PROPERTIES - Chart Configuration
@@ -159,6 +165,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
     if (this.statsSubscription) {
       this.statsSubscription.unsubscribe();
     }
@@ -322,7 +330,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
 
   private loadUsers(): void {
     this.loading = this.selectedView === 'users';
-    this.cozybotService.getTopUsers().subscribe({
+    this.cozybotService.getTopUsers().pipe(takeUntil(this.destroy$)).subscribe({
       next: (response: LeaderboardResponse) => {
         this.allUsersRaw = response.users;
         this.headerTotalUsersCount = response.total_count;
@@ -367,7 +375,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   private loadServers(): void {
-    this.cozybotService.getTopServers().subscribe({
+    this.cozybotService.getTopServers().pipe(takeUntil(this.destroy$)).subscribe({
       next: (response: ServersResponse) => {
         this.allServers = response.servers;
         this.updatePagination();
@@ -382,7 +390,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   private loadSounds(): void {
-    this.cozybotService.getTopSounds().subscribe({
+    this.cozybotService.getTopSounds().pipe(takeUntil(this.destroy$)).subscribe({
       next: (response: SoundsResponse) => {
         this.allSounds = response.sounds.filter(sound =>
           this.hasThreeEmojis(sound.display_name)
@@ -480,7 +488,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   private refreshHeaderTotals(): void {
-    this.cozybotService.getTopUsers().subscribe({
+    this.cozybotService.getTopUsers().pipe(takeUntil(this.destroy$)).subscribe({
       next: (response: LeaderboardResponse) => {
         const currentUsers = this.headerTotalUsersCount;
         const newUsers = response.total_count;
@@ -532,7 +540,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
 
   loadLiveStats(): void {
     this.statsLoading = true;
-    this.cozybotService.getLiveStats().subscribe({
+    this.cozybotService.getLiveStats().pipe(takeUntil(this.destroy$)).subscribe({
       next: (stats: LiveStats) => {
         this.previousStats = { ...this.liveStats };
 
@@ -870,7 +878,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.loadingUserDetails = true;
     this.selectedUserDetails = null;
 
-    this.cozybotService.getUserDetails(username, true).subscribe({
+    this.cozybotService.getUserDetails(username, true).pipe(takeUntil(this.destroy$)).subscribe({
       next: (details) => {
         this.selectedUserDetails = details;
         this.loadingUserDetails = false;
