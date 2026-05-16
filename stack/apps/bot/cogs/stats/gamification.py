@@ -417,9 +417,15 @@ class CozyGamification:
 
                 duration = (datetime.now() - start_time).total_seconds()
 
-                # Cap duration to 30 minutes to prevent corrupted data
+                # Cap duration to 30 minutes to prevent corrupted data. Warn so
+                # long-listener stats that suddenly plateau become explainable.
                 max_duration = 30 * 60  # 30 minutes in seconds
                 if duration > max_duration:
+                    username = self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
+                    logging.warning(
+                        f"⚠️ Capping session duration for {username} on {sound_name}: "
+                        f"{duration/60:.1f}min observed, credited as 30min"
+                    )
                     duration = max_duration
 
                 if 'listening_time_by_sound' not in user_stats:
@@ -549,8 +555,22 @@ class CozyGamification:
                 except Exception:
                     award_join_points = True
 
-        # Reset consecutive listening time for all sounds
-        if 'listening_time_by_sound' in user_stats:
+        # Reset consecutive listening time only on a real break (>10 min since last
+        # join). Quick reconnects/network blips shouldn't wipe loyalty progress —
+        # otherwise the 30min/1h/12h loyalty bonuses become unreachable for anyone
+        # who ever drops out mid-session.
+        should_reset_consecutive = True
+        if last_join_time:
+            last_join = _parse_aware(last_join_time)
+            if last_join is not None:
+                try:
+                    gap_seconds = (current_time - last_join).total_seconds()
+                    if 0 <= gap_seconds < 600:  # less than 10 minutes
+                        should_reset_consecutive = False
+                except Exception:
+                    pass
+
+        if should_reset_consecutive and 'listening_time_by_sound' in user_stats:
             for sound_name in user_stats['listening_time_by_sound']:
                 if 'consecutive_time' not in user_stats['listening_time_by_sound'][sound_name]:
                     user_stats['listening_time_by_sound'][sound_name]['consecutive_time'] = 0.0
@@ -739,19 +759,25 @@ class CozyGamification:
                 user_stats['achievements'].append(achievement)
                 achievements.append(achievement)
         
-        # Sound preference achievements
-        fav_sounds = user_stats['favorite_sounds']
-        if fav_sounds:
+        # Sound preference achievements — read from listening_time_by_sound, which
+        # IS populated. The legacy `favorite_sounds` field was never written, making
+        # these four achievements permanently unreachable.
+        listening_by_sound = user_stats.get('listening_time_by_sound', {})
+        if listening_by_sound:
             sound_achievements = {
                 "🌧️ Rain Master": "rain",
-                "🌊 Sea Master": "sea", 
+                "🌊 Sea Master": "sea",
                 "✨ Sparkles Master": "sparkles",
-                "🎵 Music Master": "background-music"
+                "🎵 Music Master": "background-music",
             }
-            
+
             for achievement, sound_type in sound_achievements.items():
                 if achievement not in current_achievements:
-                    sound_count = sum(count for sound, count in fav_sounds.items() if sound_type in sound.lower())
+                    sound_count = sum(
+                        sound_data.get('session_count', 0)
+                        for sound_name, sound_data in listening_by_sound.items()
+                        if isinstance(sound_data, dict) and sound_type in sound_name.lower()
+                    )
                     if sound_count >= 50:
                         user_stats['achievements'].append(achievement)
                         achievements.append(achievement)
