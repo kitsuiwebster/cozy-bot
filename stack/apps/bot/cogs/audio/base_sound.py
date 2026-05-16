@@ -53,10 +53,22 @@ class BaseSoundView(View):
         self.add_item(stop_button)
 
     async def on_button_click(self, interaction):
-        # Only command initiator can use buttons
+        # Anyone in the same voice channel as the bot can use the buttons.
+        # This lets the community jointly pick sounds in shared listening rooms,
+        # while still blocking randos outside the channel from spam-clicking.
+        bot_voice = interaction.guild.voice_client if interaction.guild else None
+        bot_channel = bot_voice.channel if bot_voice else None
+        user_channel = interaction.user.voice.channel if interaction.user.voice else None
+
+        # Original command author always allowed (covers the initial pick before
+        # the bot has joined a channel).
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the user who typed the command can use these buttons.😵‍💫 Use the commands instead.", ephemeral=True)
-            return
+            if not bot_channel or not user_channel or bot_channel.id != user_channel.id:
+                await interaction.response.send_message(
+                    "Join the voice channel where I'm playing to use these buttons.🎧",
+                    ephemeral=True,
+                )
+                return
 
         custom_id = interaction.data.get('custom_id')
 
