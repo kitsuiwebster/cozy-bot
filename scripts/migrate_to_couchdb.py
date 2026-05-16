@@ -169,23 +169,35 @@ class CouchDBMigrator:
         return doc
 
     def _insert_document(self, doc: Dict) -> None:
-        """Insert a document into CouchDB. Raises exception on error (except 409)."""
+        """Insert a document into CouchDB. On 409, merge with the existing doc
+        instead of silently skipping — a previous partial migration could have
+        left an incomplete doc that we now want to refresh from source JSON."""
+        url = f"{COUCHDB_URL}/{DATABASE_NAME}/{urllib.parse.quote(doc['_id'], safe='')}"
         doc_json = json.dumps(doc).encode('utf-8')
-        encoded_id = urllib.parse.quote(doc['_id'], safe='')
-        req = urllib.request.Request(
-            f"{COUCHDB_URL}/{DATABASE_NAME}/{encoded_id}",
-            data=doc_json,
-            headers=self.headers,
-            method='PUT'
-        )
+        req = urllib.request.Request(url, data=doc_json, headers=self.headers, method='PUT')
 
         try:
             with urllib.request.urlopen(req):
                 return
         except urllib.error.HTTPError as e:
-            if e.code == 409:
-                return
-            raise
+            if e.code != 409:
+                raise
+
+        # 409: fetch current doc, overlay new payload (new fields win), retry with _rev.
+        get_req = urllib.request.Request(url, headers=self.headers, method='GET')
+        with urllib.request.urlopen(get_req) as get_resp:
+            existing = json.loads(get_resp.read().decode())
+
+        merged = {**existing, **doc}
+        merged['_rev'] = existing['_rev']
+        retry_req = urllib.request.Request(
+            url,
+            data=json.dumps(merged).encode('utf-8'),
+            headers=self.headers,
+            method='PUT',
+        )
+        with urllib.request.urlopen(retry_req):
+            return
 
     def _migrate_single_document(self, data: Dict, prefix: str, doc_type: str, filename: str) -> bool:
         """Migrate a file containing a single document"""
