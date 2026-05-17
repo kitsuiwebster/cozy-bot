@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.1.0] - 2026-05-17
+## [2.1.1] - 2026-05-17
+
+### Fixed
+
+- Global event error handler now includes the exception traceback in logs and Telegram alerts.
+
+## [2.1.0] - 2026-05-16
 
 ### Added
 

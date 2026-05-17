@@ -759,7 +759,10 @@ async def check_api_endpoints():
 # Global error handler for bot events
 @bot.event
 async def on_error(event, *args, **kwargs):
-    logging.error(f"An error occurred: {event}")
+    import sys
+    # Pull the current exception so the formatter can render a real traceback;
+    # otherwise we just log the event name and have no idea what actually broke.
+    logging.error(f"Unhandled exception in event '{event}'", exc_info=sys.exc_info())
 
 # Handle voice state changes for tracking
 @bot.event
