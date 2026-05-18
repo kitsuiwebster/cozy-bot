@@ -1,8 +1,10 @@
 import couchdb3
 import logging
 import os
+import socket
 import time
 import urllib.request
+import urllib.error
 import json
 import threading
 import queue
@@ -69,6 +71,29 @@ class CouchDBClient:
         # - restore_task:{guild_id} - Restore tasks
 
     # Generic CRUD operations
+
+    def _urlopen_with_retry(self, req, max_retries: int = 3, timeout: float = 10.0):
+        # Transient network errors (DNS hiccups, brief connection refused, timeouts)
+        # are common during couchdb restarts or docker DNS blips. Retry with backoff
+        # so a momentary failure doesn't make us silently return empty data.
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                return urllib.request.urlopen(req, timeout=timeout)
+            except urllib.error.HTTPError:
+                # HTTP-level errors (4xx/5xx) are not transient — surface immediately.
+                raise
+            except (urllib.error.URLError, socket.gaierror, ConnectionError, TimeoutError, socket.timeout) as e:
+                last_error = e
+                if attempt < max_retries:
+                    delay = min(0.2 * (2 ** attempt), 1.0)
+                    logging.warning(
+                        f"⚠️ CouchDB transient network error (attempt {attempt + 1}/{max_retries + 1}): {e} — retry in {delay:.2f}s"
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
+        raise last_error  # unreachable
 
     def get_document(self, db, doc_id: str, default: Any = None) -> Any:
         """Get a document by ID, return default if not found"""
@@ -165,7 +190,7 @@ class CouchDBClient:
 
             req = urllib.request.Request(url, headers=headers)
 
-            with urllib.request.urlopen(req) as response:
+            with self._urlopen_with_retry(req) as response:
                 data = json.loads(response.read().decode())
 
                 for row in data.get('rows', []):
@@ -208,7 +233,7 @@ class CouchDBClient:
 
             req = urllib.request.Request(url, headers=headers)
 
-            with urllib.request.urlopen(req) as response:
+            with self._urlopen_with_retry(req) as response:
                 data = json.loads(response.read().decode())
 
                 for row in data.get('rows', []):
@@ -263,7 +288,7 @@ class CouchDBClient:
 
             req = urllib.request.Request(url, headers=headers)
 
-            with urllib.request.urlopen(req) as response:
+            with self._urlopen_with_retry(req) as response:
                 data = json.loads(response.read().decode())
 
                 for row in data.get("rows", []):
