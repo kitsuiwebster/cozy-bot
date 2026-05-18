@@ -53,6 +53,11 @@ services:
       retries: ${HEALTH_CHECK_RETRIES:-3}
       start_period: ${HEALTH_CHECK_START:-40s}
       disable: ${HEALTH_CHECK_DISABLE:-false}
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     depends_on:
       couchdb:
         condition: service_healthy

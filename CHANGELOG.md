@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.2] - 2026-05-18
+
+### Fixed
+
+- CouchDB reads now retry on transient network errors (DNS hiccup, connection refused, timeout) instead of silently returning empty data.
+- Bot container keeps more log history on disk (250 MB vs 30 MB), so past errors stay visible for investigation.
+
 ## [2.1.1] - 2026-05-17
 
 ### Fixed
