@@ -16,6 +16,10 @@ STATUS_HISTORY_RETENTION_DAYS = int(os.getenv("STATUS_HISTORY_RETENTION_DAYS", "
 STATUS_PAGE_SLUG = os.getenv("STATUS_PAGE_SLUG", "cozy")
 STATUS_PAGE_URL = os.getenv("STATUS_PAGE_URL", "http://uptime-kuma:3001")
 
+TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0") == "1"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
 MONITORS = [
     {
         "id": "public-api",
@@ -35,6 +39,61 @@ MONITORS = [
 ]
 
 app = FastAPI()
+
+# Edge-triggered Telegram alerting: mirrors exactly what the status page shows,
+# since it reacts to the same `checks` computed by collect_status_point() below.
+# None means "not observed yet this process lifetime" - the first observation
+# after a status-api restart just seeds state, it never fires an alert, so a
+# routine redeploy of status-api can't itself trigger a burst of notifications.
+_last_up: Dict[str, Optional[bool]] = {monitor["id"]: None for monitor in MONITORS}
+_down_since: Dict[str, float] = {}
+
+
+def _format_downtime(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m"
+
+
+async def send_telegram(session: aiohttp.ClientSession, text: str) -> None:
+    if not (TELEGRAM_ENABLED and TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID):
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+    try:
+        async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)):
+            pass
+    except Exception:
+        pass
+
+
+async def alert_status_transitions(session: aiohttp.ClientSession, checks: List[Dict[str, Any]]) -> None:
+    now = time.monotonic()
+    for check in checks:
+        monitor_id = check["id"]
+        current_up = bool(check["up"])
+        previous_up = _last_up.get(monitor_id)
+
+        if previous_up is not None and previous_up != current_up:
+            name = next((m["name"] for m in MONITORS if m["id"] == monitor_id), monitor_id)
+            if current_up:
+                downtime = _format_downtime(now - _down_since.get(monitor_id, now))
+                await send_telegram(session, f"🟢 <b>{name}</b> is back up (was down {downtime})")
+            else:
+                _down_since[monitor_id] = now
+                await send_telegram(session, f"🔴 <b>{name}</b> is down")
+
+        _last_up[monitor_id] = current_up
 
 
 async def init_db() -> None:
@@ -198,6 +257,7 @@ async def collect_status_point() -> List[Dict[str, Any]]:
                 "latency_ms": result.get("latency_ms", 0),
                 "status": result.get("status"),
             })
+        await alert_status_transitions(session, checks)
         return checks
 
 

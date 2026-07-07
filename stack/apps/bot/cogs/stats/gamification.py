@@ -283,18 +283,6 @@ class CozyGamification:
             username = f'\033[35m{self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")}\033[0m'
             logging.info(f"🏆 Achievement bonus: {username} {colorize_points(f'+{achievement_bonus} points')} for {len(new_achievements)} new achievement(s)")
 
-            try:
-                from utils.telegram_notifier import notify as tg_notify, escape as tg_escape
-                display_username = self.usernames.get(str(user_id), {}).get("username", f"User {str(user_id)[:8]}")
-                ach_lines = "\n".join(f"• {tg_escape(a)}" for a in new_achievements)
-                tg_notify(
-                    f"🏆 <b>Achievement unlocked</b> — {tg_escape(display_username)}\n"
-                    f"{ach_lines}\n"
-                    f"<i>+{achievement_bonus} pts bonus</i>"
-                )
-            except Exception:
-                pass
-            
             # Track achievement bonus in breakdown
             if user_id not in self.changes_since_save['user_points_breakdown']:
                 self.changes_since_save['user_points_breakdown'][user_id] = []

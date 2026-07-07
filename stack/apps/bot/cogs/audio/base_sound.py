@@ -326,8 +326,8 @@ class BaseSoundCog(commands.Cog):
         try:
             bot_voice = interaction.guild.me.voice if interaction.guild and interaction.guild.me else None
             if bot_voice and (bot_voice.mute or bot_voice.deaf or bot_voice.suppress):
-                logging.warning(
-                    f"⚠️ Bot voice state: mute={bot_voice.mute}, deaf={bot_voice.deaf}, suppress={bot_voice.suppress} "
+                logging.info(
+                    f"ℹ️ Bot voice state: mute={bot_voice.mute}, deaf={bot_voice.deaf}, suppress={bot_voice.suppress} "
                     f"(audio may be inaudible)"
                 )
         except Exception as e:

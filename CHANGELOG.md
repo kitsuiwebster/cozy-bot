@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.3] - 2026-07-07
+
+### Added
+
+- Status page outages now alert on Telegram in real time: `status-api` sends a message the moment a monitored service (public API, live bot, database) goes down, and another when it recovers, so Telegram always reflects what the status page shows.
+
+### Fixed
+
+- Bot presence updates and the playback watchdog no longer crash `on_ready` with "Task is already launched" after a Discord gateway reconnect.
+- Telegram no longer receives achievement-unlock alerts or two self-healing conditions that didn't need admin action (a stale voice-state cache read, and periodic cleanup of orphaned listening sessions) — both stay in local logs only.
+
 ## [2.1.2] - 2026-05-18
 
 ### Fixed
