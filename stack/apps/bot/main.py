@@ -1033,7 +1033,8 @@ async def on_ready():
         await check_api_endpoints()
 
     bot.heartbeat_interval = 360
-    change_status.start()
+    if not change_status.is_running():
+        change_status.start()
 
     if COZY_ENABLE_BACKUPS:
         global periodic_backup_task
@@ -1051,7 +1052,8 @@ async def on_ready():
         task.add_done_callback(background_tasks.discard)
         logging.info('📢 Started deployment notifier task')
 
-    _playback_watchdog_loop.start()
+    if not _playback_watchdog_loop.is_running():
+        _playback_watchdog_loop.start()
     logging.info('🎧 Started playback watchdog task')
 
     if COZY_ENABLE_AUDIO_RESTORE:
