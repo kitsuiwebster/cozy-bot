@@ -239,6 +239,30 @@ def _total_listeners_text(exclude_channel=None):
     return f"{prefix} <b>{total}</b> {suffix}"
 
 
+# Debounced Telegram listener-count ping. Voice events fire mid-transition
+# (bot connected but sound not registered yet, user counted out before state
+# settles), so an immediate snapshot often carries wrong emojis; the website
+# looks right because it polls the settled state a few seconds later. Wait for
+# the dust to settle and send ONE message for the whole burst.
+LISTENER_PING_DEBOUNCE_SECONDS = 3
+_listener_ping_task = None
+
+def _schedule_listener_ping():
+    global _listener_ping_task
+    if _listener_ping_task is not None and not _listener_ping_task.done():
+        return  # a ping is already pending; it will sample the latest state
+
+    async def _ping():
+        await asyncio.sleep(LISTENER_PING_DEBOUNCE_SECONDS)
+        try:
+            from utils.telegram_notifier import notify as tg_notify
+            tg_notify(_total_listeners_text())
+        except Exception:
+            pass
+
+    _listener_ping_task = create_background_task(_ping())
+
+
 # Save voice time data to CouchDB
 def save_voice_time_data(silent=False):
     try:
@@ -927,11 +951,7 @@ async def on_voice_state_update(member, before, after):
             logging.info("")
             logging.info(f"👉 BOT JOIN: Connected to {after.channel.name} in {member.guild.name} - {len(current_users)} users already present")
 
-            try:
-                from utils.telegram_notifier import notify as tg_notify
-                tg_notify(_total_listeners_text())
-            except Exception:
-                pass
+            _schedule_listener_ping()
 
             # Track in background to not block Discord connection
             create_background_task(asyncio.to_thread(_track_bot_join_sync, guild_id, member.guild.name, after.channel, current_users))
@@ -987,12 +1007,9 @@ async def on_voice_state_update(member, before, after):
                     )
                     logging.info(f"🏠 \033[94m+{format_duration(session_duration)}\033[0m for {before.channel.guild.name}")
 
-                    try:
-                        from utils.telegram_notifier import notify as tg_notify
-                        # The bot just dropped this voice client; compute the new total without it.
-                        tg_notify(_total_listeners_text(exclude_channel=before.channel))
-                    except Exception:
-                        pass
+                    # Debounced: by the time it fires the dropped voice client
+                    # is deregistered, so no exclude_channel needed anymore.
+                    _schedule_listener_ping()
 
                     create_background_task(asyncio.to_thread(save_voice_time_data))
                     schedule_live_stats_update()
@@ -1053,11 +1070,7 @@ async def on_voice_state_update(member, before, after):
         logging.info("")
         logging.info(f"👉 USER JOIN: \033[35m{member.name}\033[0m joined bot channel {after.channel.name} in {member.guild.name}")
 
-        try:
-            from utils.telegram_notifier import notify as tg_notify
-            tg_notify(_total_listeners_text())
-        except Exception:
-            pass
+        _schedule_listener_ping()
 
         # Track in background to avoid blocking Discord events
         create_background_task(asyncio.to_thread(_track_user_join_sync, user_id, member, guild_id))
@@ -1083,11 +1096,7 @@ async def on_voice_state_update(member, before, after):
             else:
                 logging.info(f"👋 USER LEAVE: \033[35m{member.name}\033[0m left bot channel {before.channel.name} in {member.guild.name} - no additional time")
 
-            try:
-                from utils.telegram_notifier import notify as tg_notify
-                tg_notify(_total_listeners_text())
-            except Exception:
-                pass
+            _schedule_listener_ping()
 
             cozy_gamification.finalize_current_sound(user_id)
             logging.info(f"👉 SOUND TRACKING: Finalized current sound for \033[35m{member.name}\033[0m")
