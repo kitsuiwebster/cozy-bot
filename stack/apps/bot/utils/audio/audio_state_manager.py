@@ -43,7 +43,9 @@ class AudioStateManager:
                 'audio_states': audio_states
             }
 
-            self.db.save_audio_state(state_data)
+            if not self.db.save_audio_state(state_data):
+                logging.error("❌ Failed to save audio state: CouchDB write failed")
+                return 0
 
             logging.info(f"📦 Audio state saved to CouchDB: {len(audio_states)} active sessions")
             return len(audio_states)

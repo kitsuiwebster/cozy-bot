@@ -416,7 +416,10 @@ class CouchDBClient:
         """Save audio restoration state"""
         doc = state_data.copy()
         doc['type'] = 'audio_state'
-        return self.save_document(self.db, 'audio_state', doc)
+        # Pre-shutdown write: bypass the async write worker. The deploy kills
+        # the container seconds after this call, and a queued write dies with
+        # the daemon thread, losing the state the next container must restore.
+        return self._save_document_sync(self.db, 'audio_state', doc)
 
     def load_audio_state(self) -> Optional[Dict]:
         """Load audio restoration state"""
