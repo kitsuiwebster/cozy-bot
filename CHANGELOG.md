@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.1.5] - 2026-07-17
+## [2.1.6] - 2026-07-17
+
+### Fixed
+
+- Audio state is now written to CouchDB synchronously before deploy shutdown; the queued write could be lost when the container was killed, leaving nothing to restore (bot not rejoining voice after a deploy).
+- Telegram listener-count pings wait 3s before sampling, so sound emojis match what the website shows (they used to fire mid-transition, before the sound was registered).
+- Sound-menu stop button now clears every sound category's state; clicked from another category's menu, it used to leave stale playing state and the bot reconnected seconds later.
+
+## [2.1.5] - 2026-07-16
 
 ### Fixed
 
