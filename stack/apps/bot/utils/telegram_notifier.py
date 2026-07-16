@@ -25,8 +25,10 @@ from typing import Optional
 
 
 class TelegramNotifier:
-    # Same exact message blocked for this many seconds. Prevents loops from
-    # turning the chat into a wall of identical errors.
+    # Same exact ALERT blocked for this many seconds. Prevents error loops
+    # from turning the chat into a wall of identical errors. Informational
+    # pings are state updates and only skip consecutive duplicates instead:
+    # a time window there hides real transitions (1 -> 0 -> 1 -> 0 listeners).
     THROTTLE_WINDOW_SECONDS = 300
     # Token-bucket-ish rate limit: at most RATELIMIT_MAX sends per window.
     RATELIMIT_WINDOW_SECONDS = 60
@@ -49,6 +51,7 @@ class TelegramNotifier:
             and bool(self.chat_ids)
         )
         self._recent: dict[str, float] = {}
+        self._last_info_text: Optional[str] = None
         self._sends: deque[float] = deque()
         self._alert_sends: deque[float] = deque()
         self._lock = threading.Lock()
@@ -64,8 +67,11 @@ class TelegramNotifier:
         now = time.monotonic()
 
         with self._lock:
-            last = self._recent.get(text)
-            if last is not None and (now - last) < self.THROTTLE_WINDOW_SECONDS:
+            if priority:
+                last = self._recent.get(text)
+                if last is not None and (now - last) < self.THROTTLE_WINDOW_SECONDS:
+                    return False
+            elif text == self._last_info_text:
                 return False
 
             sends = self._alert_sends if priority else self._sends
@@ -76,12 +82,15 @@ class TelegramNotifier:
                 return False
 
             sends.append(now)
-            self._recent[text] = now
+            if priority:
+                self._recent[text] = now
 
-            # Cheap GC: prune throttle table when it grows
-            if len(self._recent) > 200:
-                cutoff = now - self.THROTTLE_WINDOW_SECONDS
-                self._recent = {k: v for k, v in self._recent.items() if v > cutoff}
+                # Cheap GC: prune throttle table when it grows
+                if len(self._recent) > 200:
+                    cutoff = now - self.THROTTLE_WINDOW_SECONDS
+                    self._recent = {k: v for k, v in self._recent.items() if v > cutoff}
+            else:
+                self._last_info_text = text
 
         threading.Thread(
             target=self._post,
