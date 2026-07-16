@@ -2,9 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .base_sound import get_guild_audio_lock, global_current_sounds
-
-AUDIO_COG_NAMES = ('RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog')
+from .base_sound import AUDIO_COG_NAMES, get_guild_audio_lock, global_current_sounds
 
 # Cog for stopping audio playback and disconnecting bot
 class StopCog(commands.Cog):

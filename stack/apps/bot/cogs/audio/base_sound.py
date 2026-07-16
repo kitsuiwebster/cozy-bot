@@ -33,6 +33,10 @@ def get_guild_audio_lock(guild_id) -> asyncio.Lock:
     return lock
 
 
+# All audio cog class names. Stop paths must sweep every cog's state: the
+# playing state may live in a different cog than the menu that was clicked.
+AUDIO_COG_NAMES = ('RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog')
+
 # Last VoiceClient we successfully connected, per guild. discord.py wipes its
 # own registry on a gateway re-IDENTIFY without stopping the clients; this side
 # table lets reap_orphan_voice_clients find those orphans, whose internal tasks
@@ -569,7 +573,6 @@ class BaseSoundCog(commands.Cog):
         # a watchdog-triggered restart and leave the bot playing or holding a
         # dangling voice connection.
         async with get_guild_audio_lock(guild_id):
-            guild_state = self.get_guild_state(guild_id)
             voice_client = interaction.guild.voice_client
 
             # Finalize sound sessions for all users before stopping
@@ -583,23 +586,36 @@ class BaseSoundCog(commands.Cog):
                     cozy_gamification.finalize_current_sound(str(member.id))
                     logging.info(f"🛑 Finalized sound tracking for {member.name}")
 
-            # Cancel disconnect timer
-            if guild_state['disconnect_timer']:
-                guild_state['disconnect_timer'].cancel()
-                guild_state['disconnect_timer'] = None
-
             if voice_client:
+                # The stop button lives on ONE cog's menu, but the playing
+                # sound may be owned by another cog (old menus stay clickable
+                # forever). Clear EVERY audio cog's state, and do it BEFORE
+                # disconnecting: any leftover is_playing state makes the
+                # watchdog and the voice-drop recovery reconnect the bot
+                # seconds after the stop.
+                for cog_name in AUDIO_COG_NAMES:
+                    cog = self.bot.get_cog(cog_name)
+                    if not cog or not hasattr(cog, 'guild_states'):
+                        continue
+                    state = cog.guild_states.get(guild_id)
+                    if not state:
+                        continue
+                    state['is_playing'] = False
+                    state['current_sound'] = None
+                    if state.get('loop_task'):
+                        try:
+                            state['loop_task'].cancel()
+                        except Exception:
+                            pass
+                        state['loop_task'] = None
+                    if state.get('disconnect_timer'):
+                        state['disconnect_timer'].cancel()
+                        state['disconnect_timer'] = None
+                global_current_sounds.pop(guild_id, None)
+
                 if voice_client.is_playing():
-                    guild_state['suppress_restart'] = True
                     voice_client.stop()
                 await voice_client.disconnect()
-                guild_state['is_playing'] = False
-                guild_state['current_sound'] = None
-
-                # Clear global state
-                global global_current_sounds
-                if interaction.guild.id in global_current_sounds:
-                    del global_current_sounds[interaction.guild.id]
 
                 try:
                     import main
