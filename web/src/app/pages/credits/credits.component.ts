@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Title, Meta } from '@angular/platform-browser';
 import { CozybotService, CozyUser, LeaderboardResponse, LiveStats } from '../../services/cozybot.service';
 import { interval, Subscription } from 'rxjs';
+import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
 @Component({
   selector: 'app-credits',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LeaderboardHeaderComponent],
   templateUrl: './credits.component.html',
   styleUrls: ['./credits.component.scss']
 })
@@ -121,6 +122,31 @@ export class CreditsComponent implements OnInit, OnDestroy {
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     return `${days}d ${hours}h`;
+  }
+
+  getHeaderStats(): LeaderboardHeaderStat[] {
+    return [
+      {
+        value: this.getTotalUsers(),
+        label: 'Total Users',
+        animating: this.animatingUsers
+      },
+      {
+        value: this.liveStats.total_servers,
+        label: 'Total Servers',
+        animating: this.animatingTotalServers
+      },
+      {
+        value: this.formatPoints(this.getTotalPoints()),
+        label: 'Total CozyPoints',
+        animating: this.animatingPoints
+      },
+      {
+        value: this.getTotalTimeDays(),
+        label: 'Total Time',
+        animating: this.animatingTime
+      }
+    ];
   }
 
   private startHeaderStatsRefresh(): void {

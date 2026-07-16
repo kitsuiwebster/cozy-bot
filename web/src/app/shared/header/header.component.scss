@@ -1,11 +1,11 @@
 .cozy-header {
   background: rgba(15, 20, 25, 0.6);
   backdrop-filter: blur(6px);
-  padding: 14px 0;
+  padding: 12px 0;
   position: sticky;
   top: 0;
   z-index: 1000;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  border-bottom: 1px solid var(--color-border);
 
   .header-content {
     max-width: 1200px;
@@ -13,7 +13,33 @@
     padding: 0 24px;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    flex-shrink: 0;
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+    }
+
+    .brand-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      background: var(--gradient-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
   }
 
   .main-nav {
@@ -22,15 +48,16 @@
     align-items: center;
 
     a {
-      color: #cbd5e1;
+      color: var(--color-text-nav);
       text-decoration: none;
       font-size: 0.95rem;
       font-weight: 500;
       font-family: inherit;
       padding: 6px 10px;
       border-radius: 10px;
-      transition: all 0.2s ease;
+      transition: all 0.2s var(--ease-standard);
       position: relative;
+      white-space: nowrap;
 
       &::after {
         content: '';
@@ -39,13 +66,13 @@
         left: 10px;
         width: calc(100% - 20px);
         height: 2px;
-        background: linear-gradient(90deg, rgba(168, 85, 247, 0.9), rgba(14, 116, 144, 0.9));
+        background: linear-gradient(90deg, rgba(var(--color-accent-rgb), 0.9), rgba(14, 116, 144, 0.9));
         opacity: 0;
-        transition: width 0.3s ease;
+        transition: opacity 0.3s ease;
       }
 
       &:hover {
-        color: #f8fafc;
+        color: var(--color-text);
         background: rgba(148, 163, 184, 0.08);
 
         &::after {
@@ -54,7 +81,7 @@
       }
 
       &.active {
-        color: #f8fafc;
+        color: var(--color-text);
         background: rgba(148, 163, 184, 0.12);
 
         &::after {
@@ -69,21 +96,27 @@
       padding: 0 16px;
     }
 
+    .brand .brand-name {
+      display: none;
+    }
+
     .main-nav {
-      gap: 24px;
+      gap: 16px;
 
       a {
         font-size: 0.85rem;
+        padding: 6px 8px;
       }
     }
   }
 
   @media (max-width: 480px) {
     .main-nav {
-      gap: 16px;
+      gap: 10px;
 
       a {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
+        padding: 6px 6px;
       }
     }
   }
