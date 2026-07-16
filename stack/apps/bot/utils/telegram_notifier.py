@@ -7,7 +7,7 @@ chat. All network work runs in a daemon thread, so callers never block.
 Configured via env vars:
 - TELEGRAM_ENABLED: "1" to enable, anything else disables silently
 - TELEGRAM_BOT_TOKEN: the bot token from @BotFather
-- TELEGRAM_CHAT_ID: target chat id (a user id for DMs)
+- TELEGRAM_CHAT_ID: target chat id(s), comma-separated (a user id for DMs)
 """
 
 from __future__ import annotations
@@ -36,11 +36,13 @@ class TelegramNotifier:
 
     def __init__(self) -> None:
         self.token = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
-        self.chat_id = os.getenv('TELEGRAM_CHAT_ID', '').strip()
+        self.chat_ids = [
+            c.strip() for c in os.getenv('TELEGRAM_CHAT_ID', '').split(',') if c.strip()
+        ]
         self.enabled = (
             os.getenv('TELEGRAM_ENABLED', '0') == '1'
             and bool(self.token)
-            and bool(self.chat_id)
+            and bool(self.chat_ids)
         )
         self._recent: dict[str, float] = {}
         self._sends: deque[float] = deque()
@@ -81,28 +83,29 @@ class TelegramNotifier:
 
     def _post(self, text: str, parse_mode: str) -> None:
         url = f'https://api.telegram.org/bot{self.token}/sendMessage'
-        payload = {
-            'chat_id': self.chat_id,
-            'text': text,
-            'parse_mode': parse_mode,
-            'disable_web_page_preview': True,
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'},
-            method='POST',
-        )
         # Log under 'telegram.*' so the handler can filter its own messages and
         # avoid an infinite recursion loop on failures.
         log = logging.getLogger('telegram.notifier')
-        try:
-            with urllib.request.urlopen(req, timeout=5):
-                return
-        except urllib.error.HTTPError as e:
-            log.error('telegram send rejected: %s %s', e.code, e.reason)
-        except Exception as e:
-            log.error('telegram send failed: %s', e)
+        for chat_id in self.chat_ids:
+            payload = {
+                'chat_id': chat_id,
+                'text': text,
+                'parse_mode': parse_mode,
+                'disable_web_page_preview': True,
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST',
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=5):
+                    continue
+            except urllib.error.HTTPError as e:
+                log.error('telegram send rejected: %s %s', e.code, e.reason)
+            except Exception as e:
+                log.error('telegram send failed: %s', e)
 
 
 _notifier: Optional[TelegramNotifier] = None
