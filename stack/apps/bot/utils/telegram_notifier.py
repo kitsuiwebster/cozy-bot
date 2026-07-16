@@ -31,6 +31,10 @@ class TelegramNotifier:
     # Token-bucket-ish rate limit: at most RATELIMIT_MAX sends per window.
     RATELIMIT_WINDOW_SECONDS = 60
     RATELIMIT_MAX = 20
+    # Alerts (WARNING+ records forwarded from logging) get their own bucket so
+    # a burst of informational pings ("N people listening") can never starve a
+    # real error out of the chat.
+    ALERT_RATELIMIT_MAX = 20
     # Telegram caps a single message at 4096 chars.
     MESSAGE_MAX_CHARS = 4096
 
@@ -46,10 +50,14 @@ class TelegramNotifier:
         )
         self._recent: dict[str, float] = {}
         self._sends: deque[float] = deque()
+        self._alert_sends: deque[float] = deque()
         self._lock = threading.Lock()
 
-    def send(self, text: str, parse_mode: str = 'HTML') -> bool:
-        """Queue a send. Returns True if accepted, False if dropped (disabled, throttled, or rate-limited)."""
+    def send(self, text: str, parse_mode: str = 'HTML', priority: bool = False) -> bool:
+        """Queue a send. Returns True if accepted, False if dropped (disabled, throttled, or rate-limited).
+
+        priority=True uses the separate alert bucket (see ALERT_RATELIMIT_MAX).
+        """
         if not self.enabled or not text:
             return False
 
@@ -60,12 +68,14 @@ class TelegramNotifier:
             if last is not None and (now - last) < self.THROTTLE_WINDOW_SECONDS:
                 return False
 
-            while self._sends and (now - self._sends[0]) > self.RATELIMIT_WINDOW_SECONDS:
-                self._sends.popleft()
-            if len(self._sends) >= self.RATELIMIT_MAX:
+            sends = self._alert_sends if priority else self._sends
+            limit = self.ALERT_RATELIMIT_MAX if priority else self.RATELIMIT_MAX
+            while sends and (now - sends[0]) > self.RATELIMIT_WINDOW_SECONDS:
+                sends.popleft()
+            if len(sends) >= limit:
                 return False
 
-            self._sends.append(now)
+            sends.append(now)
             self._recent[text] = now
 
             # Cheap GC: prune throttle table when it grows
@@ -118,8 +128,8 @@ def get_notifier() -> TelegramNotifier:
     return _notifier
 
 
-def notify(text: str, parse_mode: str = 'HTML') -> bool:
-    return get_notifier().send(text, parse_mode=parse_mode)
+def notify(text: str, parse_mode: str = 'HTML', priority: bool = False) -> bool:
+    return get_notifier().send(text, parse_mode=parse_mode, priority=priority)
 
 
 def escape(s: str) -> str:

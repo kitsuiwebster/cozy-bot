@@ -30,6 +30,7 @@ class TelegramLogHandler(logging.Handler):
             # 3800 leaves headroom under Telegram's 4096-char cap for the header.
             body = escape(msg)[:3800]
             text = f'{emoji} <b>{record.levelname}</b>\n<pre>{body}</pre>'
-            notify(text)
+            # Alert bucket: never starved by informational pings.
+            notify(text, priority=True)
         except Exception:
             self.handleError(record)
