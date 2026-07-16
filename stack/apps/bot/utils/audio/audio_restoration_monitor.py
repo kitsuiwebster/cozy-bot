@@ -161,28 +161,52 @@ class AudioRestorationMonitor:
 
     # Restore audio playback in a specific channel
     async def restore_audio_in_channel(self, guild, channel, sound_name):
+        from cogs.audio.base_sound import (
+            get_guild_audio_lock,
+            global_current_sounds,
+            known_voice_clients,
+            teardown_voice_client,
+        )
+
+        # Serialize with the button/watchdog/timer paths for this guild.
+        async with get_guild_audio_lock(guild.id):
+            await self._restore_audio_in_channel_locked(
+                guild, channel, sound_name,
+                global_current_sounds, known_voice_clients, teardown_voice_client,
+            )
+
+    async def _restore_audio_in_channel_locked(self, guild, channel, sound_name,
+                                               global_current_sounds, known_voice_clients,
+                                               teardown_voice_client):
         try:
-            # Check if bot is already connected to voice in this guild
+            # Check if bot is already connected to voice in this guild.
+            # The connection must have a live websocket, not just exist:
+            # half-dead clients keep .channel set and crash play().
             voice_client = guild.voice_client
-            
-            if voice_client:
+
+            if voice_client and voice_client.channel and voice_client.is_connected():
                 # Bot is already connected, just start the sound
                 logging.info(f"🎵 Bot already connected to voice in {guild.name}, starting {sound_name}")
             else:
+                if voice_client:
+                    # Dead leftover client: tear it down or the fresh connect
+                    # below cannot complete its handshake.
+                    await teardown_voice_client(guild)
                 # Connect to the voice channel
                 voice_client = await channel.connect()
+                known_voice_clients[guild.id] = voice_client
                 logging.info(f"🔗 Connected to voice channel in {guild.name}")
-            
+
             # Play the sound directly using Discord.py
             from discord import FFmpegPCMAudio
             import os
-            
+
             # Determine the sound file path based on sound name
             sound_path = self.get_sound_file_path(sound_name)
             if not sound_path or not os.path.exists(sound_path):
                 logging.error(f"❌ Sound file not found: {sound_name}")
                 return
-            
+
             # Update the corresponding cog's guild_state first
             cog_name = self.get_cog_name_for_sound(sound_name)
             cog = None
@@ -194,6 +218,10 @@ class AudioRestorationMonitor:
                     guild_state['current_sound'] = sound_name
                     guild_state['target_channel'] = channel
                     logging.info(f"✅ Updated {cog_name} guild_state for {guild.name}")
+                    # Arm the empty-channel auto-disconnect for the restored
+                    # session (it used to be armed only on user-initiated
+                    # connects, leaving restored sessions immortal).
+                    await cog.start_disconnect_timer(guild.id)
 
             # Play the audio with callback for looping (removed -stream_loop for instant start)
             audio_source = FFmpegPCMAudio(
@@ -207,7 +235,6 @@ class AudioRestorationMonitor:
                 voice_client.play(audio_source)
 
             # Update global state to track what's playing
-            from cogs.audio.base_sound import global_current_sounds
             global_current_sounds[guild.id] = sound_name
 
             # Update gamification current_sound for each user in the channel
