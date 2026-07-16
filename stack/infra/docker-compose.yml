@@ -146,7 +146,10 @@ services:
       # Defaults derive from the service container-name vars so renaming a
       # container in env doesn't silently break status-api's reachability.
       - STATUS_MONITOR_PUBLIC_URL=${STATUS_MONITOR_PUBLIC_URL:-http://${API_CONTAINER_NAME:-cozy-api}:8000/api/public/health}
-      - STATUS_MONITOR_LIVE_URL=${STATUS_MONITOR_LIVE_URL:-http://${CONTAINER_NAME:-cozy-discord-bot}:8002/api/live/bot/health}
+      # /health returns 503 when the bot is degraded; /api/live/bot/health
+      # always returns 200 (with a "degraded" body), which made the status
+      # page stay green through real bot outages.
+      - STATUS_MONITOR_LIVE_URL=${STATUS_MONITOR_LIVE_URL:-http://${CONTAINER_NAME:-cozy-discord-bot}:8002/health}
       - STATUS_MONITOR_DB_URL=${STATUS_MONITOR_DB_URL:-http://${COUCHDB_CONTAINER_NAME:-cozy-couchdb}:5984/_up}
       - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-0}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
