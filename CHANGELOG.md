@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Telegram listener-count messages now show the playing sound emojis (same as the website), and 🚫 when nobody is listening.
+- Telegram listener-count messages now show the playing sound emojis.
 
 ### Fixed
 
