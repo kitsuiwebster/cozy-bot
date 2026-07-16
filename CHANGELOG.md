@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.5] - 2026-07-17
+
+### Fixed
+
+- Telegram listener-count pings now only skip consecutive duplicates; the previous 5-minute dedup window hid real transitions.
+
 ## [2.1.4] - 2026-07-16
 
 ### Added
