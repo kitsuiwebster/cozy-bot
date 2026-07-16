@@ -192,21 +192,51 @@ def format_duration(seconds):
             return f"{hours}h {minutes}m"
         return f"{hours}h"
 
-# Build the Telegram "N person/people listening" line.
+# Sound-category emojis matching the website's "listening now" header
+# (buildLiveSoundCategories in the web app). Order matches the site too.
+_SOUND_EMOJI_ORDER = ['🌧️', '🌊', '✨', '🎶', '📡', '🎵']
+
+def _sound_category_emoji(sound_name):
+    if sound_name.startswith('rain'):
+        return '🌧️'
+    if sound_name.startswith('sea'):
+        return '🌊'
+    if sound_name.startswith('sparkles'):
+        return '✨'
+    if sound_name.startswith('background-music'):
+        return '🎶'
+    if sound_name.startswith('white-noise') or sound_name.startswith('noise'):
+        return '📡'
+    return '🎵'
+
+# Build the Telegram "N person/people listening" line, prefixed with the
+# emojis of the sound categories currently being listened to (same emojis as
+# the website's "listening now" header). Falls back to ✨ when nothing plays.
 # Counts every human currently in any voice channel the bot is connected to,
 # across all guilds. Pass exclude_channel to discount a channel the bot is
 # about to leave (e.g. mid-disconnect, when bot.voice_clients still references it).
 def _total_listeners_text(exclude_channel=None):
+    from cogs.audio.base_sound import global_current_sounds
+
     total = 0
+    playing_emojis = set()
     for guild in bot.guilds:
         vc = guild.voice_client
         if not vc or not vc.channel:
             continue
         if exclude_channel is not None and vc.channel.id == exclude_channel.id:
             continue
-        total += sum(1 for m in vc.channel.members if not m.bot)
+        humans = sum(1 for m in vc.channel.members if not m.bot)
+        total += humans
+        if humans:
+            sound = global_current_sounds.get(guild.id)
+            if sound:
+                playing_emojis.add(_sound_category_emoji(sound))
+    prefix = ''.join(e for e in _SOUND_EMOJI_ORDER if e in playing_emojis)
+    if not prefix:
+        prefix = '🚫' if total == 0 else '✨'
     suffix = "person listening" if total == 1 else "people listening"
-    return f"✨ <b>{total}</b> {suffix}"
+    return f"{prefix} <b>{total}</b> {suffix}"
 
 
 # Save voice time data to CouchDB
