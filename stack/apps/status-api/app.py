@@ -18,7 +18,7 @@ STATUS_PAGE_URL = os.getenv("STATUS_PAGE_URL", "http://uptime-kuma:3001")
 
 TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0") == "1"
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+TELEGRAM_CHAT_IDS = [c.strip() for c in os.getenv("TELEGRAM_CHAT_ID", "").split(",") if c.strip()]
 
 MONITORS = [
     {
@@ -61,20 +61,21 @@ def _format_downtime(seconds: float) -> str:
 
 
 async def send_telegram(session: aiohttp.ClientSession, text: str) -> None:
-    if not (TELEGRAM_ENABLED and TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID):
+    if not (TELEGRAM_ENABLED and TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS):
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-    }
-    try:
-        async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)):
+    for chat_id in TELEGRAM_CHAT_IDS:
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+        try:
+            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)):
+                pass
+        except Exception:
             pass
-    except Exception:
-        pass
 
 
 async def alert_status_transitions(session: aiohttp.ClientSession, checks: List[Dict[str, Any]]) -> None:

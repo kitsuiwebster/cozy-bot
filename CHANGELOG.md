@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.4] - 2026-07-16
+
+### Added
+
+- Telegram listener-count messages now show the playing sound emojis.
+
+### Fixed
+
+- Bot now recovers within seconds when Discord kills a voice connection (server migration, gateway resume failure) instead of staying silently absent.
+- Dead voice clients are fully torn down before reconnecting, removing "Not connected to voice." errors and reconnect timeouts.
+- Orphaned voice connections no longer sabotage new connection attempts (bot joining then leaving instantly).
+- `/stop` no longer gets undone by the playback watchdog reconnecting the bot.
+- Sound buttons, watchdog, auto-disconnect timer and audio restore now share one per-guild lock, removing connect/stop races.
+- Restored audio sessions now auto-disconnect from empty channels.
+- Telegram alerts are no longer dropped during bursts of listener-count pings (separate rate-limit budget).
+- Status page no longer shows green during bot outages.
+
+### Changed
+
+- Bumped `discord.py[voice]` to 2.7.1.
+- discord.py voice and gateway logs kept at INFO in container logs for post-incident tracing.
+
 ## [2.1.3] - 2026-07-07
 
 ### Added

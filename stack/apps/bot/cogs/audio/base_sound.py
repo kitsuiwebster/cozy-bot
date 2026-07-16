@@ -32,6 +32,71 @@ def get_guild_audio_lock(guild_id) -> asyncio.Lock:
         _guild_audio_locks[guild_id] = lock
     return lock
 
+
+# Last VoiceClient we successfully connected, per guild. discord.py wipes its
+# own registry on a gateway re-IDENTIFY without stopping the clients; this side
+# table lets reap_orphan_voice_clients find those orphans, whose internal tasks
+# otherwise keep sending join/leave for the guild and sabotage every new
+# connection handshake.
+known_voice_clients = {}
+
+
+async def teardown_voice_client(guild):
+    """Force-disconnect and deregister a dead or half-dead voice client.
+
+    A client whose websocket died can keep .channel populated. Leaving it
+    registered makes play() raise "Not connected to voice" and blocks the next
+    connect() handshake for the guild, so it must be torn down completely
+    before reconnecting.
+    """
+    voice_client = guild.voice_client
+    if not voice_client:
+        return
+    known_voice_clients.pop(guild.id, None)
+    try:
+        await asyncio.wait_for(voice_client.disconnect(force=True), timeout=10)
+    except Exception as e:
+        logging.warning(f"⚠️ Voice teardown: disconnect failed in {guild.name}: {e}")
+    try:
+        voice_client.cleanup()
+    except Exception:
+        pass
+
+
+def reap_orphan_voice_clients(bot):
+    """Cancel and deregister voice clients discord.py no longer tracks.
+
+    Returns the number of orphans that still had internal tasks running.
+    Reaches into VoiceClient._connection (private API) because nothing public
+    stops an orphaned client's runner/connector tasks.
+    """
+    reaped = 0
+    for guild_id, vc in list(known_voice_clients.items()):
+        guild = bot.get_guild(guild_id)
+        current = guild.voice_client if guild else None
+        if current is vc:
+            continue
+        known_voice_clients.pop(guild_id, None)
+        connection = getattr(vc, '_connection', None)
+        live_tasks = [
+            task for task in (
+                getattr(connection, '_runner', None) if connection else None,
+                getattr(connection, '_connector', None) if connection else None,
+            ) if task is not None and not task.done()
+        ]
+        if not live_tasks:
+            continue
+        try:
+            for task in live_tasks:
+                task.cancel()
+            vc.cleanup()
+            reaped += 1
+            guild_name = guild.name if guild else guild_id
+            logging.warning(f"⚠️ Reaped orphaned voice client in {guild_name} (internal tasks still running)")
+        except Exception as e:
+            logging.warning(f"⚠️ Failed to reap orphaned voice client for guild {guild_id}: {e}")
+    return reaped
+
 # Base view for interactive sound selection buttons
 class BaseSoundView(View):
     def __init__(self, sounds, sound_labels, user_id, bot, cog_name):
@@ -88,14 +153,6 @@ class BaseSoundCog(commands.Cog):
         self.sound_labels = sound_labels
         self.description = description
         self.guild_states = {}
-        self.connection_locks = {}  # Prevent simultaneous connection attempts per guild
-
-    def _get_connection_lock(self, guild_id):
-        lock = self.connection_locks.get(guild_id)
-        if lock is None:
-            lock = asyncio.Lock()
-            self.connection_locks[guild_id] = lock
-        return lock
 
     async def play_sound_command(self, interaction, prompt_message):
         await interaction.response.defer()
@@ -208,6 +265,14 @@ class BaseSoundCog(commands.Cog):
             logging.info("⏱️ PERF click->defer: 0ms")
 
         guild_id = interaction.guild.id
+
+        # Serialize with the watchdog/after_playing restart path, stop_sound and
+        # the auto-disconnect timer. Button clicks used to run unlocked, racing
+        # those paths into double connects and play() on torn-down clients.
+        async with get_guild_audio_lock(guild_id):
+            await self._on_button_click_locked(interaction, guild_id, t0, perf_enabled)
+
+    async def _on_button_click_locked(self, interaction, guild_id, t0, perf_enabled):
         guild_state = self.get_guild_state(guild_id)
 
         # Update target channel with user's current location (in case they moved)
@@ -216,27 +281,33 @@ class BaseSoundCog(commands.Cog):
 
         sound_filename = interaction.data.get('custom_id')
 
-        # Prevent playing same sound twice
+        # Prevent playing same sound twice. is_connected() matters here: a
+        # zombie client can keep "playing" into a dead websocket, and without
+        # the check the user clicking the same sound to bring the bot back
+        # would get "already playing" instead of a reconnect.
         voice_client = interaction.guild.voice_client
         if (guild_state.get('current_sound') == sound_filename and
             guild_state.get('is_playing') and
             voice_client and
+            voice_client.is_connected() and
             voice_client.is_playing()):
             await interaction.followup.send("❌ This sound is already playing! Choose a different sound or stop playback first.", ephemeral=True)
             return
 
         user_channel = guild_state.get('target_channel')
 
-        # Check if voice_client is actually connected, not just exists (fixes ghost connection bug)
-        if voice_client and not voice_client.channel:
-            logging.warning("⚠️ Ghost voice_client detected (exists but not in channel). Cleaning up...")
-            try:
-                await voice_client.disconnect()
-            except Exception:
-                pass
+        # A voice_client that lost its channel OR its websocket (is_connected()
+        # False while .channel is still set) is dead: playing on it raises
+        # "Not connected to voice" and its stale session blocks a fresh
+        # handshake. Tear it down so the connect branch below starts clean.
+        if voice_client and (not voice_client.channel or not voice_client.is_connected()):
+            logging.warning(
+                f"⚠️ Stale voice_client detected (channel={voice_client.channel}, "
+                f"is_connected={voice_client.is_connected()}). Tearing down..."
+            )
+            await teardown_voice_client(interaction.guild)
             voice_client = None
             await asyncio.sleep(0.5)
-            logging.info("🔍 DEBUG: After cleanup, voice_client is now None")
 
         # Refresh voice_client reference
         voice_client = interaction.guild.voice_client
@@ -253,9 +324,11 @@ class BaseSoundCog(commands.Cog):
             try:
                 logging.info(f"🔍 Connecting to {user_channel.name}...")
 
-                # Connect without timeout (like romeo-bot)
+                # Default 60s handshake timeout (discord.py waits for both
+                # VOICE_STATE_UPDATE and VOICE_SERVER_UPDATE)
                 voice_client = await user_channel.connect()
                 did_connect = True
+                known_voice_clients[guild_id] = voice_client
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->connected: {int((time.monotonic() - t0) * 1000)}ms")
 
@@ -315,8 +388,8 @@ class BaseSoundCog(commands.Cog):
 
         self.clear_other_cog_states(interaction.guild.id)
 
-        # Simple verification
-        if not voice_client or not voice_client.channel:
+        # Simple verification: channel AND live websocket
+        if not voice_client or not voice_client.channel or not voice_client.is_connected():
             await interaction.followup.send("❌ Not connected to voice", ephemeral=True)
             return
 
@@ -354,7 +427,7 @@ class BaseSoundCog(commands.Cog):
         if perf_enabled:
             logging.info(f"⏱️ PERF click->after-stabilize: {int((time.monotonic() - t0) * 1000)}ms")
 
-        # Determine sound path and start playback - ignore is_connected() check
+        # Determine sound path and start playback
         try:
             if sound_filename.startswith('rain'):
                 sound_path = f"cogs/audio/rain/{sound_filename}"
@@ -452,16 +525,29 @@ class BaseSoundCog(commands.Cog):
                 human_members = [m for m in voice_client.channel.members if not m.bot]
 
                 if not non_bot_voice_ids and not human_members:
-                    # Channel is empty, disconnect
-                    guild_state = self.get_guild_state(guild_id)
-                    
-                    if voice_client.is_playing():
-                        voice_client.stop()
-                    await voice_client.disconnect()
-                    guild_state['is_playing'] = False
-                    guild_state['current_sound'] = None
-                    guild_state['disconnect_timer'] = None
-                    
+                    # Channel is empty. Serialize with the button/restart paths,
+                    # then re-check: a user may have joined (or a restart may be
+                    # mid-connect) while we waited for the lock.
+                    async with get_guild_audio_lock(guild_id):
+                        voice_client = guild.voice_client
+                        if not voice_client or not voice_client.channel:
+                            break
+                        if any(not m.bot for m in voice_client.channel.members):
+                            continue
+
+                        guild_state = self.get_guild_state(guild_id)
+                        # Clear state BEFORE stopping so after_playing and the
+                        # voice-drop recovery see a deliberate disconnect and
+                        # don't bring the bot back.
+                        guild_state['is_playing'] = False
+                        guild_state['current_sound'] = None
+                        guild_state['disconnect_timer'] = None
+                        global_current_sounds.pop(guild_id, None)
+
+                        if voice_client.is_playing():
+                            voice_client.stop()
+                        await voice_client.disconnect()
+
                     logging.info(f"👋 AUTO-DISCONNECT: Left empty voice channel in {guild.name}")
                     break
                 else:
@@ -546,9 +632,10 @@ class BaseSoundCog(commands.Cog):
                 return
 
             # Recover voice connection if Discord dropped it while users are still present.
-            # `is_connected()` can report false negatives on some reconnect edges.
-            # If we have a channel bound, treat voice as ready.
-            voice_is_ready = bool(voice_client and voice_client.channel)
+            # A usable connection needs a live websocket: zombie clients keep
+            # .channel set after a gateway drop, so .channel alone used to let
+            # dead sessions pass this check and crash play() downstream.
+            voice_is_ready = bool(voice_client and voice_client.channel and voice_client.is_connected())
             if not voice_is_ready:
                 target_channel = guild_state.get('target_channel')
                 if not target_channel:
@@ -562,44 +649,44 @@ class BaseSoundCog(commands.Cog):
                     )
                     return
 
-                lock = self._get_connection_lock(guild_id)
-                async with lock:
-                    voice_client = guild.voice_client
-                    voice_is_ready = bool(voice_client and voice_client.channel)
+                if voice_client:
+                    # Kill the dead session first: connecting over it either
+                    # raises "Already connected" or times out waiting for the
+                    # voice handshake Discord will never complete.
+                    await teardown_voice_client(guild)
 
-                    if not voice_is_ready:
-                        try:
-                            voice_client = await target_channel.connect()
-                            await asyncio.sleep(0.3)
-                            guild_state['target_channel'] = target_channel
-                            await self.start_disconnect_timer(guild_id)
+                try:
+                    voice_client = await target_channel.connect()
+                    known_voice_clients[guild_id] = voice_client
+                    await asyncio.sleep(0.3)
+                    guild_state['target_channel'] = target_channel
+                    await self.start_disconnect_timer(guild_id)
+                    logging.info(
+                        f"🔗 restart_audio_loop recovered voice connection in {guild_name}"
+                    )
+                except Exception as reconnect_error:
+                    # Race condition: Discord reports already connected while recovering.
+                    if "Already connected to a voice channel" in str(reconnect_error):
+                        voice_client = guild.voice_client
+                        if voice_client and voice_client.channel and voice_client.is_connected():
                             logging.info(
-                                f"🔗 restart_audio_loop recovered voice connection in {guild_name}"
+                                f"🔗 restart_audio_loop recovered existing voice connection in {guild_name}"
                             )
-                        except Exception as reconnect_error:
-                            # Race condition: Discord reports already connected while recovering.
-                            if "Already connected to a voice channel" in str(reconnect_error):
-                                voice_client = guild.voice_client
-                                if voice_client and voice_client.channel:
-                                    logging.info(
-                                        f"🔗 restart_audio_loop recovered existing voice connection in {guild_name}"
-                                    )
-                                    await self.start_disconnect_timer(guild_id)
-                                    voice_is_ready = True
-                                    pass
-                                else:
-                                    logging.warning(
-                                        f"🔄 restart_audio_loop reconnect race but no active channel for guild {guild_id}"
-                                    )
-                                    return
-                            else:
-                                logging.warning(
-                                    f"🔄 restart_audio_loop reconnect failed for guild {guild_id}: "
-                                    f"{type(reconnect_error).__name__}: {reconnect_error!r}"
-                                )
-                                return
+                            known_voice_clients[guild_id] = voice_client
+                            await self.start_disconnect_timer(guild_id)
+                        else:
+                            logging.warning(
+                                f"🔄 restart_audio_loop reconnect race but no active channel for guild {guild_id}"
+                            )
+                            return
+                    else:
+                        logging.warning(
+                            f"🔄 restart_audio_loop reconnect failed for guild {guild_id}: "
+                            f"{type(reconnect_error).__name__}: {reconnect_error!r}"
+                        )
+                        return
 
-            if not voice_client or not voice_client.channel:
+            if not voice_client or not voice_client.channel or not voice_client.is_connected():
                 logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
                 return
 
@@ -630,8 +717,7 @@ class BaseSoundCog(commands.Cog):
                 sound_path = f"cogs/audio/{current_sound}"
             
             # Restart audio if file exists and voice client is ready
-            # NOTE: Using voice_client.channel check instead of is_connected() due to discord.py 2.3.2 bug
-            if os.path.exists(sound_path) and voice_client.channel and not voice_client.is_playing():
+            if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
                 audio_source = FFmpegPCMAudio(
                     sound_path,
                     before_options='-stream_loop -1 -loglevel panic',

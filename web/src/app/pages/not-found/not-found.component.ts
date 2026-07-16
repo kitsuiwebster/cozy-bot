@@ -8,8 +8,9 @@ import { RouterModule } from '@angular/router';
   imports: [CommonModule, RouterModule],
   template: `
     <main class="not-found">
+      <p class="emoji">☔️</p>
       <h1>404</h1>
-      <p>This page doesn't exist.</p>
+      <p class="message">Looks like this page drifted off with the rain.</p>
       <a routerLink="/cozybot">Back to CozyBot</a>
     </main>
   `,
@@ -21,21 +22,44 @@ import { RouterModule } from '@angular/router';
       align-items: center;
       justify-content: center;
       padding: 4rem 1rem;
-      color: #fff;
-      font-family: system-ui, -apple-system, sans-serif;
       text-align: center;
     }
-    h1 { font-size: 5rem; margin: 0 0 0.5rem; font-weight: 700; }
-    p { font-size: 1.25rem; margin: 0 0 2rem; opacity: 0.8; }
-    a {
-      color: #7289da;
-      text-decoration: none;
-      padding: 0.75rem 1.5rem;
-      border: 1px solid currentColor;
-      border-radius: 6px;
-      transition: background 0.2s;
+    .emoji {
+      font-size: 2.5rem;
+      margin: 0 0 8px;
     }
-    a:hover { background: rgba(114, 137, 218, 0.1); }
+    h1 {
+      font-size: 5rem;
+      margin: 0 0 0.5rem;
+      font-weight: 700;
+      background: var(--gradient-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .message {
+      font-size: 1.15rem;
+      margin: 0 0 2rem;
+      color: var(--color-text-muted);
+    }
+    a {
+      color: var(--color-accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.75rem 1.5rem;
+      background: rgba(var(--color-accent-rgb), 0.1);
+      border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease;
+      display: inline-block;
+    }
+    a:hover {
+      background: rgba(var(--color-accent-rgb), 0.25);
+      border-color: rgba(var(--color-accent-rgb), 0.5);
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-glow-strong);
+    }
   `]
 })
 export class NotFoundComponent {}

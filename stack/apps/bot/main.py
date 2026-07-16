@@ -192,21 +192,51 @@ def format_duration(seconds):
             return f"{hours}h {minutes}m"
         return f"{hours}h"
 
-# Build the Telegram "N person/people listening" line.
+# Sound-category emojis matching the website's "listening now" header
+# (buildLiveSoundCategories in the web app). Order matches the site too.
+_SOUND_EMOJI_ORDER = ['🌧️', '🌊', '✨', '🎶', '📡', '🎵']
+
+def _sound_category_emoji(sound_name):
+    if sound_name.startswith('rain'):
+        return '🌧️'
+    if sound_name.startswith('sea'):
+        return '🌊'
+    if sound_name.startswith('sparkles'):
+        return '✨'
+    if sound_name.startswith('background-music'):
+        return '🎶'
+    if sound_name.startswith('white-noise') or sound_name.startswith('noise'):
+        return '📡'
+    return '🎵'
+
+# Build the Telegram "N person/people listening" line, prefixed with the
+# emojis of the sound categories currently being listened to (same emojis as
+# the website's "listening now" header). Falls back to ✨ when nothing plays.
 # Counts every human currently in any voice channel the bot is connected to,
 # across all guilds. Pass exclude_channel to discount a channel the bot is
 # about to leave (e.g. mid-disconnect, when bot.voice_clients still references it).
 def _total_listeners_text(exclude_channel=None):
+    from cogs.audio.base_sound import global_current_sounds
+
     total = 0
+    playing_emojis = set()
     for guild in bot.guilds:
         vc = guild.voice_client
         if not vc or not vc.channel:
             continue
         if exclude_channel is not None and vc.channel.id == exclude_channel.id:
             continue
-        total += sum(1 for m in vc.channel.members if not m.bot)
+        humans = sum(1 for m in vc.channel.members if not m.bot)
+        total += humans
+        if humans:
+            sound = global_current_sounds.get(guild.id)
+            if sound:
+                playing_emojis.add(_sound_category_emoji(sound))
+    prefix = ''.join(e for e in _SOUND_EMOJI_ORDER if e in playing_emojis)
+    if not prefix:
+        prefix = '🚫' if total == 0 else '✨'
     suffix = "person listening" if total == 1 else "people listening"
-    return f"✨ <b>{total}</b> {suffix}"
+    return f"{prefix} <b>{total}</b> {suffix}"
 
 
 # Save voice time data to CouchDB
@@ -248,6 +278,8 @@ guild_voice_time_changes = {}
 user_voice_sessions = {}
 periodic_backup_task = None
 background_tasks = set()  # Keep references to prevent garbage collection
+_deploy_notifier_started = False
+_audio_monitor_started = False
 
 # Create background task and keep reference to prevent garbage collection
 def create_background_task(coro):
@@ -589,6 +621,11 @@ _live_stats_dirty = False
 _live_stats_task_started = False
 PLAYBACK_WATCHDOG_SECONDS = 10
 PLAYBACK_WATCHDOG_COOLDOWN_SECONDS = 30
+AUDIO_COG_NAMES = ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']
+# Wait for Discord's session teardown / discord.py's own reconnect attempt
+# before repairing voice ourselves.
+VOICE_RECOVERY_DELAY_SECONDS = 8
+VOICE_RECONCILE_GRACE_SECONDS = 15
 
 async def _live_stats_flush_loop():
     while True:
@@ -606,10 +643,8 @@ async def _playback_watchdog_loop():
     try:
         for guild in bot.guilds:
             voice_client = guild.voice_client
-            if not voice_client or not voice_client.channel:
-                continue
 
-            for cog_name in ['RainCog', 'SeaCog', 'SparklesCog', 'BackgroundMusicCog', 'NoiseCog']:
+            for cog_name in AUDIO_COG_NAMES:
                 cog = bot.get_cog(cog_name)
                 if not cog or not hasattr(cog, 'guild_states'):
                     continue
@@ -619,33 +654,40 @@ async def _playback_watchdog_loop():
                     continue
 
                 if guild_state.get('current_sound') and guild_state.get('is_playing'):
-                    if not voice_client.is_playing():
+                    # A usable connection needs a live websocket. Zombie clients
+                    # keep .channel set after a drop, and after a gateway
+                    # re-IDENTIFY the registry can be wiped entirely
+                    # (voice_client is None) while state says we should play.
+                    connected = bool(voice_client and voice_client.channel and voice_client.is_connected())
+                    if not connected or not voice_client.is_playing():
                         # Skip silently when the channel has no human listeners: the
                         # bot is about to auto-disconnect, "playback stalled" is not
                         # the real cause, and warning + spawning a restart task that
                         # will immediately bail just spams the logs.
-                        if not any(not m.bot for m in voice_client.channel.members):
+                        listen_channel = voice_client.channel if connected else guild_state.get('target_channel')
+                        if not listen_channel or not any(not m.bot for m in listen_channel.members):
                             continue
                         now = time.monotonic()
                         last_restart = _playback_watchdog_loop.last_restart_by_guild.get(guild.id, 0.0)
                         if now - last_restart < PLAYBACK_WATCHDOG_COOLDOWN_SECONDS:
                             continue
-                        is_paused = voice_client.is_paused() if hasattr(voice_client, "is_paused") else None
-                        source = getattr(voice_client, "source", None)
+                        is_paused = voice_client.is_paused() if (voice_client and hasattr(voice_client, "is_paused")) else None
+                        source = getattr(voice_client, "source", None) if voice_client else None
                         source_type = type(source).__name__ if source else None
                         logging.info(
                             "🔍 WATCHDOG CHECK: guild=%s channel=%s cog=%s "
-                            "sound=%s is_playing=%s is_paused=%s source=%s",
+                            "sound=%s connected=%s is_paused=%s source=%s",
                             guild.name,
-                            voice_client.channel.name if voice_client.channel else "unknown",
+                            listen_channel.name,
                             cog_name,
                             guild_state.get('current_sound'),
-                            voice_client.is_playing(),
+                            connected,
                             is_paused,
                             source_type,
                         )
                         logging.warning(
-                            f"⚠️ Playback stalled in {guild.name} (sound={guild_state.get('current_sound')}). Restarting..."
+                            f"⚠️ Playback stalled in {guild.name} "
+                            f"(sound={guild_state.get('current_sound')}, connected={connected}). Restarting..."
                         )
                         task = bot.loop.create_task(cog.restart_audio_loop(guild.id))
                         background_tasks.add(task)
@@ -658,6 +700,87 @@ async def _playback_watchdog_loop():
 @_playback_watchdog_loop.before_loop
 async def before_playback_watchdog():
     await bot.wait_until_ready()
+
+def _find_active_audio_cog(guild_id):
+    """Returns the audio cog whose state says it should be playing in this guild."""
+    for cog_name in AUDIO_COG_NAMES:
+        cog = bot.get_cog(cog_name)
+        if not cog or not hasattr(cog, 'guild_states'):
+            continue
+        state = cog.guild_states.get(guild_id)
+        if state and state.get('current_sound') and state.get('is_playing'):
+            return cog
+    return None
+
+_voice_recovery_pending = set()
+
+async def _recover_voice_after_drop(guild):
+    """The bot left voice while it was supposed to be playing.
+
+    Waits out Discord's session teardown (reconnecting immediately races the
+    old session's events into the new handshake), then reconnects through
+    restart_audio_loop if listeners are still waiting. No-op when a stop or
+    auto-disconnect already cleared the playing state, or when discord.py's
+    internal reconnect already brought the connection back.
+    """
+    try:
+        await asyncio.sleep(VOICE_RECOVERY_DELAY_SECONDS)
+        cog = _find_active_audio_cog(guild.id)
+        if cog is None:
+            return
+        voice_client = guild.voice_client
+        if voice_client and voice_client.channel and voice_client.is_connected():
+            return
+        logging.warning(
+            f"⚠️ Voice connection dropped in {guild.name} while playing. Attempting recovery..."
+        )
+        await cog.restart_audio_loop(guild.id)
+    except Exception as e:
+        logging.error(f"❌ Voice drop recovery failed for {guild.name}: {e}")
+    finally:
+        _voice_recovery_pending.discard(guild.id)
+
+def _schedule_voice_recovery(guild):
+    if guild.id in _voice_recovery_pending:
+        return
+    _voice_recovery_pending.add(guild.id)
+    create_background_task(_recover_voice_after_drop(guild))
+
+async def _reconcile_voice_clients(trigger):
+    """Repair voice state after a gateway reconnect.
+
+    on_ready/on_resumed fire again on every gateway reconnect. Two failure
+    modes need repair: half-dead clients (websocket gone, .channel still set)
+    and orphaned clients (discord.py wiped its registry on re-IDENTIFY without
+    stopping them; their internal tasks sabotage every new handshake). Gives
+    discord.py a grace period to recover on its own first.
+    """
+    try:
+        await asyncio.sleep(VOICE_RECONCILE_GRACE_SECONDS)
+        from cogs.audio.base_sound import reap_orphan_voice_clients, teardown_voice_client
+
+        reaped = reap_orphan_voice_clients(bot)
+        if reaped:
+            logging.warning(f"⚠️ Voice reconcile ({trigger}): reaped {reaped} orphaned voice client(s)")
+
+        for guild in bot.guilds:
+            voice_client = guild.voice_client
+            if not voice_client:
+                continue
+            if voice_client.channel and voice_client.is_connected():
+                continue
+            logging.warning(
+                f"⚠️ Voice reconcile ({trigger}): tearing down dead voice client in {guild.name} "
+                f"(channel={voice_client.channel}, is_connected={voice_client.is_connected()})"
+            )
+            await teardown_voice_client(guild)
+            cog = _find_active_audio_cog(guild.id)
+            if cog is not None:
+                task = bot.loop.create_task(cog.restart_audio_loop(guild.id))
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
+    except Exception as e:
+        logging.error(f"❌ Voice reconcile ({trigger}) failed: {e}")
 
 def schedule_live_stats_update():
     global _live_stats_dirty, _live_stats_task_started
@@ -767,6 +890,14 @@ async def on_error(event, *args, **kwargs):
 # Handle voice state changes for tracking
 @bot.event
 async def on_voice_state_update(member, before, after):
+    # The bot's own voice session ended (kick, voice-server migration, or a
+    # dead websocket discord.py gave up on). This is the only reliable signal
+    # that voice died (on_disconnect/on_resumed do not cover voice), so it runs
+    # regardless of the tracking config. Recovery is a no-op when a stop or
+    # auto-disconnect already cleared the playing state.
+    if member.id == bot.user.id and before.channel is not None and after.channel is None:
+        _schedule_voice_recovery(member.guild)
+
     # Skip tracking if disabled to avoid blocking voice handshake
     if not COZY_ENABLE_VOICE_TRACKING:
         return
@@ -1032,7 +1163,6 @@ async def on_ready():
     if COZY_ENABLE_API_CHECKS:
         await check_api_endpoints()
 
-    bot.heartbeat_interval = 360
     if not change_status.is_running():
         change_status.start()
 
@@ -1045,23 +1175,39 @@ async def on_ready():
         else:
             logging.info('🕐 Periodic backup task already running')
 
+    # on_ready fires again after gateway reconnects: guard the one-shot
+    # monitors like the task loops above, or each reconnect leaks a duplicate.
     if COZY_ENABLE_DEPLOY_NOTIFIER:
-        deployment_notifier = DeploymentNotifier(bot)
-        task = bot.loop.create_task(deployment_notifier.start_monitoring())
-        background_tasks.add(task)
-        task.add_done_callback(background_tasks.discard)
-        logging.info('📢 Started deployment notifier task')
+        global _deploy_notifier_started
+        if not _deploy_notifier_started:
+            _deploy_notifier_started = True
+            deployment_notifier = DeploymentNotifier(bot)
+            task = bot.loop.create_task(deployment_notifier.start_monitoring())
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
+            logging.info('📢 Started deployment notifier task')
+        else:
+            logging.info('📢 Deployment notifier task already running')
 
     if not _playback_watchdog_loop.is_running():
         _playback_watchdog_loop.start()
     logging.info('🎧 Started playback watchdog task')
 
     if COZY_ENABLE_AUDIO_RESTORE:
-        audio_monitor = AudioRestorationMonitor(bot)
-        task = bot.loop.create_task(audio_monitor.start_monitoring())
-        background_tasks.add(task)
-        task.add_done_callback(background_tasks.discard)
-        logging.info('🎵 Started audio restoration monitor task')
+        global _audio_monitor_started
+        if not _audio_monitor_started:
+            _audio_monitor_started = True
+            audio_monitor = AudioRestorationMonitor(bot)
+            task = bot.loop.create_task(audio_monitor.start_monitoring())
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
+            logging.info('🎵 Started audio restoration monitor task')
+        else:
+            logging.info('🎵 Audio restoration monitor already running')
+
+    # Repair voice connections the gateway reconnect may have left half-dead
+    # or orphaned (this on_ready may be a reconnect, not the first startup).
+    create_background_task(_reconcile_voice_clients('on_ready'))
 
     # Python packages summary
     from utils.logging_utils import log_python_packages
@@ -1077,6 +1223,12 @@ async def on_ready():
     from utils.logging_utils import log_global_statistics, log_connected_servers
     log_global_statistics(bot, cozy_gamification)
     log_connected_servers(bot)
+
+# Gateway session resumed: existing voice connections may have died during the
+# gap without emitting any event. Verify and repair them.
+@bot.event
+async def on_resumed():
+    create_background_task(_reconcile_voice_clients('on_resumed'))
 
 # Message handler to process commands
 @bot.event
@@ -1135,7 +1287,7 @@ async def run_bot():
 # Main entry point for bot execution
 if __name__ == "__main__":
     # Welcome message
-    print("✨ Welcome to CozyBot CLI v2.0.5 by @kitsuiwebster\n")
+    print("✨ Welcome to CozyBot CLI v2.1.4 by @kitsuiwebster\n")
 
     loop = asyncio.get_event_loop()
     if COZY_ENABLE_BOT_API:

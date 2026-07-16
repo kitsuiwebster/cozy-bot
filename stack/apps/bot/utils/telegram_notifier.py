@@ -7,7 +7,7 @@ chat. All network work runs in a daemon thread, so callers never block.
 Configured via env vars:
 - TELEGRAM_ENABLED: "1" to enable, anything else disables silently
 - TELEGRAM_BOT_TOKEN: the bot token from @BotFather
-- TELEGRAM_CHAT_ID: target chat id (a user id for DMs)
+- TELEGRAM_CHAT_ID: target chat id(s), comma-separated (a user id for DMs)
 """
 
 from __future__ import annotations
@@ -31,23 +31,33 @@ class TelegramNotifier:
     # Token-bucket-ish rate limit: at most RATELIMIT_MAX sends per window.
     RATELIMIT_WINDOW_SECONDS = 60
     RATELIMIT_MAX = 20
+    # Alerts (WARNING+ records forwarded from logging) get their own bucket so
+    # a burst of informational pings ("N people listening") can never starve a
+    # real error out of the chat.
+    ALERT_RATELIMIT_MAX = 20
     # Telegram caps a single message at 4096 chars.
     MESSAGE_MAX_CHARS = 4096
 
     def __init__(self) -> None:
         self.token = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
-        self.chat_id = os.getenv('TELEGRAM_CHAT_ID', '').strip()
+        self.chat_ids = [
+            c.strip() for c in os.getenv('TELEGRAM_CHAT_ID', '').split(',') if c.strip()
+        ]
         self.enabled = (
             os.getenv('TELEGRAM_ENABLED', '0') == '1'
             and bool(self.token)
-            and bool(self.chat_id)
+            and bool(self.chat_ids)
         )
         self._recent: dict[str, float] = {}
         self._sends: deque[float] = deque()
+        self._alert_sends: deque[float] = deque()
         self._lock = threading.Lock()
 
-    def send(self, text: str, parse_mode: str = 'HTML') -> bool:
-        """Queue a send. Returns True if accepted, False if dropped (disabled, throttled, or rate-limited)."""
+    def send(self, text: str, parse_mode: str = 'HTML', priority: bool = False) -> bool:
+        """Queue a send. Returns True if accepted, False if dropped (disabled, throttled, or rate-limited).
+
+        priority=True uses the separate alert bucket (see ALERT_RATELIMIT_MAX).
+        """
         if not self.enabled or not text:
             return False
 
@@ -58,12 +68,14 @@ class TelegramNotifier:
             if last is not None and (now - last) < self.THROTTLE_WINDOW_SECONDS:
                 return False
 
-            while self._sends and (now - self._sends[0]) > self.RATELIMIT_WINDOW_SECONDS:
-                self._sends.popleft()
-            if len(self._sends) >= self.RATELIMIT_MAX:
+            sends = self._alert_sends if priority else self._sends
+            limit = self.ALERT_RATELIMIT_MAX if priority else self.RATELIMIT_MAX
+            while sends and (now - sends[0]) > self.RATELIMIT_WINDOW_SECONDS:
+                sends.popleft()
+            if len(sends) >= limit:
                 return False
 
-            self._sends.append(now)
+            sends.append(now)
             self._recent[text] = now
 
             # Cheap GC: prune throttle table when it grows
@@ -81,28 +93,29 @@ class TelegramNotifier:
 
     def _post(self, text: str, parse_mode: str) -> None:
         url = f'https://api.telegram.org/bot{self.token}/sendMessage'
-        payload = {
-            'chat_id': self.chat_id,
-            'text': text,
-            'parse_mode': parse_mode,
-            'disable_web_page_preview': True,
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'},
-            method='POST',
-        )
         # Log under 'telegram.*' so the handler can filter its own messages and
         # avoid an infinite recursion loop on failures.
         log = logging.getLogger('telegram.notifier')
-        try:
-            with urllib.request.urlopen(req, timeout=5):
-                return
-        except urllib.error.HTTPError as e:
-            log.error('telegram send rejected: %s %s', e.code, e.reason)
-        except Exception as e:
-            log.error('telegram send failed: %s', e)
+        for chat_id in self.chat_ids:
+            payload = {
+                'chat_id': chat_id,
+                'text': text,
+                'parse_mode': parse_mode,
+                'disable_web_page_preview': True,
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST',
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=5):
+                    continue
+            except urllib.error.HTTPError as e:
+                log.error('telegram send rejected: %s %s', e.code, e.reason)
+            except Exception as e:
+                log.error('telegram send failed: %s', e)
 
 
 _notifier: Optional[TelegramNotifier] = None
@@ -115,8 +128,8 @@ def get_notifier() -> TelegramNotifier:
     return _notifier
 
 
-def notify(text: str, parse_mode: str = 'HTML') -> bool:
-    return get_notifier().send(text, parse_mode=parse_mode)
+def notify(text: str, parse_mode: str = 'HTML', priority: bool = False) -> bool:
+    return get_notifier().send(text, parse_mode=parse_mode, priority=priority)
 
 
 def escape(s: str) -> str:

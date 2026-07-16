@@ -118,6 +118,17 @@ def setup_logging(discord_log_level: str = "WARNING"):
     for logger_name in discord_logger_names:
         logging.getLogger(logger_name).setLevel(discord_log_level_value)
 
+    # Voice drops, reconnect attempts and "giving up" messages are logged by
+    # discord.py at INFO. With the default WARNING level they were invisible,
+    # which made voice outages look like the bot vanished with no error. Keep
+    # these two loggers at INFO regardless of the global discord level (the
+    # Telegram handler only forwards WARNING+, so this only enriches container
+    # logs, it does not add chat noise).
+    for logger_name in ('discord.voice_state', 'discord.gateway'):
+        logging.getLogger(logger_name).setLevel(
+            min(discord_log_level_value, logging.INFO)
+        )
+
 
 def print_ascii_banner():
     """Print the CozyBot ASCII art banner"""
@@ -131,7 +142,7 @@ def print_ascii_banner():
     print("║  ╚██████╗╚██████╔╝███████╗   ██║   ██████╔╝╚██████╔╝   ██║      ║")
     print("║   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝      ║")
     print("║                                                                 ║")
-    print("║                      Version 2.0.5                              ║")
+    print("║                      Version 2.1.4                              ║")
     print("║            by @kitsuiwebster & @BubbleXGum                      ║")
     print("║                                                                 ║")
     print("╚═════════════════════════════════════════════════════════════════╝")

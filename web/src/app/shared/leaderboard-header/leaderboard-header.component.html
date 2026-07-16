@@ -1,10 +1,12 @@
 <div class="header">
-  <div class="header-content">
+  <div class="header-panel">
+    <div class="header-content">
     <div class="bot-info">
       <div class="bot-avatar">
         <img [src]="avatarSrc" alt="CozyBot Logo" />
       </div>
       <div class="bot-details">
+        <span class="kicker">☔ Cozy Ambience Bot</span>
         <h1 [class.animating]="animatingTitle">{{ title }}</h1>
         <p class="bot-description">{{ subtitle }}</p>
 
@@ -51,12 +53,14 @@
         <span class="stat-label">{{ stat.label }}</span>
       </div>
     </div>
+    </div>
   </div>
 </div>
 
 <div class="live-stats-section">
   <div class="live-stats">
-    <div class="live-stat-combined" [class.loading]="statsLoading">
+    <div class="live-stat-panel" [class.loading]="statsLoading">
+    <div class="live-stat-combined">
       <span class="live-stat-text">
         <span class="live-stat-number"
               [class.animating]="animatingListeners"
@@ -74,6 +78,7 @@
           <span class="live-stat-count">{{ item.count }}</span>
         </span>
       </span>
+    </div>
     </div>
   </div>
 </div>
