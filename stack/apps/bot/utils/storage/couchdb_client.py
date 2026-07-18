@@ -410,6 +410,17 @@ class CouchDBClient:
             logging.error(f"❌ Failed to save voice time data: {e}")
             return False
 
+    # Guild settings operations
+
+    def load_guild_settings(self) -> Dict:
+        """Load per-guild bot settings ({guild_id: {always_on: bool}})"""
+        doc = self.get_document(self.db, 'guild_settings', default={}) or {}
+        return doc.get('guilds', {})
+
+    def save_guild_settings(self, guilds: Dict) -> bool:
+        """Save per-guild bot settings. Synchronous: rare writes that must be durable."""
+        return self._save_document_sync(self.db, 'guild_settings', {'type': 'guild_settings', 'guilds': guilds})
+
     # Audio state operations
 
     def save_audio_state(self, state_data: Dict) -> bool:
@@ -525,6 +536,12 @@ class _NullCouchDBClient:
     """No-op CouchDB client for voice-only mode."""
     def get_document(self, db, doc_id: str, default: Any = None) -> Any:
         return default
+
+    def load_guild_settings(self) -> Dict:
+        return {}
+
+    def save_guild_settings(self, guilds: Dict) -> bool:
+        return True
 
     def save_document(self, db, doc_id: str, data: Dict) -> bool:
         return True

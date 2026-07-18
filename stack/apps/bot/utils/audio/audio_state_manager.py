@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from utils.storage.couchdb_client import get_couchdb_client
+from utils.guild_settings import is_always_on
 
 # Manage saving and restoring audio state during deployments
 class AudioStateManager:
@@ -26,7 +27,8 @@ class AudioStateManager:
                         # Get users in voice channel
                         user_ids = [str(member.id) for member in voice_client.channel.members if not member.bot]
                         
-                        if user_ids:  # Only save if there are users
+                        # Save when users are present, or always for 24/7 guilds
+                        if user_ids or is_always_on(guild.id):
                             state_entry = {
                                 'guild_id': str(guild.id),
                                 'channel_id': str(voice_client.channel.id), 
@@ -87,7 +89,7 @@ class AudioStateManager:
                     current_users = {str(member.id) for member in channel.members if not member.bot}
                     common_users = expected_users.intersection(current_users)
                     
-                    if not common_users:
+                    if not common_users and not is_always_on(guild_id):
                         logging.info(f"⏭️ Skipping {guild.name} - no original users remain")
                         continue
                     

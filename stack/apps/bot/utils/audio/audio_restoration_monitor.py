@@ -5,6 +5,8 @@ import glob
 import logging
 from datetime import datetime
 
+from utils.guild_settings import is_always_on
+
 # Monitor and process audio restoration tasks after deployment or reconnection
 class AudioRestorationMonitor:
     def __init__(self, bot):
@@ -95,7 +97,7 @@ class AudioRestorationMonitor:
                         continue
 
                     current_users = [member for member in channel.members if not member.bot]
-                    if not current_users:
+                    if not current_users and not is_always_on(guild.id):
                         logging.info(f"⏭️ Skipping restore for {guild.name} - no users in voice channel")
                         db.delete_restore_task(task_id)
                         continue
@@ -143,7 +145,7 @@ class AudioRestorationMonitor:
             
             # Check if any users are still in the voice channel
             current_users = [member for member in channel.members if not member.bot]
-            if not current_users:
+            if not current_users and not is_always_on(guild.id):
                 logging.info(f"⏭️ Skipping restore for {guild.name} - no users in voice channel")
                 os.remove(file_path)
                 return

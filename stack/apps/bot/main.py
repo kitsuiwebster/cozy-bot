@@ -16,6 +16,7 @@ import math
 from utils.deployment.deployment_notifier import DeploymentNotifier
 from utils.audio.audio_restoration_monitor import AudioRestorationMonitor
 from utils.logging_utils import setup_logging
+from utils import guild_settings
 
 # Load environment variables from configuration file
 load_dotenv()
@@ -689,7 +690,10 @@ async def _playback_watchdog_loop():
                         # the real cause, and warning + spawning a restart task that
                         # will immediately bail just spams the logs.
                         listen_channel = voice_client.channel if connected else guild_state.get('target_channel')
-                        if not listen_channel or not any(not m.bot for m in listen_channel.members):
+                        if not listen_channel:
+                            continue
+                        if (not any(not m.bot for m in listen_channel.members)
+                                and not guild_settings.is_always_on(guild.id)):
                             continue
                         now = time.monotonic()
                         last_restart = _playback_watchdog_loop.last_restart_by_guild.get(guild.id, 0.0)
@@ -1214,6 +1218,10 @@ async def on_ready():
         else:
             logging.info('🎵 Audio restoration monitor already running')
 
+    # Warm the guild-settings cache off the event loop so hot paths
+    # (watchdog, auto-disconnect timer) never block on the first lookup.
+    create_background_task(asyncio.to_thread(guild_settings.preload))
+
     # Repair voice connections the gateway reconnect may have left half-dead
     # or orphaned (this on_ready may be a reconnect, not the first startup).
     create_background_task(_reconcile_voice_clients('on_ready'))
@@ -1257,6 +1265,7 @@ async def run_bot():
             ('cogs.audio.noise.noise', '📡'),
             ('cogs.audio.stop', '🛑'),
             ('cogs.menu', '📋'),
+            ('cogs.settings', '⚙️'),
             ('cogs.stats.profile', '🏅'),
             ('cogs.stats.tops', '🏆'),
             ('cogs.stats.total', '📊'),

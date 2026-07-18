@@ -6,6 +6,7 @@ import os
 import asyncio
 import logging
 from ..stats.gamification import cozy_gamification
+from utils.guild_settings import is_always_on
 
 # Global state tracking which cog is playing in each guild and current sounds (survives reconnections)
 global_playing_states = {}
@@ -540,6 +541,9 @@ class BaseSoundCog(commands.Cog):
                 human_members = [m for m in voice_client.channel.members if not m.bot]
 
                 if not non_bot_voice_ids and not human_members:
+                    if is_always_on(guild_id):
+                        # 24/7 mode: stay connected in the empty channel.
+                        continue
                     # Channel is empty. Serialize with the button/restart paths,
                     # then re-check: a user may have joined (or a restart may be
                     # mid-connect) while we waited for the lock.
@@ -670,7 +674,7 @@ class BaseSoundCog(commands.Cog):
                     return
 
                 human_members = [m for m in target_channel.members if not m.bot]
-                if not human_members:
+                if not human_members and not is_always_on(guild_id):
                     logging.info(
                         f"🔄 restart_audio_loop skipped: no listeners in target channel in {guild_name}"
                     )
