@@ -5,7 +5,7 @@ import glob
 import logging
 from datetime import datetime
 
-from utils.guild_settings import is_always_on
+from utils.guild_settings import is_always_on, get_volume
 
 # Monitor and process audio restoration tasks after deployment or reconnection
 class AudioRestorationMonitor:
@@ -200,7 +200,7 @@ class AudioRestorationMonitor:
                 logging.info(f"🔗 Connected to voice channel in {guild.name}")
 
             # Play the sound directly using Discord.py
-            from discord import FFmpegPCMAudio
+            from discord import FFmpegPCMAudio, PCMVolumeTransformer
             import os
 
             # Determine the sound file path based on sound name
@@ -226,9 +226,12 @@ class AudioRestorationMonitor:
                     await cog.start_disconnect_timer(guild.id)
 
             # Play the audio with callback for looping (removed -stream_loop for instant start)
-            audio_source = FFmpegPCMAudio(
-                sound_path,
-                before_options='-stream_loop -1 -loglevel error',
+            audio_source = PCMVolumeTransformer(
+                FFmpegPCMAudio(
+                    sound_path,
+                    before_options='-stream_loop -1 -loglevel error',
+                ),
+                volume=get_volume(guild.id),
             )
             # Use the cog's after_playing callback if available
             if cog and hasattr(cog, 'after_playing'):

@@ -1,4 +1,4 @@
-from discord import FFmpegPCMAudio, ButtonStyle, app_commands
+from discord import FFmpegPCMAudio, PCMVolumeTransformer, ButtonStyle, app_commands
 import time
 from discord.ext import commands
 from discord.ui import Button, View
@@ -6,7 +6,7 @@ import os
 import asyncio
 import logging
 from ..stats.gamification import cozy_gamification
-from utils.guild_settings import is_always_on
+from utils.guild_settings import is_always_on, get_volume
 
 # Global state tracking which cog is playing in each guild and current sounds (survives reconnections)
 global_playing_states = {}
@@ -461,10 +461,13 @@ class BaseSoundCog(commands.Cog):
                 # Play audio like romeo-bot - simple and direct
                 if perf_enabled:
                     logging.info(f"⏱️ PERF click->before-ffmpeg: {int((time.monotonic() - t0) * 1000)}ms")
-                audio_source = FFmpegPCMAudio(
-                    sound_path,
-                    executable="ffmpeg",
-                    before_options='-stream_loop -1 -loglevel panic',
+                audio_source = PCMVolumeTransformer(
+                    FFmpegPCMAudio(
+                        sound_path,
+                        executable="ffmpeg",
+                        before_options='-stream_loop -1 -loglevel panic',
+                    ),
+                    volume=get_volume(guild_id),
                 )
                 if not voice_client.is_playing():
                     voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
@@ -749,9 +752,12 @@ class BaseSoundCog(commands.Cog):
             
             # Restart audio if file exists and voice client is ready
             if os.path.exists(sound_path) and voice_client.is_connected() and not voice_client.is_playing():
-                audio_source = FFmpegPCMAudio(
-                    sound_path,
-                    before_options='-stream_loop -1 -loglevel panic',
+                audio_source = PCMVolumeTransformer(
+                    FFmpegPCMAudio(
+                        sound_path,
+                        before_options='-stream_loop -1 -loglevel panic',
+                    ),
+                    volume=get_volume(guild_id),
                 )
                 voice_client.play(audio_source, after=lambda e: self.after_playing(e, guild_id))
             

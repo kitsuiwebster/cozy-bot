@@ -19,6 +19,14 @@ def build_settings_embed(guild):
         ),
         inline=False,
     )
+    embed.add_field(
+        name="🔊 Volume",
+        value=(
+            f"Server-wide bot volume: **{guild_settings.get_volume_percent(guild.id)}%**\n"
+            "Change it with `/volume`."
+        ),
+        inline=False,
+    )
     return embed
 
 
@@ -81,6 +89,48 @@ class SettingsCog(commands.Cog):
             embed=build_settings_embed(interaction.guild),
             view=SettingsView(interaction.guild.id),
         )
+
+    @app_commands.command(name="volume", description="Set the bot volume for this server (1-100)")
+    @app_commands.describe(percent="Volume in percent (1-100). Leave empty to show the current volume.")
+    async def volume_command(self, interaction: discord.Interaction, percent: app_commands.Range[int, 1, 100] = None):
+        if interaction.guild is None:
+            await interaction.response.send_message("❌ This command only works in a server.", ephemeral=True)
+            return
+
+        guild = interaction.guild
+
+        if percent is None:
+            await asyncio.to_thread(guild_settings.preload)
+            current = guild_settings.get_volume_percent(guild.id)
+            await interaction.response.send_message(f"🔊 Current server volume: **{current}%**", ephemeral=True)
+            return
+
+        # Members in the bot's voice channel can adjust the volume (same rule
+        # as the sound buttons); Manage Server is allowed from anywhere, which
+        # covers stage moderators.
+        if not interaction.user.guild_permissions.manage_guild:
+            bot_channel = guild.voice_client.channel if guild.voice_client else None
+            user_channel = interaction.user.voice.channel if interaction.user.voice else None
+            if not bot_channel or not user_channel or bot_channel.id != user_channel.id:
+                await interaction.response.send_message(
+                    "❌ Join the voice channel where I'm playing (or have the Manage Server permission) to change the volume.",
+                    ephemeral=True,
+                )
+                return
+
+        saved = await asyncio.to_thread(guild_settings.set_volume, guild.id, percent)
+        if not saved:
+            await interaction.response.send_message("❌ Could not save the volume, please try again.", ephemeral=True)
+            return
+
+        # Apply live when something is playing: the source is a
+        # PCMVolumeTransformer, its volume is adjustable mid-stream.
+        voice_client = guild.voice_client
+        source = getattr(voice_client, 'source', None) if voice_client else None
+        if source is not None and hasattr(source, 'volume'):
+            source.volume = percent / 100
+
+        await interaction.response.send_message(f"🔊 Server volume set to **{percent}%**")
 
 
 async def setup(bot):

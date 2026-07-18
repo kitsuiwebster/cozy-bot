@@ -1,7 +1,8 @@
 """Per-guild bot settings, persisted in CouchDB with an in-memory cache.
 
-Currently a single flag per guild:
+Per guild:
 - always_on: 24/7 mode, the bot stays in the voice channel even when empty.
+- volume: server-wide playback volume in percent (1-100, default 100).
 
 Reads are served from the cache (a plain dict lookup after the first load),
 so hot paths like the watchdog and the auto-disconnect timer can call
@@ -46,9 +47,39 @@ def set_always_on(guild_id, enabled: bool) -> bool:
         cache = _load()
         entry = cache.setdefault(str(guild_id), {})
         entry['always_on'] = bool(enabled)
-        try:
-            from utils.storage.couchdb_client import get_couchdb_client
-            return get_couchdb_client().save_guild_settings(cache)
-        except Exception as e:
-            logging.error(f"❌ Failed to save guild settings: {e}")
-            return False
+        return _save(cache)
+
+
+DEFAULT_VOLUME_PERCENT = 100
+
+
+def get_volume_percent(guild_id) -> int:
+    """Server volume in percent (1-100)."""
+    settings = _load().get(str(guild_id))
+    value = settings.get('volume') if settings else None
+    if not isinstance(value, (int, float)):
+        return DEFAULT_VOLUME_PERCENT
+    return int(min(100, max(1, value)))
+
+
+def get_volume(guild_id) -> float:
+    """Server volume as a 0.0-1.0 multiplier for PCMVolumeTransformer."""
+    return get_volume_percent(guild_id) / 100
+
+
+def set_volume(guild_id, percent: int) -> bool:
+    """Persist the server volume. Returns False if the save failed."""
+    with _lock:
+        cache = _load()
+        entry = cache.setdefault(str(guild_id), {})
+        entry['volume'] = int(min(100, max(1, percent)))
+        return _save(cache)
+
+
+def _save(cache) -> bool:
+    try:
+        from utils.storage.couchdb_client import get_couchdb_client
+        return get_couchdb_client().save_guild_settings(cache)
+    except Exception as e:
+        logging.error(f"❌ Failed to save guild settings: {e}")
+        return False
