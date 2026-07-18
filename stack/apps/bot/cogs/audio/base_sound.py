@@ -98,7 +98,7 @@ def reap_orphan_voice_clients(bot):
             guild_name = guild.name if guild else guild_id
             logging.warning(f"⚠️ Reaped orphaned voice client in {guild_name} (internal tasks still running)")
         except Exception as e:
-            logging.warning(f"⚠️ Failed to reap orphaned voice client for guild {guild_id}: {e}")
+            logging.warning(f"⚠️ Failed to reap orphaned voice client in {guild.name if guild else guild_id}: {e}")
     return reaped
 
 # Base view for interactive sound selection buttons
@@ -666,13 +666,13 @@ class BaseSoundCog(commands.Cog):
             if not voice_is_ready:
                 target_channel = guild_state.get('target_channel')
                 if not target_channel:
-                    logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
+                    logging.info(f"🔄 restart_audio_loop skipped: voice not connected in {guild_name}")
                     return
 
                 human_members = [m for m in target_channel.members if not m.bot]
                 if not human_members:
                     logging.info(
-                        f"🔄 restart_audio_loop skipped: no listeners in target channel for guild {guild_id}"
+                        f"🔄 restart_audio_loop skipped: no listeners in target channel in {guild_name}"
                     )
                     return
 
@@ -703,18 +703,18 @@ class BaseSoundCog(commands.Cog):
                             await self.start_disconnect_timer(guild_id)
                         else:
                             logging.warning(
-                                f"🔄 restart_audio_loop reconnect race but no active channel for guild {guild_id}"
+                                f"🔄 restart_audio_loop reconnect race but no active channel in {guild_name}"
                             )
                             return
                     else:
                         logging.warning(
-                            f"🔄 restart_audio_loop reconnect failed for guild {guild_id}: "
+                            f"🔄 restart_audio_loop reconnect failed in {guild_name}: "
                             f"{type(reconnect_error).__name__}: {reconnect_error!r}"
                         )
                         return
 
             if not voice_client or not voice_client.channel or not voice_client.is_connected():
-                logging.info(f"🔄 restart_audio_loop skipped: voice not connected for guild {guild_id}")
+                logging.info(f"🔄 restart_audio_loop skipped: voice not connected in {guild_name}")
                 return
 
             logging.info("")

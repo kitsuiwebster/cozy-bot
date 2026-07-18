@@ -90,7 +90,7 @@ class AudioRestorationMonitor:
 
                     channel = guild.get_channel(channel_id)
                     if not channel:
-                        logging.warning(f"⚠️ Channel {channel_id} not found for restore task")
+                        logging.warning(f"⚠️ Channel {channel_id} not found in {guild.name} for restore task")
                         db.delete_restore_task(task_id)
                         continue
 

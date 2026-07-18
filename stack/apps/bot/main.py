@@ -112,7 +112,7 @@ def _track_user_join_sync(user_id, member, guild_id):
                     current_sound = guild_state['current_sound']
                     logging.info("")
                     logging.info("")
-                    logging.info(f"🔍 Found current sound \033[36m{current_sound}\033[0m in {cog_name} for guild {guild_id}")
+                    logging.info(f"🔍 Found current sound \033[36m{current_sound}\033[0m in {cog_name} for {member.guild.name}")
                     break
 
         if current_sound:
@@ -120,7 +120,7 @@ def _track_user_join_sync(user_id, member, guild_id):
             cozy_gamification.track_sound_start(user_id, current_sound, save_immediately=False)
             logging.info(f"🎵 Tracking \033[36m{current_sound}\033[0m for \033[35m{member.name}\033[0m")
         else:
-            logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining guild {guild_id}")
+            logging.warning(f"⚠️ No current sound found for \033[35m{member.name}\033[0m joining {member.guild.name}")
 
         # Save once after all operations
         cozy_gamification.save_user_data()
@@ -372,7 +372,7 @@ async def periodic_backup():
                 # Cap session duration at 30 minutes to prevent corrupted data
                 max_session_duration = 30 * 60
                 if current_session_time > max_session_duration:
-                    logging.warning(f"⚠️ Suspicious server session duration for guild {guild_id}: {current_session_time/60:.1f}min - capping to 30min")
+                    logging.warning(f"⚠️ Suspicious server session duration in {guild.name}: {current_session_time/60:.1f}min - capping to 30min")
                     current_session_time = max_session_duration
 
                 new_total = accumulated_time + current_session_time
