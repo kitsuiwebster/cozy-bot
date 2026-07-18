@@ -338,6 +338,17 @@ class BaseSoundCog(commands.Cog):
 
                 await self.start_disconnect_timer(guild_id)
 
+            except asyncio.TimeoutError as e:
+                # Discord never delivered the voice handshake within 60s: a
+                # Discord-side outage (voice server or gateway), not a bot bug.
+                # One clear line for Telegram; the full traceback adds nothing.
+                logging.warning(
+                    f"🌐 DISCORD-SIDE: voice handshake timed out (60s) joining "
+                    f"{user_channel.name} in {interaction.guild.name}. "
+                    f"Discord voice is having issues, user was asked to retry."
+                )
+                await interaction.followup.send(f"❌ Connection failed: {str(e)}", ephemeral=True)
+                return
             except Exception as e:
                 import traceback
                 logging.error(f"❌ Connection error: {e}")
