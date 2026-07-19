@@ -2,6 +2,7 @@
 // IMPORTS
 // =============================================================================
 
+import { formatDaysHours } from '../../shared/duration';
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -454,17 +455,12 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   getTotalTimeDays(): string {
-    const totalSeconds = this.getTotalListeningTimeSeconds(this.allUsersRaw);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    return `${days}d ${hours}h`;
+    return formatDaysHours(this.getTotalListeningTimeSeconds(this.allUsersRaw));
   }
 
   getHeaderTotalTimeDays(): string {
     const totalSeconds = this.headerTotalTimeSeconds || this.getTotalListeningTimeSeconds(this.allUsers);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    return `${days}d ${hours}h`;
+    return formatDaysHours(totalSeconds);
   }
 
   private getTotalListeningTimeSeconds(users: CozyUser[]): number {
@@ -494,9 +490,7 @@ export class CozybotComponent implements OnInit, OnDestroy {
         const newUsers = response.total_count;
         const newTimeSeconds = this.getTotalListeningTimeSeconds(response.users);
         const currentTime = this.getHeaderTotalTimeDays();
-        const days = Math.floor(newTimeSeconds / 86400);
-        const hours = Math.floor((newTimeSeconds % 86400) / 3600);
-        const newTime = `${days}d ${hours}h`;
+        const newTime = formatDaysHours(newTimeSeconds);
 
         if (currentUsers !== newUsers) {
           this.animatingUsers = true;

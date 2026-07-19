@@ -1,3 +1,4 @@
+import { formatDaysHours } from '../../shared/duration';
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Title, Meta } from '@angular/platform-browser';
@@ -118,10 +119,7 @@ export class CreditsComponent implements OnInit, OnDestroy {
   }
 
   getTotalTimeDays(): string {
-    const totalSeconds = this.leaderboard.reduce((total, user) => total + user.listening_time_seconds, 0);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    return `${days}d ${hours}h`;
+    return formatDaysHours(this.leaderboard.reduce((total, user) => total + user.listening_time_seconds, 0));
   }
 
   getHeaderStats(): LeaderboardHeaderStat[] {
@@ -242,9 +240,7 @@ export class CreditsComponent implements OnInit, OnDestroy {
       next: (response: LeaderboardResponse) => {
         const currentTime = this.getTotalTimeDays();
         const totalSeconds = response.users.reduce((total, user) => total + user.listening_time_seconds, 0);
-        const days = Math.floor(totalSeconds / 86400);
-        const hours = Math.floor((totalSeconds % 86400) / 3600);
-        const newTime = `${days}d ${hours}h`;
+        const newTime = formatDaysHours(totalSeconds);
         
         if (currentTime !== newTime) {
           this.animatingTime = true;
