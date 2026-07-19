@@ -210,45 +210,47 @@
         </button>
       </div>
 
-      <!-- Sounds Analytics Charts -->
-      <div class="sounds-charts-wrapper" *ngIf="soundsChartData.length > 0">
-        <!-- Pie Chart by Category -->
-        <div class="sounds-chart-section">
-          <div class="sounds-chart-container">
-            <ngx-charts-pie-chart
-              [results]="soundsByCategoryChartData"
-              [legend]="false"
-              [labels]="true"
-              [doughnut]="false"
-              [explodeSlices]="false"
-              [animations]="true"
-              [view]="chartView"
-              [scheme]="colorScheme"
-              [trimLabels]="false"
-              [labelFormatting]="formatCategoryChartLabel"
-              [tooltipDisabled]="false"
-              [tooltipText]="formatCategoryTooltipText">
-            </ngx-charts-pie-chart>
+      <!-- Sounds Analytics Charts (pure CSS donuts) -->
+      <div class="sounds-charts-wrapper" *ngIf="categoryPie || soundsPie">
+        <!-- Donut by Category -->
+        <div class="sounds-chart-section" *ngIf="categoryPie">
+          <div class="css-pie">
+            <h4 class="css-pie-title">By Category</h4>
+            <div class="css-pie-figure">
+              <div class="css-pie-donut" [style.background]="categoryPie.gradient"></div>
+              <div class="css-pie-center">
+                <span class="css-pie-total">{{ categoryPie.totalLabel }}</span>
+                <span class="css-pie-caption">listened</span>
+              </div>
+            </div>
+            <ul class="css-pie-legend">
+              <li *ngFor="let seg of categoryPie.segments">
+                <span class="css-pie-dot" [style.background]="seg.color"></span>
+                <span class="css-pie-label">{{ seg.name }}</span>
+                <span class="css-pie-value">{{ seg.valueLabel }} · {{ seg.percentLabel }}</span>
+              </li>
+            </ul>
           </div>
         </div>
 
-        <!-- Pie Chart by Sound -->
-        <div class="sounds-chart-section">
-          <div class="sounds-chart-container">
-            <ngx-charts-pie-chart
-              [results]="soundsChartData"
-              [legend]="false"
-              [labels]="true"
-              [doughnut]="false"
-              [explodeSlices]="false"
-              [animations]="true"
-              [view]="chartView"
-              [scheme]="colorScheme"
-              [trimLabels]="false"
-              [labelFormatting]="formatSoundsChartLabel"
-              [tooltipDisabled]="false"
-              [tooltipText]="formatSoundsTooltipText">
-            </ngx-charts-pie-chart>
+        <!-- Donut by Sound -->
+        <div class="sounds-chart-section" *ngIf="soundsPie">
+          <div class="css-pie">
+            <h4 class="css-pie-title">By Sound</h4>
+            <div class="css-pie-figure">
+              <div class="css-pie-donut" [style.background]="soundsPie.gradient"></div>
+              <div class="css-pie-center">
+                <span class="css-pie-total">{{ soundsPie.totalLabel }}</span>
+                <span class="css-pie-caption">listened</span>
+              </div>
+            </div>
+            <ul class="css-pie-legend">
+              <li *ngFor="let seg of soundsPie.segments">
+                <span class="css-pie-dot" [style.background]="seg.color"></span>
+                <span class="css-pie-label">{{ seg.name }}</span>
+                <span class="css-pie-value">{{ seg.valueLabel }} · {{ seg.percentLabel }}</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

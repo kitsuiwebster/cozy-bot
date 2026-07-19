@@ -3,15 +3,47 @@
 // =============================================================================
 
 import { formatDaysHours } from '../../shared/duration';
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Title, Meta } from '@angular/platform-browser';
 import { CozybotService, CozyUser, LeaderboardResponse, LiveStats, CozyServer, CozySound, ServersResponse, SoundsResponse, UserDetails } from '../../services/cozybot.service';
 import { interval, Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
 import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
+
+// =============================================================================
+// CSS PIE CHARTS
+// =============================================================================
+
+interface CssPieSegment {
+  name: string;
+  color: string;
+  valueLabel: string;
+  percentLabel: string;
+}
+
+interface CssPie {
+  gradient: string;
+  segments: CssPieSegment[];
+  totalLabel: string;
+}
+
+// Validated dark-mode categorical palette (fixed slot order, never cycled).
+// Gray is reserved for the "Other" fold and deliberately reads as neutral.
+const PIE_SERIES_COLORS = ['#3987e5', '#008300', '#d55181', '#c98500', '#199e70', '#d95926', '#9085e9', '#e66767'];
+const PIE_OTHER_COLOR = '#8a8a86';
+const PIE_TOP_SLICES = 7;
+
+// Color follows the category entity, never its rank.
+const PIE_CATEGORIES: { [emoji: string]: { label: string; color: string } } = {
+  '🌧️': { label: '🌧️ Rain', color: '#3987e5' },
+  '🌊': { label: '🌊 Sea', color: '#199e70' },
+  '✨': { label: '✨ Sparkles', color: '#c98500' },
+  '🎶': { label: '🎶 Music', color: '#9085e9' },
+  '🎵': { label: '🎶 Music', color: '#9085e9' },
+  '📡': { label: '📡 Noise', color: '#d55181' },
+};
 
 // =============================================================================
 // COMPONENT DEFINITION
@@ -20,7 +52,7 @@ import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/
 @Component({
   selector: 'app-cozybot',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgxChartsModule, LeaderboardHeaderComponent],
+  imports: [CommonModule, FormsModule, LeaderboardHeaderComponent],
   templateUrl: './cozybot.component.html',
   styleUrls: ['./cozybot.component.scss']
 })
@@ -98,23 +130,8 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // PROPERTIES - Chart Configuration
   // ===========================================================================
 
-  soundsChartData: { name: string; value: number }[] = [];
-  soundsByCategoryChartData: { name: string; value: number }[] = [];
-  soundsChartTotalTime = 0;
-  soundsCategoryTotalTime = 0;
-  colorScheme: Color = {
-    name: 'soundsColors',
-    selectable: true,
-    group: ScaleType.Ordinal,
-    domain: [
-      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-      '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84',
-      '#96CEB4', '#FFEAA7', '#DFE6E9', '#74B9FF', '#A29BFE',
-      '#FD79A8', '#FDCB6E', '#6C5CE7', '#00B894', '#E17055'
-    ]
-  };
-  chartView: [number, number] = [550, 450];
-  showChartLegend = true;
+  soundsPie: CssPie | null = null;
+  categoryPie: CssPie | null = null;
 
   // ===========================================================================
   // PROPERTIES - User Details Modal
@@ -138,8 +155,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
     this.titleService.setTitle('CozyBot - Discord Bot Leaderboard');
     this.setFavicon('assets/images/cozybot/cozybot-logo3.png');
     this.metaService.updateTag({ name: 'description', content: 'CozyBot Discord Bot leaderboard with real-time stats and CozyPoints system.' });
-
-    this.updateChartSize();
 
     const urlParams = new URLSearchParams(globalThis.location.search);
     const viewParam = urlParams.get('view');
@@ -744,19 +759,31 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // CHART DATA PREPARATION METHODS
   // ===========================================================================
 
-  // Prepares sound data for the pie chart
-  // Limited to top sounds for better visibility
+  // Prepares the per-sound donut: top slices in fixed palette order, the
+  // rest folded into a neutral "Other" slice.
   private prepareSoundsChartData(): void {
-    const topSoundsCount = this.allSounds.length;
-    const sortedSounds = [...this.allSounds].sort((a, b) => b.total_time - a.total_time);
+    const sortedSounds = [...this.allSounds]
+      .filter(sound => sound.total_time > 0)
+      .sort((a, b) => b.total_time - a.total_time);
 
-    const topSounds = sortedSounds.slice(0, topSoundsCount);
-    this.soundsChartData = topSounds.map(sound => ({
+    const top = sortedSounds.slice(0, PIE_TOP_SLICES);
+    const rest = sortedSounds.slice(PIE_TOP_SLICES);
+
+    const items = top.map((sound, index) => ({
       name: sound.display_name,
-      value: sound.total_time
+      value: sound.total_time,
+      color: PIE_SERIES_COLORS[index]
     }));
 
-    this.soundsChartTotalTime = topSounds.reduce((sum, sound) => sum + sound.total_time, 0);
+    if (rest.length > 0) {
+      items.push({
+        name: `Other (${rest.length} sounds)`,
+        value: rest.reduce((sum, sound) => sum + sound.total_time, 0),
+        color: PIE_OTHER_COLOR
+      });
+    }
+
+    this.soundsPie = this.buildCssPie(items);
 
     this.prepareSoundsByCategoryChartData();
   }
@@ -775,69 +802,63 @@ export class CozybotComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.soundsByCategoryChartData = Object.entries(categoriesMap)
-      .map(([emoji, time]) => ({
-        name: `${emoji}\n${this.formatChartValue(time)}`,
-        value: time
-      }))
+    // Merge emoji buckets that map to the same category (🎶 and 🎵 are both
+    // Music) and give each category its fixed entity color.
+    const byCategory: { [label: string]: { value: number; color: string } } = {};
+    Object.entries(categoriesMap).forEach(([emoji, time]) => {
+      const category = PIE_CATEGORIES[emoji] || { label: emoji, color: PIE_OTHER_COLOR };
+      if (!byCategory[category.label]) {
+        byCategory[category.label] = { value: 0, color: category.color };
+      }
+      byCategory[category.label].value += time;
+    });
+
+    const items = Object.entries(byCategory)
+      .map(([label, entry]) => ({ name: label, value: entry.value, color: entry.color }))
       .sort((a, b) => b.value - a.value);
 
-    this.soundsCategoryTotalTime = this.soundsByCategoryChartData.reduce((sum, item) => sum + item.value, 0);
+    this.categoryPie = this.buildCssPie(items);
+  }
+
+  // Builds a pure-CSS donut: a conic-gradient with a surface gap between
+  // slices, plus precomputed legend rows.
+  private buildCssPie(items: { name: string; value: number; color: string }[]): CssPie | null {
+    const visible = items.filter(item => item.value > 0);
+    const total = visible.reduce((sum, item) => sum + item.value, 0);
+    if (visible.length === 0 || total <= 0) {
+      return null;
+    }
+
+    // ~2px gap at this donut radius; a single full slice needs none.
+    const gapDeg = visible.length > 1 ? 1.4 : 0;
+    const stops: string[] = [];
+    let angle = 0;
+
+    visible.forEach(item => {
+      const sweep = (item.value / total) * 360;
+      const start = Math.min(angle + gapDeg / 2, angle + sweep);
+      const end = Math.max(start, angle + sweep - gapDeg / 2);
+      stops.push(`transparent ${angle.toFixed(3)}deg ${start.toFixed(3)}deg`);
+      stops.push(`${item.color} ${start.toFixed(3)}deg ${end.toFixed(3)}deg`);
+      stops.push(`transparent ${end.toFixed(3)}deg ${(angle + sweep).toFixed(3)}deg`);
+      angle += sweep;
+    });
+
+    return {
+      gradient: `conic-gradient(${stops.join(', ')})`,
+      segments: visible.map(item => ({
+        name: item.name,
+        color: item.color,
+        valueLabel: this.formatChartValue(item.value),
+        percentLabel: this.formatPercent(item.value, total)
+      })),
+      totalLabel: this.formatChartValue(total)
+    };
   }
 
   // ===========================================================================
   // CHART CONFIGURATION AND FORMATTING METHODS
   // ===========================================================================
-
-  // Updates chart size based on screen size
-  @HostListener('window:resize')
-  onResize() {
-    this.updateChartSize();
-  }
-
-  private updateChartSize(): void {
-    const width = window.innerWidth;
-    if (width <= 768) {
-      this.chartView = [350, 320];
-      this.showChartLegend = false;
-    } else if (width <= 1200) {
-      this.chartView = [450, 400];
-      this.showChartLegend = true;
-    } else {
-      this.chartView = [550, 450];
-      this.showChartLegend = true;
-    }
-  }
-
-  // Formats chart labels to display only emojis (without time)
-  formatChartLabel = (label: string): string => {
-    return label.split('\n')[0];
-  }
-
-  formatSoundsChartLabel = (label: string): string => label || '';
-
-  formatSoundsTooltipText = (arc: { data?: { name?: string; value?: number } } | null): string => {
-    if (!arc?.data) {
-      return '';
-    }
-    const label = arc.data.name || '';
-    const value = arc.data.value || 0;
-    return `${label} · ${this.formatChartValue(value)} · ${this.formatPercent(value, this.soundsChartTotalTime)}`;
-  }
-
-  formatCategoryTooltipText = (arc: { data?: { name?: string; value?: number } } | null): string => {
-    if (!arc?.data) {
-      return '';
-    }
-    const rawLabel = arc.data.name || '';
-    const label = rawLabel.split('\n')[0];
-    const value = arc.data.value || 0;
-    return `${label} · ${this.formatChartValue(value)} · ${this.formatPercent(value, this.soundsCategoryTotalTime)}`;
-  }
-
-  formatCategoryChartLabel = (label: string): string => {
-    return label.split('\n')[0];
-  }
 
   formatPercent = (value: number, total: number): string => {
     if (!total || total <= 0) {
