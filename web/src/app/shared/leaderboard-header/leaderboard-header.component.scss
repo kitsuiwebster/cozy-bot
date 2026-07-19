@@ -133,12 +133,7 @@
             }
           }
 
-          .filter-menu {
-            position: relative;
-          }
-
-          .filter-menu summary {
-            list-style: none;
+          .filter-toggle {
             cursor: pointer;
             padding: 8px 12px;
             border-radius: 6px;
@@ -148,39 +143,20 @@
             font-size: 0.85rem;
             font-weight: 500;
             user-select: none;
-            transition: all 0.2s ease;
-          }
-
-          .filter-menu summary::-webkit-details-marker {
-            display: none;
-          }
-
-          .filter-menu[open] summary,
-          .filter-menu summary:hover {
-            background: rgba(30, 41, 59, 0.6);
-            border-color: rgba(var(--color-accent-rgb), 0.4);
-            color: var(--color-accent);
-          }
-
-          .filter-option {
-            position: absolute;
-            top: calc(100% + 6px);
-            left: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 12px;
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            font-size: 0.85rem;
-            color: var(--color-text-light);
-            z-index: 5;
             white-space: nowrap;
-          }
+            transition: all 0.2s ease;
 
-          .filter-option input {
-            accent-color: var(--color-amber);
+            &:hover {
+              background: rgba(30, 41, 59, 0.6);
+              border-color: rgba(var(--color-accent-rgb), 0.4);
+              color: var(--color-accent);
+            }
+
+            &.active {
+              background: rgba(var(--color-accent-rgb), 0.15);
+              border-color: rgba(var(--color-accent-rgb), 0.5);
+              color: var(--color-accent);
+            }
           }
 
           .add-to-server-btn {

@@ -69,8 +69,7 @@ export class LeaderboardHeaderComponent {
     this.refresh.emit();
   }
 
-  onStreakOnlyChange(event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    this.streakOnlyChange.emit(!!input?.checked);
+  onStreakOnlyToggle(): void {
+    this.streakOnlyChange.emit(!this.streakOnly);
   }
 }
