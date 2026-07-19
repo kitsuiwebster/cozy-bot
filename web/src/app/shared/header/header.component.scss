@@ -42,51 +42,38 @@
     }
   }
 
+  // Segmented glass pill: the whole nav sits in one rounded container and
+  // the active page is a filled brand-gradient pill, echoing the CTA button.
   .main-nav {
     display: flex;
-    gap: 28px;
+    gap: 4px;
     align-items: center;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
 
     a {
       color: var(--color-text-nav);
       text-decoration: none;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 500;
       font-family: inherit;
-      padding: 6px 10px;
-      border-radius: 10px;
+      padding: 7px 16px;
+      border-radius: 999px;
       transition: all 0.2s var(--ease-standard);
-      position: relative;
       white-space: nowrap;
-
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 10px;
-        width: calc(100% - 20px);
-        height: 2px;
-        background: linear-gradient(90deg, rgba(var(--color-accent-rgb), 0.9), rgba(14, 116, 144, 0.9));
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      }
 
       &:hover {
         color: var(--color-text);
-        background: rgba(148, 163, 184, 0.08);
-
-        &::after {
-          opacity: 1;
-        }
+        background: rgba(148, 163, 184, 0.1);
       }
 
       &.active {
-        color: var(--color-text);
-        background: rgba(148, 163, 184, 0.12);
-
-        &::after {
-          opacity: 1;
-        }
+        color: #ffffff;
+        font-weight: 600;
+        background: var(--gradient-brand);
+        box-shadow: 0 4px 14px rgba(var(--color-accent-rgb), 0.35);
       }
     }
   }
@@ -101,22 +88,22 @@
     }
 
     .main-nav {
-      gap: 16px;
+      gap: 3px;
 
       a {
         font-size: 0.85rem;
-        padding: 6px 8px;
+        padding: 6px 12px;
       }
     }
   }
 
   @media (max-width: 480px) {
     .main-nav {
-      gap: 10px;
+      gap: 2px;
 
       a {
         font-size: 0.78rem;
-        padding: 6px 6px;
+        padding: 5px 9px;
       }
     }
   }
