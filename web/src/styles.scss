@@ -61,6 +61,53 @@ body {
   width: 100%;
 }
 
+// Global ambient background, shared by every page: radial brand glow plus the
+// animated rain. Positioned content (z-index >= 1) renders above both.
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+// Rain tile heights (150/200/300) all divide 600px and the cycle translates
+// exactly 600px, so the loop is seamless.
+body::after {
+  content: '';
+  position: fixed;
+  top: -620px;
+  left: -10%;
+  width: 120%;
+  height: calc(100% + 1240px);
+  background-image:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.12) 2%, transparent 2%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 2%, transparent 2%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.06) 2%, transparent 2%);
+  background-size: 140px 150px, 200px 200px, 260px 300px;
+  background-position: 0 0, 40px -80px, 80px -160px;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  animation: rain-fall 3.4s linear infinite;
+}
+
+@keyframes rain-fall {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 600px, 0);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
