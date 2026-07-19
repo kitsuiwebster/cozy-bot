@@ -3,12 +3,14 @@
 // =============================================================================
 
 // Ambient background (radial glow + rain) is global now: see styles.scss.
+// No position here: a positioned opaque host would paint over the global
+// body::before gradient (that is exactly what hid it on this page).
 :host {
   display: block;
   width: 100%;
   min-height: 100vh;
-  background: #0f1419;
-  position: relative;
+  background: var(--color-bg);
+  z-index: 1;
 }
 
 // =============================================================================
