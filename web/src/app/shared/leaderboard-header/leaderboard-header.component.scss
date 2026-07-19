@@ -222,34 +222,6 @@
         text-align: center;
         min-width: 96px;
         padding: 16px 20px;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-md);
-        overflow: hidden;
-        transition: border-color 0.2s var(--ease-standard), transform 0.2s var(--ease-standard), box-shadow 0.2s var(--ease-standard);
-
-        // Gradient accent line along the top edge of each stat card
-        &::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: var(--gradient-brand);
-          opacity: 0.6;
-          transition: opacity 0.2s ease;
-        }
-
-        &:hover {
-          border-color: rgba(var(--color-accent-rgb), 0.4);
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-card);
-
-          &::before {
-            opacity: 1;
-          }
-        }
 
         .stat-number {
           display: block;
@@ -290,10 +262,6 @@
       position: relative;
       display: inline-block;
       padding: 36px 56px;
-      background: radial-gradient(circle at 50% 0%, rgba(var(--color-accent-rgb), 0.08), transparent 70%), var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-elevated);
       transition: opacity 0.3s ease;
 
       &.loading {
