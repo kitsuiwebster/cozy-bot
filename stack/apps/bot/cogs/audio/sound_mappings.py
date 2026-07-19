@@ -37,7 +37,7 @@ SOUND_LABELS = {
     # Noise sounds
     "white-noise00.mp3": "📡⏳🔜",
     "white-noise01.mp3": "📡🤍🌌",
-    "white-noise02.mp3": "📡⏳🔜",
+    "white-noise02.mp3": "📡💗🎙",
     "white-noise03.mp3": "📡⏳🔜",
     "white-noise04.mp3": "📡⏳🔜",
 }

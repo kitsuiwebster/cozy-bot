@@ -7,7 +7,7 @@ from ..sound_mappings import SOUND_LABELS
 # Cog for playing noise sounds
 class NoiseCog(BaseSoundCog):
     def __init__(self, bot):
-        sounds = ["white-noise00.mp3", "white-noise01.mp3", "pink-noise01.mp3", "white-noise03.mp3", "white-noise04.mp3"]
+        sounds = ["white-noise00.mp3", "white-noise01.mp3", "white-noise02.mp3", "white-noise03.mp3", "white-noise04.mp3"]
         sound_labels = {sound: SOUND_LABELS[sound] for sound in sounds}
         super().__init__(bot, "noise", sounds, sound_labels, "Play differnet types of noises.📡")
 
@@ -19,7 +19,7 @@ class NoiseCog(BaseSoundCog):
         wip_sounds = ["white-noise00.mp3", "white-noise03.mp3", "white-noise04.mp3"]
         if sound_filename in wip_sounds:
             await interaction.response.send_message(
-                "🚧 **Work in Progress** 🚧\n\nThis noise sound is currently being prepared and will be available soon!\n\nTry **📡🤍🌌** in the meantime.",
+                "🚧 **Work in Progress** 🚧\n\nThis noise sound is currently being prepared and will be available soon!\n\nTry **📡🤍🌌** and  **📡💗🎙** in the meantime.",
                 ephemeral=True
             )
             return
