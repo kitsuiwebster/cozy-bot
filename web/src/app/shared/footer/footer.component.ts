@@ -9,6 +9,6 @@ import { CommonModule } from '@angular/common';
   styleUrls: ['./footer.component.scss']
 })
 export class FooterComponent {
-  version = '2.1.3';
+  version = '2.1.6';
   currentYear = new Date().getFullYear();
 }
