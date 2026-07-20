@@ -64,6 +64,26 @@ class _LogFilter(logging.Filter):
         return True
 
 
+class _TelegramNoiseFilter(logging.Filter):
+    """Keep asyncio's internal voice-churn noise out of Telegram only.
+
+    These fire during discord.py's own voice reconnect churn (the poller task
+    dies on a torn-down socket, or a pending wait is GC'd). They are logged at
+    ERROR by asyncio's default handler but are not actionable and never signal
+    an outage — our recovery layer already handles the reconnect. They stay in
+    the container logs; this filter is attached to the Telegram handler only.
+    """
+
+    NOISE = (
+        "Task exception was never retrieved",
+        "Task was destroyed but it is pending",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(phrase in msg for phrase in self.NOISE)
+
+
 def setup_logging(discord_log_level: str = "WARNING"):
     """
     Configure enhanced logging system with visual formatting
@@ -98,6 +118,7 @@ def setup_logging(discord_log_level: str = "WARNING"):
     from .telegram_log_handler import TelegramLogHandler
     telegram_handler = TelegramLogHandler(level=logging.WARNING)
     telegram_handler.addFilter(_LogFilter())
+    telegram_handler.addFilter(_TelegramNoiseFilter())
     logger.addHandler(telegram_handler)
 
     # Set Discord log level
