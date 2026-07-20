@@ -1,9 +1,9 @@
-# CozyBot v2.1.6
+# CozyBot v2.2.0
 
 <p align="center">
   <a href="https://discord.gg/Rxeh64Y73U"><img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/kitsuiwebster/cozy-bot?style=for-the-badge" alt="License"></a>
-  <img src="https://img.shields.io/badge/Version-2.1.6-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.2.0-blue?style=for-the-badge" alt="Version">
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-View-orange?style=for-the-badge" alt="Changelog"></a>
   <img src="https://img.shields.io/badge/Made%20with-❤️-white?style=for-the-badge" alt="Made with Love">
 </p>

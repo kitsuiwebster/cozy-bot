@@ -47,7 +47,7 @@ async def api_health():
         "status": "ok" if db_ok else "degraded",
         "details": {
             "service": "cozybot-api",
-            "version": "2.1.6",
+            "version": "2.2.0",
             "couchdb_reachable": db_ok,
         },
     }

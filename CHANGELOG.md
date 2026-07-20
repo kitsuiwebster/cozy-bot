@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-07-20
+
+### Added
+
+- `/settings` command (Manage Server) with a 24/7 mode toggle: the bot stays in the voice channel and keeps playing even when it is empty.
+- `/volume` command to set a server-wide playback volume (1-100), applied live to the current sound and persisted across reconnects and deploys.
+- New pink noise ambiance in `/noise`.
+
+### Changed
+
+- Voice log warnings show server names instead of raw guild IDs.
+
+### Fixed
+
+- Button connection timeouts now surface as a single Discord-side warning in Telegram instead of a full traceback.
+
 ## [2.1.6] - 2026-07-17
 
 ### Fixed
@@ -75,7 +91,6 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Frontend dev environment now points at the local API by default; production unchanged.
 - CORS origins and Status API monitor URLs driven by environment variables instead of hardcoded values.
 - `status-api` waits for Uptime Kuma to be healthy before starting (was just "started").
 
@@ -86,7 +101,6 @@ All notable changes to this project will be documented in this file.
 - Audio start/stop/restart actions for a guild serialized to remove race conditions on shared state.
 - Streak rollover and daily activity now use a consistent UTC day boundary regardless of host timezone.
 - User identifiers normalized to a single type across gamification, preventing duplicate keys.
-- Leaderboard display names no longer flicker between the global name and the raw username.
 - Loyalty bonuses (30 min / 1 h / 12 h on the same sound) reachable again after a quick voice rejoin.
 - Sound-master achievements (Rain/Sea/Sparkles/Music) now actually unlock when earned.
 - Session credit reordered so concurrent finalize/backup paths no longer double-credit listening time or points.
@@ -99,7 +113,6 @@ All notable changes to this project will be documented in this file.
 - Obsolete startup handoff to the removed endpoints cleaned up.
 - Playback watchdog no longer warns about "stalled" audio when the voice channel is simply empty.
 - Exception tracebacks now appear in logs for Discord.py "Ignoring exception" messages.
-- Website fetches now time out after 15 seconds, render a real 404 on unknown URLs, and stop leaking subscriptions in long-running tabs.
 - Status page polling cancels in-flight requests under slow networks instead of stacking them.
 - Deploy script no longer masks docker build failures as success.
 - Re-running the CouchDB migration merges existing docs instead of silently skipping them.
@@ -171,7 +184,6 @@ All notable changes to this project will be documented in this file.
 - Deploy script improvements for Live API checks, notifications, and restore flow.
 - Status maintenance history tracking and banner metadata (started/ended timestamps).
 - Bot voice handling moved to dedicated threads/workers for DB writes and background tasks.
-- Leaderboard shared header component and consistent header stats across pages.
 - Status API-backed monitor history endpoints and public status API routes.
 
 ### Changed
@@ -180,16 +192,14 @@ All notable changes to this project will be documented in this file.
 - Dev/prod configuration unified to a single stack with environment-driven values only.
 - Docker compose services/ports/volumes renamed for consistency across environments.
 - Bot/API logging cleaned up and grouped; new API endpoint listing sections in bot startup logs.
-- Status page and web UI typography/colors aligned.
+- Status page typography and colors aligned.
 - Status page now reads from `/api/status/*` instead of Public API routes.
 - Make targets aligned and expanded per service (status API DB helper, UI links, seeds).
 - Status page monitor ordering with Bot (Live API) first.
 - Bot presence rotation now alternates server count and `/menu`.
 - Noise menu entry uses 📡 icon.
-- Web modal UI polish and refreshed leaderboard visuals.
-- Web API polling tuned (live stats 5s, header totals 60s, manual refresh for lists).
 - Status page mobile layout uses desktop viewport width.
-- Credits button removed and streak bonus copy corrected.
+- Streak bonus copy corrected.
 
 ### Fixed
 
@@ -204,7 +214,6 @@ All notable changes to this project will be documented in this file.
 - CORS handling for public API calls.
 - Admin API writes now persist to CouchDB consistently.
 - Audio playback change latency and restore write reliability.
-- Live stats glow/animation and cached values between page switches.
 
 ### Removed
 

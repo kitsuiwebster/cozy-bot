@@ -10,5 +10,5 @@ import { CommonModule } from '@angular/common';
   styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent {
-  version = '2.1.6';
+  version = '2.2.0';
 }

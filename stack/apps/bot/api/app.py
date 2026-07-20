@@ -88,7 +88,7 @@ API_PREFIX = "/api/public"
 app = FastAPI(
     title="CozyBot API",
     description="REST API for CozyBot Discord bot statistics",
-    version="2.1.6"
+    version="2.2.0"
 )
 
 # Configure CORS for web access
@@ -111,7 +111,7 @@ app.include_router(audio_restore_router, prefix=API_PREFIX, tags=["audio"])
 
 @app.get("/")
 async def root():
-    return {"message": "CozyBot Public API", "version": "2.1.6"}
+    return {"message": "CozyBot Public API", "version": "2.2.0"}
 
 @app.get("/health")
 async def health_check():
