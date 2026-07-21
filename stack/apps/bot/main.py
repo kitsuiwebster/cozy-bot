@@ -660,6 +660,27 @@ async def _live_stats_flush_loop():
             logging.error(f'❌ Live stats flush failed: {e}')
         await asyncio.sleep(LIVE_STATS_FLUSH_SECONDS)
 
+# Sample the concurrent listener total once a minute into the daily CouchDB
+# time series that feeds the website's listener chart.
+@tasks.loop(seconds=60)
+async def _listener_history_loop():
+    try:
+        total = 0
+        for guild in bot.guilds:
+            vc = guild.voice_client
+            if vc and vc.channel:
+                total += sum(1 for m in vc.channel.members if not m.bot)
+
+        from utils.storage.couchdb_client import get_couchdb_client
+        from utils.audio import listener_history
+        await asyncio.to_thread(listener_history.record_sample, get_couchdb_client(), total)
+    except Exception as e:
+        logging.error(f'❌ Listener history sample failed: {e}')
+
+@_listener_history_loop.before_loop
+async def before_listener_history():
+    await bot.wait_until_ready()
+
 @tasks.loop(seconds=PLAYBACK_WATCHDOG_SECONDS)
 async def _playback_watchdog_loop():
     if not hasattr(_playback_watchdog_loop, 'last_restart_by_guild'):
@@ -1205,6 +1226,17 @@ async def on_ready():
     if not _playback_watchdog_loop.is_running():
         _playback_watchdog_loop.start()
     logging.info('🎧 Started playback watchdog task')
+
+    if not _listener_history_loop.is_running():
+        # Backfill invented past history once, then start the 60s sampler.
+        try:
+            from utils.storage.couchdb_client import get_couchdb_client
+            from utils.audio import listener_history
+            await asyncio.to_thread(listener_history.seed_past_if_needed, get_couchdb_client())
+        except Exception as e:
+            logging.warning(f'⚠️ Listener history seed skipped: {e}')
+        _listener_history_loop.start()
+        logging.info('📈 Started listener history sampler')
 
     if COZY_ENABLE_AUDIO_RESTORE:
         global _audio_monitor_started
