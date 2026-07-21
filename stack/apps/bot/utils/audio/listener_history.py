@@ -15,7 +15,10 @@ import random
 from datetime import datetime, timedelta
 
 DOC_PREFIX = 'listener_history:'
-SEED_SENTINEL = 'listener_history_seeded'
+# Invented history covers this fixed window; days already present (real
+# samples or a previous seed) are never overwritten.
+SEED_START = datetime(2025, 7, 1)
+SEED_END = datetime(2026, 7, 23)
 
 
 def _day_id(date):
@@ -37,7 +40,7 @@ def record_sample(db, listeners, now=None):
             'sum': doc.get('sum', 0) + listeners,
             'count': count + 1,
         })
-        db.save_document(db.db, doc_id, doc)
+        db.save_document_sync(db.db, doc_id, doc)
     except Exception as e:
         logging.error(f"❌ Failed to record listener sample: {e}")
 
@@ -63,20 +66,24 @@ def load_history(db, days=400):
 
 
 def seed_past_if_needed(db):
-    """Backfill invented daily history once (guarded by a sentinel).
+    """Backfill invented daily history, filling only missing days.
 
     The shape mirrors CozyBot's real growth: a slow start through late 2025,
     a winter bump, a slow spring climb, then a steep summer 2026 rise. Weekly
     ranges are interpolated and each day is sampled inside its band, with a
     share of near-zero days early on. Deterministic (fixed RNG seed).
+
+    Idempotent: a day whose document already exists (real samples or a prior
+    seed) is skipped, so re-running only fills gaps. Fast-path exits when the
+    last day is already present.
     """
     try:
-        if db.get_document(db.db, SEED_SENTINEL):
+        if db.get_document(db.db, _day_id(SEED_END)):
             return 0
 
         rng = random.Random(20260721)
-        start = datetime(2025, 7, 1)
-        end = datetime.now() - timedelta(days=1)
+        start = SEED_START
+        end = SEED_END
 
         # (month-anchor, typical daily max, chance a day stays near zero)
         # Values between anchors are linearly interpolated day by day.
@@ -86,7 +93,7 @@ def seed_past_if_needed(db):
             (datetime(2026, 2, 28), 12, 0.35),   # Dec-Feb climbs into 0-12
             (datetime(2026, 6, 1), 15, 0.28),    # slow spring climb to 14-15
             (datetime(2026, 6, 25), 26, 0.0),    # summer surge begins
-            (datetime(2026, 7, 21), 32, 0.0),
+            (datetime(2026, 7, 23), 32, 0.0),
         ]
 
         def interp(day):
@@ -102,6 +109,11 @@ def seed_past_if_needed(db):
         seeded = 0
         day = start
         while day <= end:
+            # Never overwrite an existing day (real samples or prior seed).
+            if db.get_document(db.db, _day_id(day)):
+                day += timedelta(days=1)
+                continue
+
             day_max, zero_chance = interp(day)
             day_max = max(2, int(round(day_max)))
 
@@ -122,7 +134,7 @@ def seed_past_if_needed(db):
                 d_avg = round(rng.uniform(d_min + 0.5, d_max - 0.5) if d_max - d_min > 1 else d_min, 1)
 
             count = rng.randint(200, 1440)
-            db.save_document(db.db, _day_id(day), {
+            db.save_document_sync(db.db, _day_id(day), {
                 'type': 'listener_history',
                 'date': day.strftime('%Y-%m-%d'),
                 'min': d_min,
@@ -133,7 +145,6 @@ def seed_past_if_needed(db):
             seeded += 1
             day += timedelta(days=1)
 
-        db.save_document(db.db, SEED_SENTINEL, {'type': 'listener_history_seed', 'seeded': seeded})
         logging.info(f"🌱 Seeded {seeded} days of listener history")
         return seeded
     except Exception as e:

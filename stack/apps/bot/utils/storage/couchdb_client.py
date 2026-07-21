@@ -111,6 +111,14 @@ class CouchDBClient:
             return True
         return self._save_document_sync(db, doc_id, data)
 
+    def save_document_sync(self, db, doc_id: str, data: Dict) -> bool:
+        """Save a document synchronously, bypassing the async write worker.
+
+        For durable one-shot writes (e.g. seeding) that must land before the
+        caller returns — a queued write is lost if the process exits first.
+        """
+        return self._save_document_sync(db, doc_id, data)
+
     def _save_document_sync(self, db, doc_id: str, data: Dict, max_retries: int = 5) -> bool:
         """Save or update a document (sync). Retries on 409 conflicts by refetching _rev.
 
@@ -544,6 +552,9 @@ class _NullCouchDBClient:
         return True
 
     def save_document(self, db, doc_id: str, data: Dict) -> bool:
+        return True
+
+    def save_document_sync(self, db, doc_id: str, data: Dict) -> bool:
         return True
 
     def get_all_documents(self) -> Dict:
