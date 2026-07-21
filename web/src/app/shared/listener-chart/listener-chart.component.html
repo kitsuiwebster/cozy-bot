@@ -1,21 +1,41 @@
-<div class="listener-chart" *ngIf="plot.length > 0; else empty">
+<div class="listener-chart" *ngIf="points.length > 0; else empty">
+  <div class="lc-toolbar">
+    <label class="lc-toggle lc-avg-toggle">
+      <input type="checkbox" [(ngModel)]="showAvg" />
+      <span class="lc-swatch"></span> Average
+    </label>
+    <label class="lc-toggle lc-max-toggle">
+      <input type="checkbox" [(ngModel)]="showMax" />
+      <span class="lc-swatch"></span> Max
+    </label>
+    <label class="lc-toggle lc-min-toggle">
+      <input type="checkbox" [(ngModel)]="showMin" />
+      <span class="lc-swatch"></span> Min
+    </label>
+
+    <span class="lc-spacer"></span>
+    <button *ngIf="isZoomed" type="button" class="lc-reset" (click)="resetZoom()">Reset zoom ✕</button>
+    <span class="lc-hint">Drag to zoom</span>
+  </div>
+
   <div class="lc-frame">
     <svg
       #svg
       [attr.viewBox]="'0 0 ' + width + ' ' + height"
       preserveAspectRatio="none"
       class="lc-svg"
+      (mousedown)="onDown($event, svg)"
       (mousemove)="onMove($event, svg)"
+      (mouseup)="onUp()"
       (mouseleave)="onLeave()"
     >
       <defs>
         <linearGradient id="lc-band" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.28" />
-          <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0.02" />
+          <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.45" />
+          <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0.08" />
         </linearGradient>
       </defs>
 
-      <!-- gridlines + y labels -->
       <g class="lc-grid">
         <line
           *ngFor="let t of yTicks"
@@ -29,24 +49,36 @@
         <text *ngFor="let t of yTicks" [attr.x]="padding.left - 8" [attr.y]="t.y + 3">{{ t.label }}</text>
       </g>
 
-      <!-- min-max band -->
+      <!-- min-max band (always behind) -->
       <path [attr.d]="bandPath" fill="url(#lc-band)" stroke="none" />
-      <!-- average line -->
-      <path [attr.d]="avgPath" class="lc-avg" fill="none" />
 
-      <!-- x labels -->
+      <!-- toggleable lines -->
+      <path *ngIf="showMax" [attr.d]="maxPath" class="lc-max" fill="none" />
+      <path *ngIf="showMin" [attr.d]="minPath" class="lc-min" fill="none" />
+      <path *ngIf="showAvg" [attr.d]="avgPath" class="lc-avgline" fill="none" />
+
       <g class="lc-xlabels">
         <text *ngFor="let t of monthTicks" [attr.x]="t.x" [attr.y]="height - 8">{{ t.label }}</text>
       </g>
 
+      <!-- drag-to-zoom selection -->
+      <rect
+        *ngIf="selecting"
+        class="lc-sel"
+        [attr.x]="selRect.x"
+        [attr.y]="padding.top"
+        [attr.width]="selRect.w"
+        [attr.height]="height - padding.top - padding.bottom"
+      />
+
       <!-- hover crosshair + marker -->
-      <g *ngIf="hover" class="lc-hover">
+      <g *ngIf="hover && !selecting" class="lc-hover">
         <line [attr.x1]="hover.x" [attr.x2]="hover.x" [attr.y1]="padding.top" [attr.y2]="height - padding.bottom" />
         <circle [attr.cx]="hover.x" [attr.cy]="hover.yAvg" r="4" />
       </g>
     </svg>
 
-    <div class="lc-tooltip" *ngIf="hover" [ngStyle]="tooltipStyle">
+    <div class="lc-tooltip" *ngIf="hover && !selecting" [ngStyle]="tooltipStyle">
       <div class="lc-tt-date">{{ tooltipDate(hover.data.date) }}</div>
       <div class="lc-tt-row"><span>avg</span><b>{{ hover.data.avg }}</b></div>
       <div class="lc-tt-row"><span>peak</span><b>{{ hover.data.max }}</b></div>

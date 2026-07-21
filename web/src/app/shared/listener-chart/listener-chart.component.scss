@@ -2,6 +2,73 @@
   width: 100%;
 }
 
+.lc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+
+  .lc-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--color-accent);
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .lc-swatch {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    &.lc-avg-toggle .lc-swatch { background: var(--color-accent); }
+    &.lc-max-toggle .lc-swatch { background: #7dd3fc; }
+    &.lc-min-toggle .lc-swatch {
+      background: transparent;
+      border-top: 2px dashed #94a3b8;
+      height: 0;
+    }
+
+    input:checked ~ .lc-swatch + * ,
+    &:has(input:checked) {
+      color: var(--color-text);
+    }
+  }
+
+  .lc-spacer { flex: 1; }
+
+  .lc-reset {
+    background: rgba(var(--color-accent-rgb), 0.12);
+    border: 1px solid rgba(var(--color-accent-rgb), 0.4);
+    color: var(--color-accent);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { background: rgba(var(--color-accent-rgb), 0.2); }
+  }
+
+  .lc-hint {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    opacity: 0.7;
+  }
+}
+
 .lc-frame {
   position: relative;
   width: 100%;
@@ -35,12 +102,40 @@
   font-family: inherit;
 }
 
-.lc-avg {
+.lc-avgline {
   stroke: var(--color-accent);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+}
+
+.lc-max {
+  stroke: #7dd3fc;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-min {
+  stroke: #94a3b8;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-sel {
+  fill: rgba(var(--color-accent-rgb), 0.14);
+  stroke: rgba(var(--color-accent-rgb), 0.5);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-svg {
+  cursor: crosshair;
 }
 
 .lc-hover {
