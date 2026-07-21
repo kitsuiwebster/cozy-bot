@@ -63,6 +63,17 @@ export interface SoundsResponse {
   total_sounds: number;
 }
 
+export interface ListenerPoint {
+  date: string;
+  min: number;
+  max: number;
+  avg: number;
+}
+
+export interface ListenersHistoryResponse {
+  points: ListenerPoint[];
+}
+
 export interface UserListeningBySound {
   sound_name: string;
   display_name: string;
@@ -134,6 +145,10 @@ export class CozybotService {
 
   getTopSounds(): Observable<SoundsResponse> {
     return this.http.get<SoundsResponse>(`${this.apiUrl}/top-sounds`);
+  }
+
+  getListenersHistory(days = 400): Observable<ListenersHistoryResponse> {
+    return this.http.get<ListenersHistoryResponse>(`${this.apiUrl}/listeners-history?days=${days}`);
   }
 
   getUserDetails(username: string, forceRefresh = false): Observable<UserDetails> {

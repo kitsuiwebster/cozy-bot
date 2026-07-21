@@ -1,0 +1,105 @@
+.listener-chart {
+  width: 100%;
+}
+
+.lc-frame {
+  position: relative;
+  width: 100%;
+}
+
+.lc-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 900 / 320;
+  overflow: visible;
+}
+
+.lc-grid line {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-ylabels text {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  text-anchor: end;
+  font-family: inherit;
+}
+
+.lc-xlabels text {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  text-anchor: middle;
+  font-family: inherit;
+}
+
+.lc-avg {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.lc-hover {
+  line {
+    stroke: rgba(255, 255, 255, 0.25);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  circle {
+    fill: var(--color-accent);
+    stroke: #0f1419;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+  }
+}
+
+.lc-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: rgba(15, 20, 25, 0.95);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 96px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  .lc-tt-date {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+  }
+
+  .lc-tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    font-size: 0.75rem;
+
+    span {
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.65rem;
+    }
+
+    b {
+      color: var(--color-text);
+    }
+  }
+}
+
+.lc-empty {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

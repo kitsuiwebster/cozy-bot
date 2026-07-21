@@ -13,39 +13,6 @@ import { takeUntil } from 'rxjs/operators';
 import { LeaderboardHeaderComponent, LeaderboardHeaderStat } from '../../shared/leaderboard-header/leaderboard-header.component';
 
 // =============================================================================
-// CSS PIE CHARTS
-// =============================================================================
-
-interface CssPieSegment {
-  name: string;
-  color: string;
-  valueLabel: string;
-  percentLabel: string;
-}
-
-interface CssPie {
-  gradient: string;
-  segments: CssPieSegment[];
-  totalLabel: string;
-}
-
-// Validated dark-mode categorical palette (fixed slot order, never cycled).
-// Gray is reserved for the "Other" fold and deliberately reads as neutral.
-const PIE_SERIES_COLORS = ['#3987e5', '#008300', '#d55181', '#c98500', '#199e70', '#d95926', '#9085e9', '#e66767'];
-const PIE_OTHER_COLOR = '#8a8a86';
-const PIE_TOP_SLICES = 7;
-
-// Color follows the category entity, never its rank.
-const PIE_CATEGORIES: { [emoji: string]: { label: string; color: string } } = {
-  '🌧️': { label: '🌧️ Rain', color: '#3987e5' },
-  '🌊': { label: '🌊 Sea', color: '#199e70' },
-  '✨': { label: '✨ Sparkles', color: '#c98500' },
-  '🎶': { label: '🎶 Music', color: '#9085e9' },
-  '🎵': { label: '🎶 Music', color: '#9085e9' },
-  '📡': { label: '📡 Noise', color: '#d55181' },
-};
-
-// =============================================================================
 // COMPONENT DEFINITION
 // =============================================================================
 
@@ -130,8 +97,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // PROPERTIES - Chart Configuration
   // ===========================================================================
 
-  soundsPie: CssPie | null = null;
-  categoryPie: CssPie | null = null;
 
   // ===========================================================================
   // PROPERTIES - User Details Modal
@@ -412,7 +377,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
           this.hasThreeEmojis(sound.display_name)
         );
 
-        this.prepareSoundsChartData();
         this.updatePagination();
         this.loading = false;
       },
@@ -746,141 +710,6 @@ export class CozybotComponent implements OnInit, OnDestroy {
   // Checks if a sound name contains exactly 3 emojis
   private hasThreeEmojis(displayName: string): boolean {
     return this.countEmojis(displayName) === 3;
-  }
-
-  // Extracts the first emoji from a string
-  private getFirstEmoji(text: string): string {
-    const emojiRegex = /(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\u200D(?:\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/u;
-    const match = emojiRegex.exec(text);
-    return match ? match[0] : '';
-  }
-
-  // ===========================================================================
-  // CHART DATA PREPARATION METHODS
-  // ===========================================================================
-
-  // Prepares the per-sound donut: top slices in fixed palette order, the
-  // rest folded into a neutral "Other" slice.
-  private prepareSoundsChartData(): void {
-    const sortedSounds = [...this.allSounds]
-      .filter(sound => sound.total_time > 0)
-      .sort((a, b) => b.total_time - a.total_time);
-
-    const top = sortedSounds.slice(0, PIE_TOP_SLICES);
-    const rest = sortedSounds.slice(PIE_TOP_SLICES);
-
-    const items = top.map((sound, index) => ({
-      name: sound.display_name,
-      value: sound.total_time,
-      color: PIE_SERIES_COLORS[index]
-    }));
-
-    if (rest.length > 0) {
-      items.push({
-        name: `Other (${rest.length} sounds)`,
-        value: rest.reduce((sum, sound) => sum + sound.total_time, 0),
-        color: PIE_OTHER_COLOR
-      });
-    }
-
-    this.soundsPie = this.buildCssPie(items);
-
-    this.prepareSoundsByCategoryChartData();
-  }
-
-  // Prepares sound data grouped by category (first emoji)
-  private prepareSoundsByCategoryChartData(): void {
-    const categoriesMap: { [key: string]: number } = {};
-
-    this.allSounds.forEach(sound => {
-      const firstEmoji = this.getFirstEmoji(sound.display_name);
-      if (firstEmoji) {
-        if (!categoriesMap[firstEmoji]) {
-          categoriesMap[firstEmoji] = 0;
-        }
-        categoriesMap[firstEmoji] += sound.total_time;
-      }
-    });
-
-    // Merge emoji buckets that map to the same category (🎶 and 🎵 are both
-    // Music) and give each category its fixed entity color.
-    const byCategory: { [label: string]: { value: number; color: string } } = {};
-    Object.entries(categoriesMap).forEach(([emoji, time]) => {
-      const category = PIE_CATEGORIES[emoji] || { label: emoji, color: PIE_OTHER_COLOR };
-      if (!byCategory[category.label]) {
-        byCategory[category.label] = { value: 0, color: category.color };
-      }
-      byCategory[category.label].value += time;
-    });
-
-    const items = Object.entries(byCategory)
-      .map(([label, entry]) => ({ name: label, value: entry.value, color: entry.color }))
-      .sort((a, b) => b.value - a.value);
-
-    this.categoryPie = this.buildCssPie(items);
-  }
-
-  // Builds a pure-CSS donut: a conic-gradient with a surface gap between
-  // slices, plus precomputed legend rows.
-  private buildCssPie(items: { name: string; value: number; color: string }[]): CssPie | null {
-    const visible = items.filter(item => item.value > 0);
-    const total = visible.reduce((sum, item) => sum + item.value, 0);
-    if (visible.length === 0 || total <= 0) {
-      return null;
-    }
-
-    // ~2px gap at this donut radius; a single full slice needs none.
-    const gapDeg = visible.length > 1 ? 1.4 : 0;
-    const stops: string[] = [];
-    let angle = 0;
-
-    visible.forEach(item => {
-      const sweep = (item.value / total) * 360;
-      const start = Math.min(angle + gapDeg / 2, angle + sweep);
-      const end = Math.max(start, angle + sweep - gapDeg / 2);
-      stops.push(`transparent ${angle.toFixed(3)}deg ${start.toFixed(3)}deg`);
-      stops.push(`${item.color} ${start.toFixed(3)}deg ${end.toFixed(3)}deg`);
-      stops.push(`transparent ${end.toFixed(3)}deg ${(angle + sweep).toFixed(3)}deg`);
-      angle += sweep;
-    });
-
-    return {
-      gradient: `conic-gradient(${stops.join(', ')})`,
-      segments: visible.map(item => ({
-        name: item.name,
-        color: item.color,
-        valueLabel: this.formatChartValue(item.value),
-        percentLabel: this.formatPercent(item.value, total)
-      })),
-      totalLabel: this.formatChartValue(total)
-    };
-  }
-
-  // ===========================================================================
-  // CHART CONFIGURATION AND FORMATTING METHODS
-  // ===========================================================================
-
-  formatPercent = (value: number, total: number): string => {
-    if (!total || total <= 0) {
-      return '0%';
-    }
-    const percent = (value / total) * 100;
-    return `${percent.toFixed(1)}%`;
-  }
-
-  // Formats time value in days, hours, minutes
-  formatChartValue = (value: number): string => {
-    const seconds = Math.floor(value);
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    const parts: string[] = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-
-    return parts.length > 0 ? parts.join(' ') : '0m';
   }
 
   // ===========================================================================

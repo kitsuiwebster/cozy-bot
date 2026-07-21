@@ -209,51 +209,6 @@
           Next →
         </button>
       </div>
-
-      <!-- Sounds Analytics Charts (pure CSS donuts) -->
-      <div class="sounds-charts-wrapper" *ngIf="categoryPie || soundsPie">
-        <!-- Donut by Category -->
-        <div class="sounds-chart-section" *ngIf="categoryPie">
-          <div class="css-pie">
-            <h4 class="css-pie-title">By Category</h4>
-            <div class="css-pie-figure">
-              <div class="css-pie-donut" [style.background]="categoryPie.gradient"></div>
-              <div class="css-pie-center">
-                <span class="css-pie-total">{{ categoryPie.totalLabel }}</span>
-                <span class="css-pie-caption">listened</span>
-              </div>
-            </div>
-            <ul class="css-pie-legend">
-              <li *ngFor="let seg of categoryPie.segments">
-                <span class="css-pie-dot" [style.background]="seg.color"></span>
-                <span class="css-pie-label">{{ seg.name }}</span>
-                <span class="css-pie-value">{{ seg.valueLabel }} · {{ seg.percentLabel }}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Donut by Sound -->
-        <div class="sounds-chart-section" *ngIf="soundsPie">
-          <div class="css-pie">
-            <h4 class="css-pie-title">By Sound</h4>
-            <div class="css-pie-figure">
-              <div class="css-pie-donut" [style.background]="soundsPie.gradient"></div>
-              <div class="css-pie-center">
-                <span class="css-pie-total">{{ soundsPie.totalLabel }}</span>
-                <span class="css-pie-caption">listened</span>
-              </div>
-            </div>
-            <ul class="css-pie-legend">
-              <li *ngFor="let seg of soundsPie.segments">
-                <span class="css-pie-dot" [style.background]="seg.color"></span>
-                <span class="css-pie-label">{{ seg.name }}</span>
-                <span class="css-pie-value">{{ seg.valueLabel }} · {{ seg.percentLabel }}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </div>

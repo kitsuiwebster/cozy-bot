@@ -1,0 +1,32 @@
+<div class="container">
+  <app-leaderboard-header
+    title="CozyBot"
+    subtitle="Discord Bot • Stats"
+    [animatingTitle]="animatingTitle"
+    [statsLoading]="statsLoading"
+    [currentListeners]="liveStats.current_listeners"
+    [serversWithBot]="liveStats.servers_with_bot"
+    ctaHref="/cozybot"
+    ctaText="← Back to CozyBot Leaderboard"
+    ctaVariant="back"
+  ></app-leaderboard-header>
+
+  <div class="content-section">
+    <div class="section-header">
+      <h2>📈 Listeners over time</h2>
+    </div>
+    <div class="chart-card">
+      <app-listener-chart [points]="listenerPoints"></app-listener-chart>
+    </div>
+  </div>
+
+  <div class="content-section">
+    <div class="section-header">
+      <h2>🎧 Sound analytics</h2>
+    </div>
+    <div class="donuts">
+      <app-css-pie-chart title="By Category" [pie]="categoryPie"></app-css-pie-chart>
+      <app-css-pie-chart title="By Sound" [pie]="soundsPie"></app-css-pie-chart>
+    </div>
+  </div>
+</div>
