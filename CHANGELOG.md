@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2026-10-08
+
+### Added
+
+- New Stats page with a chart of listeners over time (average, min and max lines, drag to zoom) and sound analytics by category and by sound.
+- Community stats on the Stats page: average session length, all-time peak listeners, active streaks, new listeners per day, achievement rarity, longest streaks, level distribution and sound affinities.
+- User profiles show the average session length, where the user ranks for points and listening time, and how rare each of their achievements is.
+- New site background: out-of-focus lights behind a window with realistic rain drops sliding down the glass, shown as a still image on phones.
+
+### Changed
+
+- CozyBot runs on a new, faster server.
+- Routine voice reconnection warnings no longer trigger Telegram alerts.
+
+### Fixed
+
+- The bot no longer freezes for up to 30 seconds, which made slash commands such as `/rain` fail with "Unknown interaction".
+- `/top-servers` and `/top-sounds` no longer fail when the database is slow.
+- The leaderboard and the website load in seconds again instead of minutes.
+- The database no longer grows endlessly from rewriting every user on each save.
+- Daily streaks are kept through the October 2026 outage.
+- Internal services are no longer reachable from the internet.
+
 ## [2.2.0] - 2026-07-20
 
 ### Added
