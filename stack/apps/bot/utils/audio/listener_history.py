@@ -20,6 +20,8 @@ DOC_PREFIX = 'listener_history:'
 SEED_START = datetime(2025, 7, 1)
 # Ends the day before real sampling started in production (2026-10-08).
 SEED_END = datetime(2026, 10, 7)
+# From here the invented history eases down from the summer peak.
+AUTUMN_START = datetime(2026, 9, 1)
 
 
 def _day_id(date):
@@ -70,8 +72,8 @@ def seed_past_if_needed(db):
     """Backfill invented daily history, filling only missing days.
 
     The shape mirrors CozyBot's real growth: a slow start through late 2025,
-    a winter bump, a slow spring climb, then a steep summer 2026 rise that
-    holds through early autumn. Weekly
+    a winter bump, a slow spring climb, a steep summer 2026 rise, then an
+    autumn easing back to 10-20. Weekly
     ranges are interpolated and each day is sampled inside its band, with a
     share of near-zero days early on. Deterministic (fixed RNG seed).
 
@@ -96,7 +98,7 @@ def seed_past_if_needed(db):
             (datetime(2026, 6, 1), 15, 0.28),    # slow spring climb to 14-15
             (datetime(2026, 6, 25), 26, 0.0),    # summer surge begins
             (datetime(2026, 7, 23), 32, 0.0),
-            (datetime(2026, 10, 7), 32, 0.0),    # summer level holds into autumn
+            (datetime(2026, 10, 7), 32, 0.0),    # max band only; autumn has its own branch
         ]
 
         def interp(day):
@@ -120,8 +122,15 @@ def seed_past_if_needed(db):
             day_max, zero_chance = interp(day)
             day_max = max(2, int(round(day_max)))
 
+            # Autumn: the summer crowd thins out. The average drifts from ~20 down
+            # to ~14 over three weeks, with real day-to-day swings in 10-20.
+            if day >= AUTUMN_START:
+                target = 20 - 6 * min(1.0, (day - AUTUMN_START).days / 21)
+                d_avg = round(max(9.0, min(22.0, target + rng.uniform(-5, 5))), 1)
+                d_min = max(1, int(d_avg * rng.uniform(0.25, 0.5)))
+                d_max = int(round(d_avg + rng.uniform(4, 10)))
             # Summer surge: a hard floor so it is never zero and averages ~20.
-            if day >= datetime(2026, 6, 25):
+            elif day >= datetime(2026, 6, 25):
                 lo = rng.randint(8, 12) if day < datetime(2026, 7, 10) else rng.randint(18, 22)
                 hi = max(lo + 4, day_max + rng.randint(-2, 3))
                 d_min, d_max = lo, hi
