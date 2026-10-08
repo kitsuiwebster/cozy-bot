@@ -985,18 +985,27 @@
     pointer-events: none;
   }
 
+  // Thin scrollbar kept clear of the rounded corners: a transparent track
+  // with vertical margins, so nothing paints over the 24px radius. Chrome
+  // ignores the ::-webkit-scrollbar rules once scrollbar-width is set, so the
+  // standard properties are only for browsers without them (Firefox).
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--color-accent-rgb), 0.5) transparent;
+  }
+
   &::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
 
   &::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
+    background: transparent;
+    margin: 24px 0;
   }
 
   &::-webkit-scrollbar-thumb {
     background: rgba(var(--color-accent-rgb), 0.5);
-    border-radius: 4px;
+    border-radius: 3px;
 
     &:hover {
       background: rgba(var(--color-accent-rgb), 0.7);
