@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 
 DOC_ID = 'stats:first_seen'
 _lock = threading.Lock()
-_doc = None
 
 
 def _today():
@@ -31,20 +30,21 @@ def load(db):
 
 
 def record(db, user_id):
-    """Remember today as the first day of a user not seen before. Never overwrites."""
-    global _doc
+    """Remember today as the first day of a user not seen before. Never overwrites.
+
+    Re-reads the document every time (new users are rare) and writes
+    synchronously, so a backfill merged into it meanwhile is never lost.
+    """
     try:
         with _lock:
-            if _doc is None:
-                _doc = load(db)
-            seen = _doc.setdefault('first_seen', {})
+            doc = load(db)
+            seen = doc.setdefault('first_seen', {})
             if user_id in seen:
                 return
             seen[user_id] = _today()
-            _doc.setdefault('tracking_since', _today())
-            _doc['type'] = 'stats'
-            snapshot = {**_doc, 'first_seen': dict(seen)}
-        db.save_document(db.db, DOC_ID, snapshot)
+            doc.setdefault('tracking_since', _today())
+            doc['type'] = 'stats'
+            db.save_document_sync(db.db, DOC_ID, doc)
     except Exception as e:
         logging.error(f"❌ Failed to record first-seen day for {user_id}: {e}")
 

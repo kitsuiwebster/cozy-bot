@@ -558,8 +558,10 @@ class CozyGamification:
         is_new_user = user_id not in (self.user_data or {})
         user_stats = self.get_user_stats(user_id)
         if is_new_user:
+            # Blocking CouchDB round trip: keep it off the event loop.
+            import threading
             from utils import first_seen
-            first_seen.record(self.db, user_id)
+            threading.Thread(target=first_seen.record, args=(self.db, user_id), daemon=True).start()
 
         # Check for recent join to prevent duplicate points from reconnections
         last_join_time = user_stats.get('last_join_time')
