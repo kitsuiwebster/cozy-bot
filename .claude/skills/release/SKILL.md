@@ -84,6 +84,8 @@ If a new place showing the version was added since this skill was written, updat
 
 ## 5. Commit
 
+Commit every other change first: the version commit is always the last commit before the push, so the release tip reads `feat: X.Y.Z`.
+
 One atomic commit containing only CHANGELOG.md and the version strings:
 
 ```
