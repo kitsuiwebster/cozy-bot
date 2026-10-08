@@ -2,7 +2,7 @@
 // IMPORTS
 // =============================================================================
 
-import { formatDaysHours } from '../../shared/duration';
+import { formatDaysHours, formatHoursMinutes } from '../../shared/duration';
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -742,6 +742,21 @@ export class CozybotComponent implements OnInit, OnDestroy {
   }
 
   // Formats listening time in days when more than 24h
+  formatSession(seconds: number): string {
+    return formatHoursMinutes(seconds);
+  }
+
+  // "Top 0.1%" for the very top, whole numbers once it is not a podium thing.
+  formatTopPercent(value: number): string {
+    return value < 1 ? value.toFixed(1) : value < 10 ? value.toFixed(1).replace(/\.0$/, '') : Math.round(value).toString();
+  }
+
+  rarityTitle(achievement: string): string {
+    const r = this.selectedUserDetails?.achievement_rarity?.[achievement];
+    if (!r) return achievement;
+    return `${r.tier.charAt(0).toUpperCase()}${r.tier.slice(1)}: ${r.percent < 1 ? r.percent.toFixed(2) : r.percent.toFixed(1)}% of listeners have it`;
+  }
+
   formatListeningTimeDays(seconds: number): string {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);

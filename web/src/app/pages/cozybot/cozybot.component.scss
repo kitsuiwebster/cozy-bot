@@ -1152,6 +1152,36 @@
     }
   }
 
+  .top-percent {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: -16px 0 32px 0;
+
+    .top-percent-item {
+      flex: 1;
+      min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(var(--color-accent-rgb), 0.1);
+      border: 1px solid rgba(var(--color-accent-rgb), 0.3);
+    }
+
+    .top-percent-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .top-percent-label {
+      font-size: 0.75rem;
+      color: var(--color-text-light);
+    }
+  }
+
   .listening-stats {
     display: flex;
     flex-direction: column;
@@ -1212,6 +1242,23 @@
       font-size: 0.85rem;
       color: var(--color-text-light);
       font-weight: 600;
+    }
+
+    // Rarity of each achievement across all listeners (common stays neutral).
+    .achievement-badge.tier-rare {
+      border-color: rgba(var(--color-accent-2-rgb), 0.6);
+      background: rgba(var(--color-accent-2-rgb), 0.12);
+    }
+
+    .achievement-badge.tier-epic {
+      border-color: rgba(var(--color-accent-rgb), 0.7);
+      background: rgba(var(--color-accent-rgb), 0.16);
+    }
+
+    .achievement-badge.tier-legendary {
+      border-color: rgba(245, 158, 11, 0.8);
+      background: rgba(245, 158, 11, 0.16);
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
     }
   }
 

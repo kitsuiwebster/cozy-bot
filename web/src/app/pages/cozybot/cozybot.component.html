@@ -290,6 +290,11 @@
           <span class="stat-text">{{ selectedUserDetails.sessions_joined }}</span>
           <span class="stat-desc">Sessions joined</span>
         </div>
+        <div class="stat-item" *ngIf="selectedUserDetails.avg_session_seconds">
+          <span class="stat-icon">⌛</span>
+          <span class="stat-text">{{ formatSession(selectedUserDetails.avg_session_seconds) }}</span>
+          <span class="stat-desc">Average session</span>
+        </div>
         <div class="stat-item">
           <span class="stat-icon">📅</span>
           <span class="stat-text">{{ selectedUserDetails.days_since_last_activity }} day(s) ago</span>
@@ -297,11 +302,25 @@
         </div>
       </div>
 
+      <!-- Where this user stands in the community -->
+      <div class="top-percent" *ngIf="selectedUserDetails.points_top_percent || selectedUserDetails.listening_top_percent">
+        <div class="top-percent-item" *ngIf="selectedUserDetails.points_top_percent">
+          <span class="top-percent-value">Top {{ formatTopPercent(selectedUserDetails.points_top_percent) }}%</span>
+          <span class="top-percent-label">for points</span>
+        </div>
+        <div class="top-percent-item" *ngIf="selectedUserDetails.listening_top_percent">
+          <span class="top-percent-value">Top {{ formatTopPercent(selectedUserDetails.listening_top_percent) }}%</span>
+          <span class="top-percent-label">for listening time</span>
+        </div>
+      </div>
+
       <!-- User Achievements -->
       <div *ngIf="selectedUserDetails.achievements && selectedUserDetails.achievements.length > 0" class="achievements-section">
         <h3>🏆 Achievements</h3>
         <div class="achievements-grid">
-          <div *ngFor="let achievement of selectedUserDetails.achievements" class="achievement-badge">
+          <div *ngFor="let achievement of selectedUserDetails.achievements" class="achievement-badge"
+               [ngClass]="'tier-' + (selectedUserDetails.achievement_rarity?.[achievement]?.tier || 'common')"
+               [title]="rarityTitle(achievement)">
             {{ achievement }}
           </div>
         </div>
