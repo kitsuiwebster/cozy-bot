@@ -18,7 +18,8 @@ DOC_PREFIX = 'listener_history:'
 # Invented history covers this fixed window; days already present (real
 # samples or a previous seed) are never overwritten.
 SEED_START = datetime(2025, 7, 1)
-SEED_END = datetime(2026, 7, 23)
+# Ends the day before real sampling started in production (2026-10-08).
+SEED_END = datetime(2026, 10, 7)
 
 
 def _day_id(date):
@@ -69,7 +70,8 @@ def seed_past_if_needed(db):
     """Backfill invented daily history, filling only missing days.
 
     The shape mirrors CozyBot's real growth: a slow start through late 2025,
-    a winter bump, a slow spring climb, then a steep summer 2026 rise. Weekly
+    a winter bump, a slow spring climb, then a steep summer 2026 rise that
+    holds through early autumn. Weekly
     ranges are interpolated and each day is sampled inside its band, with a
     share of near-zero days early on. Deterministic (fixed RNG seed).
 
@@ -94,6 +96,7 @@ def seed_past_if_needed(db):
             (datetime(2026, 6, 1), 15, 0.28),    # slow spring climb to 14-15
             (datetime(2026, 6, 25), 26, 0.0),    # summer surge begins
             (datetime(2026, 7, 23), 32, 0.0),
+            (datetime(2026, 10, 7), 32, 0.0),    # summer level holds into autumn
         ]
 
         def interp(day):
