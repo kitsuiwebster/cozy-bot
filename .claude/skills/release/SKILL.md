@@ -100,9 +100,15 @@ Pushing `main` deploys to production automatically (`.github/workflows/prod-depl
 2. Push `dev` first (`git push origin dev`), this deploys to the dev environment.
 3. Bring `main` to `dev` (fast-forward when possible): `git checkout main && git merge --ff-only dev && git push origin main && git checkout dev`.
 4. Watch the workflow: `gh run watch $(gh run list --workflow=prod-deploy.yml -L1 --json databaseId -q '.[0].databaseId')`.
+5. Website, only if `web/` changed since the last release (`git diff --stat <last release commit> -- web`). The site is static, on Hostinger web hosting (not on the VPS), and the user uploads it by hand:
+   - Build it: `cd web && npx ng build --configuration production`. The output is `web/dist/cozybot-web/browser/`.
+   - Tell the user to drag and drop the **contents** of that folder into the site root in the hPanel File Manager (the folder that already holds `index.html`), replacing the existing files.
+   - Warn them that `.htaccess` is a hidden file and must be uploaded too (show hidden files first). Without it, every page except the home page returns 404 on refresh or direct link.
+   - Old hashed bundles (`main-*.js`) left on the server are harmless.
 
 ## 7. Verify in production
 
 - `curl -s https://api.cozybot.online/api/public/health` shows the new version.
-- The website header and footer show the new version.
+- The website header and footer show the new version: `curl -s https://cozybot.online/ | grep -o 'main-[A-Z0-9]*\.js'` must match the file name in `web/dist/cozybot-web/browser/`.
+- A deep link works (`curl -s -o /dev/null -w '%{http_code}' https://cozybot.online/stats` returns 200), which proves `.htaccess` was uploaded.
 - Report the result to the user with the evidence.
