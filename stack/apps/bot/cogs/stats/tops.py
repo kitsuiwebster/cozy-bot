@@ -1,3 +1,4 @@
+import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -27,10 +28,12 @@ class TopsCog(commands.Cog):
 
     @app_commands.command(name="top-servers", description="Display the top servers")
     async def top_servers_command(self, interaction: discord.Interaction):
+        # Acknowledge first: the CouchDB reads below can exceed Discord's 3 s window
+        await interaction.response.defer()
         try:
             # Retrieve voice channel usage statistics and server names
-            guild_voice_time = self.load_voice_time_data()
-            servernames_data = self.load_servernames_data()
+            guild_voice_time = await asyncio.to_thread(self.load_voice_time_data)
+            servernames_data = await asyncio.to_thread(self.load_servernames_data)
 
             # Sort guilds by accumulated voice time in descending order
             sorted_guilds = sorted(guild_voice_time.items(), key=lambda x: x[1][1], reverse=True)
@@ -61,10 +64,10 @@ class TopsCog(commands.Cog):
                 embed.add_field(name=f"{index}. {server_name}", value=time_str, inline=False)
 
             # Deliver formatted rankings response to user
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
         except Exception as e:
             # Handle command execution errors gracefully
-            await interaction.response.send_message(f"An error occurred while executing the command: {e}", ephemeral=True)
+            await interaction.followup.send(f"An error occurred while executing the command: {e}", ephemeral=True)
 
     @app_commands.command(name="top-users", description="View the top users")
     async def top_users_command(self, interaction: discord.Interaction):
@@ -107,16 +110,18 @@ class TopsCog(commands.Cog):
 
     @app_commands.command(name="top-sounds", description="View the most listened sounds")
     async def top_sounds_command(self, interaction: discord.Interaction):
+        # Acknowledge first: the CouchDB read below can exceed Discord's 3 s window
+        await interaction.response.defer()
         try:
             # Load cozy points data from CouchDB
             try:
-                user_data = self.db.load_user_data()
+                user_data = await asyncio.to_thread(self.db.load_user_data)
             except Exception:
-                await interaction.response.send_message("No listening data found yet! Start playing some sounds! 🎵")
+                await interaction.followup.send("No listening data found yet! Start playing some sounds! 🎵")
                 return
                     
             if not user_data:
-                await interaction.response.send_message("No listening data found yet! Start playing some sounds! 🎵")
+                await interaction.followup.send("No listening data found yet! Start playing some sounds! 🎵")
                 return
             
             # Aggregate sound data across all users
@@ -140,7 +145,7 @@ class TopsCog(commands.Cog):
                     sound_aggregates[sound_name]['unique_listeners'].add(user_id)
             
             if not sound_aggregates:
-                await interaction.response.send_message("No sound listening data yet! Start playing some cozy sounds! 🎵")
+                await interaction.followup.send("No sound listening data yet! Start playing some cozy sounds! 🎵")
                 return
             
             # Convert to list and sort by total time
@@ -183,10 +188,10 @@ class TopsCog(commands.Cog):
                 listeners_info = f"{time_str} • {sound_data['unique_listeners']} listeners"
                 embed.add_field(name=f"{i}. {sound_data['display_name']}", value=listeners_info, inline=False)
             
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            await interaction.response.send_message(f"An error occurred while executing the command: {e}", ephemeral=True)
+            await interaction.followup.send(f"An error occurred while executing the command: {e}", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(TopsCog(bot))
