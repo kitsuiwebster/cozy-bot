@@ -1,3 +1,4 @@
+import { formatDaysHours } from '../duration';
 import { CozySound } from '../../services/cozybot.service';
 
 export interface CssPieSegment {
@@ -29,16 +30,13 @@ const PIE_CATEGORIES: { [emoji: string]: { label: string; color: string } } = {
   '📡': { label: '📡 Noise', color: '#d55181' },
 };
 
+// Long totals read as "3y 113d" (years past 365 days), then "12d 5h", then "5h 20m".
 function formatValue(seconds: number): string {
   const s = Math.floor(seconds);
-  const days = Math.floor(s / 86400);
-  const hours = Math.floor((s % 86400) / 3600);
+  if (s >= 86400) return formatDaysHours(s);
+  const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  return parts.length > 0 ? parts.join(' ') : '0m';
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 function formatPercent(value: number, total: number): string {
@@ -101,7 +99,7 @@ export function buildSoundsPie(sounds: CozySound[]): CssPie | null {
 
   if (rest.length > 0) {
     items.push({
-      name: `Other (${rest.length} sounds)`,
+      name: 'Other',
       value: rest.reduce((sum, s) => sum + s.total_time, 0),
       color: PIE_OTHER_COLOR,
     });
