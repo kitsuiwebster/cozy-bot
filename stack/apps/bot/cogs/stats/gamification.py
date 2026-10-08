@@ -555,7 +555,11 @@ class CozyGamification:
     def join_session(self, user_id: str, username: str = None, force_bonus: bool = False, save_immediately: bool = True):
 
         user_id = str(user_id)
+        is_new_user = user_id not in (self.user_data or {})
         user_stats = self.get_user_stats(user_id)
+        if is_new_user:
+            from utils import first_seen
+            first_seen.record(self.db, user_id)
 
         # Check for recent join to prevent duplicate points from reconnections
         last_join_time = user_stats.get('last_join_time')
