@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+import asyncio
 import logging
 
 from utils.storage.couchdb_client import get_couchdb_client
@@ -24,7 +25,7 @@ async def listeners_history(days: int = 400):
     """Daily min/max/avg concurrent listeners for the last `days` days."""
     days = max(1, min(days, 800))
     try:
-        points = listener_history.load_history(get_couchdb_client(), days=days)
+        points = await asyncio.to_thread(listener_history.load_history, get_couchdb_client(), days=days)
     except Exception as e:
         logging.error(f"❌ Failed to load listener history: {e}")
         points = []
