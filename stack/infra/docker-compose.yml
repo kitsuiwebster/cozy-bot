@@ -100,7 +100,11 @@ services:
     container_name: ${COUCHDB_CONTAINER_NAME}
     restart: ${RESTART_POLICY:-unless-stopped}
     ports:
-      - "${COUCHDB_PORT:-5984}:5984"
+      # Loopback only: Docker-published ports bypass ufw, so a bare
+      # "PORT:5984" left CouchDB reachable from the internet. Containers
+      # reach it over the compose network; host tools (backup script) use
+      # 127.0.0.1.
+      - "127.0.0.1:${COUCHDB_PORT:-5984}:5984"
     environment:
       - COUCHDB_USER=${COUCHDB_USER:-admin}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
