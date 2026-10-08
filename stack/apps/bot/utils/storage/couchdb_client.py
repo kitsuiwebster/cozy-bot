@@ -225,9 +225,18 @@ class CouchDBClient:
         try:
             result = {}
 
-            # Use _all_docs view with startkey/endkey for prefix search
-            # This is more reliable than iterating
-            url = f"{self.host}/cozy_bot_data/_all_docs?include_docs=true"
+            # Bound the _all_docs range server-side. Without startkey/endkey this
+            # downloaded the whole database on every call (1.8 MB / 51 s in prod)
+            # just to keep the prefixed docs. '\ufff0' is the usual end-of-range
+            # sentinel; keep it as an ASCII escape, the raw character is
+            # silently dropped by terminals and copy-paste, which would make
+            # the range empty and return no documents at all.
+            params = {
+                "include_docs": "true",
+                "startkey": json.dumps(prefix),
+                "endkey": json.dumps(prefix + "\ufff0"),
+            }
+            url = f"{self.host}/cozy_bot_data/_all_docs?{urllib.parse.urlencode(params)}"
 
             # Create auth header
             import base64
