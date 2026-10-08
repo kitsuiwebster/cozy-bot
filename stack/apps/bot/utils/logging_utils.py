@@ -65,18 +65,24 @@ class _LogFilter(logging.Filter):
 
 
 class _TelegramNoiseFilter(logging.Filter):
-    """Keep asyncio's internal voice-churn noise out of Telegram only.
+    """Keep voice-churn noise out of Telegram only.
 
     These fire during discord.py's own voice reconnect churn (the poller task
-    dies on a torn-down socket, or a pending wait is GC'd). They are logged at
-    ERROR by asyncio's default handler but are not actionable and never signal
-    an outage — our recovery layer already handles the reconnect. They stay in
-    the container logs; this filter is attached to the Telegram handler only.
+    dies on a torn-down socket, or a pending wait is GC'd), and our recovery
+    layer reports each step of handling it (stalled playback, dropped voice
+    connection, a reconnect attempt timing out before the next one succeeds).
+    Discord drops voice connections routinely, so none of these is actionable
+    on its own; a real outage shows up on the status page and health checks.
+    They stay in the container logs; this filter is attached to the Telegram
+    handler only.
     """
 
     NOISE = (
         "Task exception was never retrieved",
         "Task was destroyed but it is pending",
+        "Playback stalled in ",
+        "Voice connection dropped in ",
+        "restart_audio_loop reconnect failed in ",
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
