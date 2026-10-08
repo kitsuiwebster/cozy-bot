@@ -6,6 +6,7 @@ from .routes.simple_deployment import router as simple_deployment_router
 from .routes.audio_restore import router as audio_restore_router
 from .routes.health import router as health_router
 from .routes.listeners_history import router as listeners_history_router
+from .routes.community import router as community_router
 import logging
 import os
 import sys
@@ -110,6 +111,7 @@ app.include_router(admin.router, prefix=f"{API_PREFIX}/admin", tags=["admin"])
 app.include_router(simple_deployment_router, prefix=API_PREFIX, tags=["simple-deployment"])
 app.include_router(audio_restore_router, prefix=API_PREFIX, tags=["audio"])
 app.include_router(listeners_history_router, prefix=API_PREFIX, tags=["listeners"])
+app.include_router(community_router, prefix=API_PREFIX, tags=["community"])
 
 @app.get("/")
 async def root():

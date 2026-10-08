@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 import sys
 import os
 import json
@@ -124,6 +124,11 @@ class UserDetailedProfile(BaseModel):
     favorite_sound: Optional[str] = None
     listening_by_sound: List[SoundStats]
     current_sound: Optional[CurrentSound] = None
+    points_top_percent: Optional[float] = None
+    listening_top_percent: Optional[float] = None
+    avg_session_seconds: Optional[float] = None
+    # achievement name -> {"percent": share of users who have it, "tier": rarity}
+    achievement_rarity: Dict[str, Dict[str, Any]] = {}
 
 # Import centralized sound mapping
 import sys
@@ -218,6 +223,30 @@ def get_current_streak_from_stats(user_stats: dict) -> int:
     except Exception:
         return 0
     return 0
+
+def rarity_tier(percent: float) -> str:
+    """Achievement rarity by share of users who unlocked it."""
+    if percent < 1:
+        return 'legendary'
+    if percent < 5:
+        return 'epic'
+    if percent < 15:
+        return 'rare'
+    return 'common'
+
+
+def achievement_counts(users: dict) -> dict:
+    counts = {}
+    for stats in users.values():
+        for name in set(stats.get('achievements') or []):
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def top_percent(rank: int, total: int) -> float:
+    """1-based rank as "top X %" (rank 1 of 1000 -> 0.1)."""
+    return round(rank * 100 / total, 1) if total else 100.0
+
 
 # Get top users by cozy points
 @router.get("/top-users", response_model=TopUsersResponse)
@@ -444,6 +473,18 @@ async def get_user_profile(username: str):
             except Exception:
                 current_sound_obj = None
 
+        # Community comparisons for the profile
+        total_users = len(user_data_raw)
+        by_listening = sorted(user_data_raw, key=lambda uid: user_data_raw[uid].get('listening_time', 0) or 0, reverse=True)
+        listening_top = top_percent(by_listening.index(user_id) + 1, total_users)
+        sessions = user_stats.get('sessions_joined', 0) or 0
+        avg_session = round((user_stats.get('listening_time', 0) or 0) / sessions, 1) if sessions else None
+        counts = achievement_counts(user_data_raw)
+        rarity = {}
+        for name in achievements:
+            pct = counts.get(name, 0) * 100 / total_users if total_users else 0
+            rarity[name] = {'percent': round(pct, 2), 'tier': rarity_tier(pct)}
+
         return UserDetailedProfile(
             user_id=user_id,
             username=username_str,
@@ -463,7 +504,11 @@ async def get_user_profile(username: str):
             category_completions=category_completions,
             favorite_sound=favorite_sound_emoji,
             listening_by_sound=listening_by_sound,
-            current_sound=current_sound_obj
+            current_sound=current_sound_obj,
+            points_top_percent=top_percent(rank, len(all_users)) if rank else None,
+            listening_top_percent=listening_top,
+            avg_session_seconds=avg_session,
+            achievement_rarity=rarity,
         )
 
     except HTTPException:
