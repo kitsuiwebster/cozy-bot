@@ -21,6 +21,8 @@ router = APIRouter()
 AFFINITY_MIN_SECONDS = 600
 # Pairs shared by fewer users are noise.
 AFFINITY_MIN_USERS = 10
+# Fills two rows of four cards on the Stats page.
+AFFINITY_COUNT = 8
 
 
 class AchievementRarity(BaseModel):
@@ -156,7 +158,7 @@ def _compute() -> dict:
     affinities = [
         SoundAffinity(sound_a=get_sound_display_name(a), sound_b=get_sound_display_name(b),
                       shared_users=both, percent_of_a=round(both * 100 / single[a], 1))
-        for lift, both, a, b in scored[:6] if lift > 1
+        for lift, both, a, b in [x for x in scored if x[0] > 1][:AFFINITY_COUNT]
     ]
 
     db = get_couchdb_client()
