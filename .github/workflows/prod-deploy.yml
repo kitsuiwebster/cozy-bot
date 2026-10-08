@@ -69,13 +69,13 @@ jobs:
           echo "HOME is: $HOME"
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
-          ssh-keyscan -p 22 77.37.87.26 >> "$HOME/.ssh/known_hosts"
+          ssh-keyscan -p 22 54.37.13.40 >> "$HOME/.ssh/known_hosts"
           chmod 644 "$HOME/.ssh/known_hosts"
 
       - name: 🛡️ Deploy to Production
         timeout-minutes: 6
         run: |
-          ssh -p 22 -o StrictHostKeyChecking=no kitsui@77.37.87.26 bash -s <<'EOF'
+          ssh -p 22 -o StrictHostKeyChecking=no debian@54.37.13.40 bash -s <<'EOF'
           set -euo pipefail
           export LC_ALL=C.UTF-8
           export LANG=C.UTF-8
