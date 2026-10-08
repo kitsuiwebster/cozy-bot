@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.1] - 2026-10-08
+
+### Changed
+
+- The site background is now a faint, distant rain behind a window instead of blurred lights, with fewer drops on the glass that slide down more naturally.
+- The Stats page shows eight sound affinities instead of six.
+- Long listening totals on the Stats page read in years and days (for example "3y 113d").
+
+### Fixed
+
+- The Levels chart on the Stats page is as tall as the Longest streaks list next to it.
+- The "Other" slice of the sound chart no longer shows a cut-off sound count.
+- The scrollbar of the user profile no longer overlaps its rounded corners.
+
 ## [2.3.0] - 2026-10-08
 
 ### Added
