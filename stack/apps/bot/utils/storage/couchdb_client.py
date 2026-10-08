@@ -20,6 +20,11 @@ class CouchDBClient:
 
     def __init__(self):
         self.host = os.getenv('COUCHDB_HOST', 'http://couchdb:5984')
+        # Last payload written (or loaded) per user, so unchanged users are not
+        # rewritten. Every rewrite adds a revision, and rewriting all users on
+        # each save is what bloated the database and fed the compaction loop.
+        self._saved_user_sigs: Dict[str, str] = {}
+        self._saved_user_lock = threading.Lock()
         self.user = os.getenv('COUCHDB_USER', 'admin')
         self.password = os.getenv('COUCHDB_PASSWORD')
 
@@ -328,17 +333,43 @@ class CouchDBClient:
 
     # Cozy Points operations
 
+    @staticmethod
+    def _user_signature(stats: Dict) -> Optional[str]:
+        try:
+            return json.dumps(stats, sort_keys=True, default=str)
+        except Exception:
+            # Mutated concurrently by the event loop: treat as changed.
+            return None
+
+    def forget_saved_user(self, user_id: str) -> None:
+        """Force the next save_user_data to rewrite this user (after a failed write)."""
+        with self._saved_user_lock:
+            self._saved_user_sigs.pop(user_id, None)
+
     def load_user_data(self) -> Dict:
         """Load all user gamification data"""
-        return self.get_documents_by_prefix('user:')
+        users = self.get_documents_by_prefix('user:')
+        sigs = {uid: self._user_signature(stats) for uid, stats in users.items()}
+        with self._saved_user_lock:
+            self._saved_user_sigs.update({uid: sig for uid, sig in sigs.items() if sig})
+        return users
 
     def save_user_data(self, user_data: Dict) -> bool:
-        """Save all user gamification data"""
+        """Save user gamification data, skipping users unchanged since their last save or load"""
         try:
-            for user_id, stats in user_data.items():
+            for user_id, stats in list(user_data.items()):
                 doc = stats.copy()
+                sig = self._user_signature(doc)
+                with self._saved_user_lock:
+                    if sig is not None and self._saved_user_sigs.get(user_id) == sig:
+                        continue
+                    if sig is None:
+                        self._saved_user_sigs.pop(user_id, None)
+                    else:
+                        self._saved_user_sigs[user_id] = sig
                 doc['type'] = 'user'
-                self.save_document(self.db, f'user:{user_id}', doc)
+                if not self.save_document(self.db, f'user:{user_id}', doc):
+                    self.forget_saved_user(user_id)
             return True
         except Exception as e:
             logging.error(f"❌ Failed to save user data: {e}")
@@ -546,7 +577,9 @@ class _CouchDBWriteWorker:
             if not item:
                 continue
             db, doc_id, data = item
-            self._client._save_document_sync(db, doc_id, data)
+            if not self._client._save_document_sync(db, doc_id, data) and doc_id.startswith('user:'):
+                # Let the next save retry this user instead of assuming it landed.
+                self._client.forget_saved_user(doc_id[len('user:'):])
 
 
 class _NullCouchDBClient:
