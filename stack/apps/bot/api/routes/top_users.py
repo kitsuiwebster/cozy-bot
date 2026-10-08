@@ -3,6 +3,7 @@ from typing import List, Optional
 import sys
 import os
 import json
+import asyncio
 import logging
 from pydantic import BaseModel
 
@@ -13,6 +14,7 @@ MAX_TOP_LIMIT = 1000
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from cogs.stats.gamification import cozy_gamification
+from api.ttl_cache import TTLCache
 
 # Initialize FastAPI router for user stats endpoints
 router = APIRouter()
@@ -39,8 +41,10 @@ class TopUsersResponse(BaseModel):
     users: List[UserStats]
     total_count: int
 
-# Load cozy points data from CouchDB
-def load_cozy_points_data():
+# Leaderboard data moves slowly; cache it so each page load doesn't hit CouchDB
+_read_cache = TTLCache(ttl_seconds=60)
+
+def _fetch_cozy_points_data():
     try:
         from utils.storage.couchdb_client import get_couchdb_client
         db = get_couchdb_client()
@@ -48,14 +52,21 @@ def load_cozy_points_data():
     except Exception:
         return {}
 
-# Load usernames cache from CouchDB
-def load_usernames_data():
+def _fetch_usernames_data():
     try:
         from utils.storage.couchdb_client import get_couchdb_client
         db = get_couchdb_client()
         return db.load_usernames()
     except Exception:
         return {}
+
+# Load cozy points data from CouchDB (cached, read-only: never write it back)
+def load_cozy_points_data():
+    return _read_cache.get_or_load("user", _fetch_cozy_points_data)
+
+# Load usernames cache from CouchDB (cached, read-only: never write it back)
+def load_usernames_data():
+    return _read_cache.get_or_load("username", _fetch_usernames_data)
 
 # Convert seconds to human-readable listening time format
 def format_listening_time(total_seconds: float) -> str:
@@ -138,7 +149,7 @@ class TopSoundsResponse(BaseModel):
 @router.get("/top-sounds", response_model=TopSoundsResponse)
 async def get_top_sounds(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
-        user_data = load_cozy_points_data()
+        user_data = await asyncio.to_thread(load_cozy_points_data)
         
         # Aggregate all sound data across users
         sound_aggregates = {}
@@ -213,8 +224,8 @@ def get_current_streak_from_stats(user_stats: dict) -> int:
 async def get_top_users(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         # Load data directly from the same JSON files the bot uses
-        user_data_raw = load_cozy_points_data()
-        usernames_data = load_usernames_data()
+        user_data_raw = await asyncio.to_thread(load_cozy_points_data)
+        usernames_data = await asyncio.to_thread(load_usernames_data)
         
         if not user_data_raw:
             return TopUsersResponse(users=[], total_count=0)
@@ -323,8 +334,8 @@ async def get_user_profile(username: str):
         from datetime import date, datetime, timezone
 
         # Load data
-        user_data_raw = load_cozy_points_data()
-        usernames_data = load_usernames_data()
+        user_data_raw = await asyncio.to_thread(load_cozy_points_data)
+        usernames_data = await asyncio.to_thread(load_usernames_data)
 
         # Find user by username
         user_id = None

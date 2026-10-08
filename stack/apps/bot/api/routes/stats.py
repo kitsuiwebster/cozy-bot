@@ -7,9 +7,13 @@ import asyncio
 import logging
 import urllib.request
 from utils.storage.couchdb_client import get_couchdb_client
+from api.ttl_cache import TTLCache
 
 # Initialize FastAPI router for stats endpoints
 router = APIRouter()
+
+# Slow-moving, read-only data for the public stats endpoint
+_read_cache = TTLCache(ttl_seconds=60)
 
 # Response model for total stats endpoint
 class TotalStats(BaseModel):
@@ -68,10 +72,13 @@ async def get_total_stats():
         # Try CouchDB for baseline totals (works even when bot is in another process)
         try:
             db = get_couchdb_client()
-            servernames = db.load_servernames()
+            # Server names move slowly: cached. Live stats are not, they must stay fresh.
+            servernames = await asyncio.to_thread(
+                _read_cache.get_or_load, "servername", db.load_servernames
+            )
             total_servers = len(servernames)
             if not live_stats:
-                live_stats = db.load_live_stats() or {}
+                live_stats = await asyncio.to_thread(db.load_live_stats) or {}
         except Exception:
             total_servers = 0
             if not live_stats:

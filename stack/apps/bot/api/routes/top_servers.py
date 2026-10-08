@@ -2,8 +2,11 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import json
 import os
+import asyncio
 import logging
 from pydantic import BaseModel
+
+from api.ttl_cache import TTLCache
 
 # Cap user-supplied list sizes to prevent unbounded responses
 MAX_TOP_LIMIT = 1000
@@ -24,8 +27,10 @@ class TopServersResponse(BaseModel):
     servers: List[ServerStats]
     total_count: int
 
-# Load voice channel usage statistics from CouchDB
-def load_voice_time_data():
+# Leaderboard data moves slowly; cache it so each page load doesn't hit CouchDB
+_read_cache = TTLCache(ttl_seconds=60)
+
+def _fetch_voice_time_data():
     try:
         from utils.storage.couchdb_client import get_couchdb_client
         db = get_couchdb_client()
@@ -33,14 +38,21 @@ def load_voice_time_data():
     except Exception:
         return {}
 
-# Load server names cache from CouchDB
-def load_servernames_data():
+def _fetch_servernames_data():
     try:
         from utils.storage.couchdb_client import get_couchdb_client
         db = get_couchdb_client()
         return db.load_servernames()
     except Exception:
         return {}
+
+# Load voice channel usage statistics from CouchDB (cached, read-only: never write it back)
+def load_voice_time_data():
+    return _read_cache.get_or_load("voice_time", _fetch_voice_time_data)
+
+# Load server names cache from CouchDB (cached, read-only: never write it back)
+def load_servernames_data():
+    return _read_cache.get_or_load("servername", _fetch_servernames_data)
 
 # Convert seconds to human-readable duration format
 def format_time(total_seconds: int) -> str:
@@ -54,8 +66,8 @@ def format_time(total_seconds: int) -> str:
 async def get_top_servers(limit: Optional[int] = Query(default=None, ge=1, le=MAX_TOP_LIMIT)):
     try:
         # Load voice time and server names data
-        guild_voice_time = load_voice_time_data()
-        servernames_data = load_servernames_data()
+        guild_voice_time = await asyncio.to_thread(load_voice_time_data)
+        servernames_data = await asyncio.to_thread(load_servernames_data)
         
         if not guild_voice_time:
             return TopServersResponse(servers=[], total_count=0)
