@@ -12,24 +12,40 @@ interface Drop {
   nextTrailGap: number;
   shrink: number;
   killed: boolean;
+  friction: number; // how fast a sliding drop is caught again (lower = shorter runs)
+  grip: number; // how readily a heavy drop lets go of the glass
+}
+
+interface Streak {
+  x: number;
+  y: number;
+  length: number;
+  speed: number;
+  alpha: number;
+  width: number;
 }
 
 // Tuning. Radii are in CSS pixels.
 const MIN_R = 2;
 const MAX_R = 17;
 const SLIDE_R = 8; // drops smaller than this stay stuck to the glass
-const MAX_DROPS = 220;
-const SPAWN_PER_FRAME = 0.6;
+const MAX_DROPS = 150;
+const SPAWN_PER_FRAME = 0.4;
 const MIST_PER_FRAME = 4;
 const MIST_FADE_EVERY = 45; // frames
 const REFRACTION = 2.6; // how much of the scene each drop "sees", relative to its size
 const STATIC_WARMUP_FRAMES = 420;
 const SLOW_FRAME_MS = 30;
+// Distant rain behind the pane: streaks per screen pixel, and the slant
+// (horizontal px per vertical px) the wind gives them.
+const STREAK_DENSITY = 1 / 9000;
+const WIND = 0.12;
 
-// Window-pane background shared by every page: out-of-focus lights behind the
-// glass (rendered once) and water drops on it that cling, grow, merge and slide
-// down in irregular bursts, leaving trails and wiping the mist. Each drop
-// refracts an inverted view of the lights, like a real water lens. Touch
+// Window-pane background shared by every page: a dark night with faint, distant
+// rain behind the glass, and water drops on the pane that cling, grow, merge
+// and slide down in irregular bursts (some race down, most stop short),
+// leaving trails and wiping the mist. Each drop refracts an inverted view of
+// the scene behind it, like a real water lens. Touch
 // devices and reduced-motion users get a single still frame; on desktop the
 // animation lightens itself, then freezes, if it cannot hold a smooth framerate.
 @Component({
@@ -73,6 +89,8 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
   private mistCtx!: CanvasRenderingContext2D;
   private refractSource!: HTMLCanvasElement; // the scene, flipped on both axes
   private dropSprite!: HTMLCanvasElement; // rim shading + highlights, drawn over the refraction
+  private streakSprite!: HTMLCanvasElement;
+  private streaks: Streak[] = [];
 
   private readonly onResize = () => {
     clearTimeout(this.resizeTimer);
@@ -93,6 +111,7 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
       this.dropSprite = this.buildDropSprite();
+      this.streakSprite = this.buildStreakSprite();
       this.setup();
       window.addEventListener('resize', this.onResize, { passive: true });
       document.addEventListener('visibilitychange', this.onVisibility);
@@ -127,6 +146,7 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
     this.refractSource = this.flip(sharpScene);
 
     this.drops = [];
+    this.streaks = Array.from({ length: Math.round(this.width * this.height * STREAK_DENSITY) }, () => this.newStreak(true));
     this.frame = 0;
     this.slowFrames = 0;
     this.maxDrops = Math.round(MAX_DROPS * Math.min(1, (this.width * this.height) / (1600 * 900)));
@@ -176,16 +196,12 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
     return canvas;
   }
 
-  // Out-of-focus lights behind the glass. Returns a less blurred copy, which
-  // is what the drops refract (a lens sees the scene sharper than the eye
-  // focused on the pane does).
+  // The night behind the glass: the site background with two soft glows.
+  // Returns a less blurred, brighter copy, which is what the drops refract
+  // (a lens sees the scene sharper than the eye focused on the pane does).
   private paintScene(target: HTMLCanvasElement): HTMLCanvasElement {
     const css = getComputedStyle(document.documentElement);
     const bg = css.getPropertyValue('--color-bg').trim() || '#0f1419';
-    const accent = css.getPropertyValue('--color-accent-rgb').trim() || '168, 85, 247';
-    const accent2 = css.getPropertyValue('--color-accent-2-rgb').trim() || '6, 182, 212';
-    const palette = [accent, accent, accent2, accent2, '255, 119, 198', '245, 158, 11', '199, 210, 254'];
-
     const lights = this.sizeCanvas(document.createElement('canvas'));
     const ctx = lights.getContext('2d')!;
     const w = this.width;
@@ -194,25 +210,6 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
     ctx.fillRect(0, 0, w, h);
     this.glow(ctx, w * 0.2, h * 0.8, Math.max(w, h) * 0.5, `rgba(120, 119, 198, 0.3)`);
     this.glow(ctx, w * 0.8, h * 0.2, Math.max(w, h) * 0.5, `rgba(255, 119, 198, 0.15)`);
-
-    const count = Math.round(18 + (w * h) / 42000);
-    for (let i = 0; i < count; i++) {
-      const rgb = palette[Math.floor(Math.random() * palette.length)];
-      const r = 14 + Math.pow(Math.random(), 1.8) * 85;
-      // Lights cluster towards the bottom half, like a street seen through a window.
-      const x = Math.random() * w;
-      const y = h * (0.15 + 0.85 * Math.pow(Math.random(), 0.7));
-      const a = 0.07 + Math.random() * 0.22;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, `rgba(${rgb}, ${a * 0.55})`);
-      g.addColorStop(0.82, `rgba(${rgb}, ${a * 0.75})`);
-      g.addColorStop(0.95, `rgba(${rgb}, ${a})`);
-      g.addColorStop(1, `rgba(${rgb}, 0)`);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
     const out = target.getContext('2d')!;
     out.save();
@@ -283,6 +280,35 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
     return c;
   }
 
+  // A streak of distant rain. Three depths: far ones are thin, faint and slow.
+  private newStreak(anywhere: boolean): Streak {
+    const depth = Math.random();
+    const length = 18 + depth * 46;
+    return {
+      // The wind shifts streaks right as they fall, so start some off-screen left.
+      x: -this.height * WIND + Math.random() * (this.width + this.height * WIND),
+      y: anywhere ? Math.random() * this.height : -length - Math.random() * this.height * 0.3,
+      length,
+      speed: 9 + depth * 16 + Math.random() * 3,
+      alpha: 0.035 + depth * 0.075,
+      width: 0.6 + depth * 0.9,
+    };
+  }
+
+  private buildStreakSprite(): HTMLCanvasElement {
+    const c = document.createElement('canvas');
+    c.width = 4;
+    c.height = 64;
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, 'rgba(210, 225, 255, 0)');
+    g.addColorStop(0.7, 'rgba(210, 225, 255, 0.9)');
+    g.addColorStop(1, 'rgba(210, 225, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 64);
+    return c;
+  }
+
   private newDrop(x: number, y: number, r: number): Drop {
     return {
       x, y, r,
@@ -294,6 +320,10 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
       nextTrailGap: 8 + Math.random() * 30,
       shrink: 0,
       killed: false,
+      // Mostly sticky drops with short runs; about one in eight finds a wet,
+      // slippery path and races down.
+      friction: Math.random() < 0.12 ? 0.975 + Math.random() * 0.015 : 0.88 + Math.random() * 0.08,
+      grip: 0.3 + Math.random() * 1.6,
     };
   }
 
@@ -312,6 +342,12 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
       spawn -= 1;
     }
 
+    for (let i = 0; i < this.streaks.length; i++) {
+      const st = this.streaks[i];
+      st.y += st.speed * k;
+      if (st.y > this.height + st.length) this.streaks[i] = this.newStreak(false);
+    }
+
     this.addMist(k);
 
     const fresh: Drop[] = [];
@@ -321,13 +357,13 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
       // Clinging drops occasionally give way; heavier drops give way more often
       // and in stronger bursts. Friction then catches them again: that stop-and-go
       // is what makes real drops look irregular.
-      if (d.r > SLIDE_R && Math.random() < ((d.r - SLIDE_R) / (MAX_R - SLIDE_R)) * 0.06 * k) {
-        d.momentum += Math.random() * (d.r / MAX_R) * 4;
+      if (d.r > SLIDE_R && Math.random() < ((d.r - SLIDE_R) / (MAX_R - SLIDE_R)) * 0.06 * d.grip * k) {
+        d.momentum += Math.random() * (d.r / MAX_R) * 4 * (Math.random() < 0.2 ? 2.5 : 1);
       }
       if (d.r > SLIDE_R && d.momentum > 0) {
         d.momentumX += (Math.random() - 0.5) * 0.35 * k;
       }
-      d.momentum *= Math.pow(0.94, k);
+      d.momentum *= Math.pow(d.friction, k);
       d.momentumX *= Math.pow(0.9, k);
       d.y += d.momentum * k;
       d.x += d.momentumX * k;
@@ -418,6 +454,17 @@ export class RainGlassComponent implements AfterViewInit, OnDestroy {
     const h = this.height;
     const dpr = this.dpr;
     ctx.clearRect(0, 0, w, h);
+
+    // Distant rain, slanted by the wind with a single shear for all streaks.
+    ctx.save();
+    ctx.transform(1, 0, WIND, 1, 0, 0);
+    for (const st of this.streaks) {
+      ctx.globalAlpha = st.alpha;
+      ctx.drawImage(this.streakSprite, st.x, st.y - st.length, st.width, st.length);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
     ctx.drawImage(this.mist, 0, 0, w, h);
 
     for (const d of this.drops) {
