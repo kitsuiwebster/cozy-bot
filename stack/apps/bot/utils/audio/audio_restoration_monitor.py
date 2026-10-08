@@ -68,7 +68,7 @@ class AudioRestorationMonitor:
         try:
             from utils.storage.couchdb_client import get_couchdb_client
             db = get_couchdb_client()
-            tasks = db.get_all_restore_tasks()
+            tasks = await asyncio.to_thread(db.get_all_restore_tasks)
             if not tasks:
                 return
 
@@ -81,36 +81,36 @@ class AudioRestorationMonitor:
                     sound_name = task_data.get('sound_name')
                     if not channel_id or not sound_name:
                         logging.warning(f"⚠️ Invalid restore task data for guild {task_id}, deleting task")
-                        db.delete_restore_task(task_id)
+                        await asyncio.to_thread(db.delete_restore_task, task_id)
                         continue
 
                     guild = self.bot.get_guild(guild_id)
                     if not guild:
                         logging.warning(f"⚠️ Guild {guild_id} not found for restore task")
-                        db.delete_restore_task(task_id)
+                        await asyncio.to_thread(db.delete_restore_task, task_id)
                         continue
 
                     channel = guild.get_channel(channel_id)
                     if not channel:
                         logging.warning(f"⚠️ Channel {channel_id} not found in {guild.name} for restore task")
-                        db.delete_restore_task(task_id)
+                        await asyncio.to_thread(db.delete_restore_task, task_id)
                         continue
 
                     current_users = [member for member in channel.members if not member.bot]
                     if not current_users and not is_always_on(guild.id):
                         logging.info(f"⏭️ Skipping restore for {guild.name} - no users in voice channel")
-                        db.delete_restore_task(task_id)
+                        await asyncio.to_thread(db.delete_restore_task, task_id)
                         continue
 
                     await self.restore_audio_in_channel(guild, channel, sound_name)
-                    db.delete_restore_task(task_id)
+                    await asyncio.to_thread(db.delete_restore_task, task_id)
                     logging.info(f"✅ Audio restoration task completed for {guild.name}")
 
                 except Exception as e:
                     logging.error(f"❌ Failed to process restore task {task_id}: {e}")
                     # Avoid infinite retries on bad tasks
                     try:
-                        db.delete_restore_task(task_id)
+                        await asyncio.to_thread(db.delete_restore_task, task_id)
                     except Exception:
                         pass
         except Exception as e:
