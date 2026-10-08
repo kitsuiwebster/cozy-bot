@@ -68,16 +68,16 @@ Replace the old version with the new one in all of these. They all must change t
 
 Do not touch `web/package.json` (its own `version` stays `0.0.0`; `karma-coverage` `~2.2.0` is a dependency, not our version).
 
-Then verify nothing was missed. This must print only CHANGELOG.md lines and the `karma-coverage` dependency:
+Then verify nothing was missed. This must print only CHANGELOG.md lines and npm dependencies that happen to share the number (`karma-coverage`, `tslib` in `web/package.json`):
 
 ```bash
-git grep -n -F 'OLD.VERSION' -- . ':!*.lock'
+git grep -n -F 'OLD.VERSION' -- . ':!*.lock' ':!.claude'
 ```
 
 And this must print exactly 11 lines, the version spots of the table above (`README.md` and `api/app.py` have 2 each):
 
 ```bash
-git grep -n -F 'NEW.VERSION' -- . ':!CHANGELOG.md' ':!*.lock' | grep -v karma-coverage
+git grep -n -F 'NEW.VERSION' -- . ':!CHANGELOG.md' ':!*.lock' ':!.claude' ':!web/package.json'
 ```
 
 If a new place showing the version was added since this skill was written, update it and add it to the table above in the same release.
