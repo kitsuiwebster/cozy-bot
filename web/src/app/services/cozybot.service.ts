@@ -102,6 +102,33 @@ export interface UserDetails {
   favorite_sound: string | null;
   listening_by_sound: UserListeningBySound[];
   current_sound: string | null;
+  points_top_percent?: number | null;
+  listening_top_percent?: number | null;
+  avg_session_seconds?: number | null;
+  achievement_rarity?: Record<string, { percent: number; tier: RarityTier }>;
+}
+
+export type RarityTier = 'common' | 'rare' | 'epic' | 'legendary';
+
+export interface CommunityStats {
+  total_users: number;
+  avg_session_seconds: number;
+  achievements: { name: string; count: number; percent: number; tier: RarityTier }[];
+  streaks: {
+    active: number;
+    week_plus: number;
+    month_plus: number;
+    top: { username: string; display_name: string; streak: number }[];
+  };
+  levels: { level: number; count: number }[];
+  affinities: { sound_a: string; sound_b: string; shared_users: number; percent_of_a: number }[];
+  peak: { listeners: number; date: string } | null;
+  new_users: {
+    available: boolean;
+    baseline_day: string | null;
+    before_baseline: number;
+    days: { date: string; count: number }[];
+  };
 }
 
 @Injectable({
@@ -145,6 +172,10 @@ export class CozybotService {
 
   getTopSounds(): Observable<SoundsResponse> {
     return this.http.get<SoundsResponse>(`${this.apiUrl}/top-sounds`);
+  }
+
+  getCommunityStats(): Observable<CommunityStats> {
+    return this.http.get<CommunityStats>(`${this.apiUrl}/community-stats`);
   }
 
   getListenersHistory(days = 400): Observable<ListenersHistoryResponse> {

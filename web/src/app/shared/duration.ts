@@ -10,3 +10,10 @@ export function formatDaysHours(totalSeconds: number): string {
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   return `${totalDays}d ${hours}h`;
 }
+
+// Format a shorter duration (a listening session): "1h 26m", or "45m" under an hour.
+export function formatHoursMinutes(totalSeconds: number): string {
+  const minutes = Math.round(totalSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}

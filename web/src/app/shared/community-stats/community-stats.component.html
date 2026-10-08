@@ -1,0 +1,121 @@
+<p *ngIf="failed" class="muted">Community stats are unavailable right now.</p>
+
+<ng-container *ngIf="stats as s">
+  <div class="content-section">
+    <div class="section-header">
+      <h2>Community</h2>
+    </div>
+    <div class="tiles">
+      <div class="tile">
+        <div class="tile-value">{{ duration(s.avg_session_seconds) }}</div>
+        <div class="tile-label">Average session</div>
+      </div>
+      <div class="tile" *ngIf="s.peak">
+        <div class="tile-value">{{ s.peak.listeners }}</div>
+        <div class="tile-label">All-time peak listeners</div>
+        <div class="tile-sub">{{ date(s.peak.date) }}</div>
+      </div>
+      <div class="tile">
+        <div class="tile-value">{{ s.streaks.active }}</div>
+        <div class="tile-label">Active streaks</div>
+      </div>
+      <div class="tile">
+        <div class="tile-value">{{ s.streaks.week_plus }}</div>
+        <div class="tile-label">Streaks of 7+ days</div>
+      </div>
+      <div class="tile">
+        <div class="tile-value">{{ s.streaks.month_plus }}</div>
+        <div class="tile-label">Streaks of 30+ days</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-section">
+    <div class="section-header">
+      <h2>New listeners per day</h2>
+    </div>
+    <div class="card">
+      <ng-container *ngIf="s.new_users.available && newUserBars.length; else newUsersPending">
+        <div class="new-users-summary">
+          <strong>{{ newUserTotal }}</strong> new listeners since {{ date(s.new_users.baseline_day) }}
+          <span class="muted" *ngIf="s.new_users.before_baseline">
+            (plus {{ s.new_users.before_baseline }} who were already here)
+          </span>
+        </div>
+        <svg class="bars" [attr.viewBox]="'0 0 100 ' + chartHeight" preserveAspectRatio="none" role="img"
+             aria-label="New listeners per day">
+          <rect *ngFor="let b of newUserBars" [attr.x]="b.x * 100" [attr.y]="chartHeight - b.height"
+                [attr.width]="barWidth()" [attr.height]="b.height" rx="0.3">
+            <title>{{ date(b.date) }}: {{ b.count }}</title>
+          </rect>
+        </svg>
+        <div class="axis">
+          <span>{{ date(newUserBars[0].date) }}</span>
+          <span>{{ date(newUserBars[newUserBars.length - 1].date) }}</span>
+        </div>
+      </ng-container>
+      <ng-template #newUsersPending>
+        <p class="muted">We are rebuilding this history from our daily backups. It will show up here soon.</p>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="content-section">
+    <div class="section-header">
+      <h2>Achievement rarity</h2>
+    </div>
+    <div class="card rarity-list">
+      <div class="rarity-row" *ngFor="let a of s.achievements">
+        <span class="rarity-name">{{ a.name }}</span>
+        <span class="rarity-bar"><span [style.width.%]="(a.percent / maxAchievementPercent) * 100" [ngClass]="'tier-' + a.tier"></span></span>
+        <span class="rarity-percent">{{ percent(a.percent) }}%</span>
+        <span class="tier-chip" [ngClass]="'tier-' + a.tier">{{ a.tier }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-section two-columns">
+    <div>
+      <div class="section-header">
+        <h2>Longest streaks</h2>
+      </div>
+      <div class="card">
+        <ol class="streak-list" *ngIf="s.streaks.top.length; else noStreaks">
+          <li *ngFor="let u of s.streaks.top; let i = index">
+            <span class="streak-rank">{{ i + 1 }}</span>
+            <span class="streak-name" [title]="u.username">{{ u.display_name }}</span>
+            <span class="streak-days">🔥 {{ u.streak }}</span>
+          </li>
+        </ol>
+        <ng-template #noStreaks><p class="muted">No active streak right now.</p></ng-template>
+      </div>
+    </div>
+    <div>
+      <div class="section-header">
+        <h2>Levels</h2>
+      </div>
+      <div class="card">
+        <div class="levels">
+          <div class="level-col" *ngFor="let l of s.levels" [title]="'Level ' + l.level + ': ' + l.count">
+            <span class="level-count">{{ l.count || '' }}</span>
+            <span class="level-bar" [style.height.%]="l.count ? Math.max(2, (l.count / maxLevelCount) * 100) : 0"></span>
+            <span class="level-number">{{ l.level }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-section" *ngIf="s.affinities.length">
+    <div class="section-header">
+      <h2>Sound affinities</h2>
+    </div>
+    <div class="affinities">
+      <div class="card affinity" *ngFor="let a of s.affinities">
+        <div class="affinity-pair"><span>{{ a.sound_a }}</span><span class="plus">+</span><span>{{ a.sound_b }}</span></div>
+        <div class="affinity-text">{{ percent(a.percent_of_a) }}% of {{ a.sound_a }} listeners also love {{ a.sound_b }}</div>
+        <div class="muted small">{{ a.shared_users }} listeners</div>
+      </div>
+    </div>
+  </div>
+</ng-container>

@@ -8,11 +8,12 @@ import { LeaderboardHeaderComponent } from '../../shared/leaderboard-header/lead
 import { ListenerChartComponent } from '../../shared/listener-chart/listener-chart.component';
 import { CssPieChartComponent } from '../../shared/css-pie/css-pie-chart.component';
 import { CssPie, buildSoundsPie, buildCategoryPie } from '../../shared/css-pie/css-pie';
+import { CommunityStatsComponent } from '../../shared/community-stats/community-stats.component';
 
 @Component({
   selector: 'app-stats',
   standalone: true,
-  imports: [CommonModule, LeaderboardHeaderComponent, ListenerChartComponent, CssPieChartComponent],
+  imports: [CommonModule, LeaderboardHeaderComponent, ListenerChartComponent, CssPieChartComponent, CommunityStatsComponent],
   templateUrl: './stats.component.html',
   styleUrls: ['./stats.component.scss'],
 })
@@ -37,7 +38,7 @@ export class StatsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.titleService.setTitle('Stats - CozyBot Discord Bot');
     this.setFavicon('assets/images/cozybot/cozybot-logo3.png');
-    this.metaService.updateTag({ name: 'description', content: 'CozyBot listening activity over time and sound analytics.' });
+    this.metaService.updateTag({ name: 'description', content: 'CozyBot listening activity over time, sound analytics and community stats.' });
 
     this.loadListeners();
     this.loadSounds();

@@ -1,0 +1,297 @@
+:host {
+  display: block;
+}
+
+.content-section {
+  margin-top: 24px;
+
+  .section-header h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    margin: 0 0 16px 0;
+  }
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.muted {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  margin: 0;
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+// Headline tiles
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 18px 16px;
+  text-align: center;
+
+  .tile-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .tile-label {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  }
+
+  .tile-sub {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  }
+}
+
+// New listeners per day
+.new-users-summary {
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.bars {
+  display: block;
+  width: 100%;
+  height: 140px;
+
+  rect {
+    fill: rgb(var(--color-accent-2-rgb));
+    opacity: 0.85;
+  }
+
+  rect:hover {
+    opacity: 1;
+    fill: rgb(var(--color-accent-rgb));
+  }
+}
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+}
+
+// Rarity tiers: shared by bars and chips
+$tiers: (
+  common: rgba(148, 163, 184, 0.7),
+  rare: var(--color-accent-2),
+  epic: var(--color-accent),
+  legendary: var(--color-amber),
+);
+
+.rarity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rarity-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 1fr 64px 92px;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.rarity-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+
+  span {
+    display: block;
+    height: 100%;
+    min-width: 3px;
+    border-radius: var(--radius-pill);
+  }
+}
+
+.rarity-percent {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.tier-chip {
+  justify-self: start;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+}
+
+@each $tier, $color in $tiers {
+  .rarity-bar span.tier-#{$tier} {
+    background: $color;
+  }
+  .tier-chip.tier-#{$tier} {
+    color: $color;
+  }
+}
+
+// Streaks and levels side by side
+.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+// Grid items default to min-width: auto, so a long (ellipsized) name would
+// widen the column past the screen on mobile.
+.two-columns > div {
+  min-width: 0;
+}
+
+.streak-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--color-text);
+  }
+
+  li:last-child {
+    border-bottom: none;
+  }
+
+  .streak-rank {
+    font-family: var(--font-mono);
+    color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  }
+
+  .streak-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .streak-days {
+    font-weight: 700;
+  }
+}
+
+.levels {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 260px;
+}
+
+.level-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+
+.level-count {
+  font-size: 0.6rem;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  margin-bottom: 4px;
+}
+
+.level-bar {
+  width: 100%;
+  max-height: calc(100% - 40px);
+  border-radius: 4px 4px 0 0;
+  background: var(--gradient-brand);
+}
+
+.level-number {
+  margin-top: 6px;
+  font-size: 0.65rem;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+}
+
+// Sound affinities
+.affinities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.affinity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .affinity-pair {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.4rem;
+
+    .plus {
+      font-size: 1rem;
+      color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+    }
+  }
+
+  .affinity-text {
+    font-size: 0.9rem;
+    color: var(--color-text);
+  }
+}
+
+@media (max-width: 768px) {
+  .two-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .rarity-row {
+    grid-template-columns: 1fr 64px;
+    row-gap: 6px;
+
+    .rarity-bar {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .tier-chip {
+      display: none;
+    }
+  }
+
+  .levels {
+    height: 200px;
+  }
+}
